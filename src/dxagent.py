@@ -38,7 +38,8 @@ class DXAgent(IOManager):
       self.scheduler = sched.scheduler()
       
       self.top = 0 
-      self.page = 0
+      self.screen = 0
+      self.max_screens = 2
       self.max_lines = 2**10      
 
       self._data = {}
@@ -245,21 +246,25 @@ class DXAgent(IOManager):
       self.scheduler.enter(1,0,self.process)
 
    def _format_attrs(self, category):
-      self.pad.addstr(category+"\n", curses.A_BOLD)
+      self.pad_raw_input.addstr(category+"\n", curses.A_BOLD)
       for e in self._data[category]:
-         self.pad.addstr(e[0]+": ")
-         self.pad.addstr(" ".join(e[1:])+" ")
-      self.pad.addstr("\n")
-      self.pad.addstr("\n")
+         self.pad_raw_input.addstr(e[0]+": ")
+         self.pad_raw_input.addstr(" ".join(e[1:])+" ")
+      self.pad_raw_input.addstr("\n")
+      self.pad_raw_input.addstr("\n")
 
    def _format_attrs_list(self, category):
-      self.pad.addstr(category+"\n", curses.A_BOLD)
+      self.pad_raw_input.addstr(category+"\n", curses.A_BOLD)
       for l in self._data[category]:
          for e in l:
-            self.pad.addstr(e[0]+": ")
-            self.pad.addstr(" ".join(e[1:])+" ")
-         self.pad.addstr("\n")
-      self.pad.addstr("\n")
+            self.pad_raw_input.addstr(e[0]+": ")
+            self.pad_raw_input.addstr(" ".join(e[1:])+" ")
+         self.pad_raw_input.addstr("\n")
+      self.pad_raw_input.addstr("\n")
+
+   def _center_text(self, pad, text, *args):
+      padding = int((self.width-len(text))/2)
+      pad.addstr(padding*" "+text, *args)
 
    def _format(self):
       """
@@ -268,15 +273,15 @@ class DXAgent(IOManager):
       """
 
       self.height, self.width = self.window.getmaxyx()
-      self.pad = curses.newpad(self.max_lines, self.width)
+      self.pad_raw_input = curses.newpad(self.max_lines, self.width)
 
-      self.pad.addstr("RAW INPUT\n")
-   
-      self.pad.addstr("System:\n\n")
-      self.pad.addstr(str(self.sysinfo)+"\n")
-
-      self.pad.addstr("\nBareMetal:\n\n")
-      self.pad.addstr("bm_ifs: "+" ".join(self._data["bm_ifs"])+"\n\n")
+      self._center_text(self.pad_raw_input, "RAW INPUT   \n",
+                        curses.A_BOLD)
+                         
+      self.pad_raw_input.addstr("System:\n\n", curses.A_BOLD)
+      self.pad_raw_input.addstr(str(self.sysinfo)+"\n")
+      self.pad_raw_input.addstr("\nBareMetal:\n\n", curses.A_BOLD)
+      self.pad_raw_input.addstr("bm_ifs: "+" ".join(self._data["bm_ifs"])+"\n\n")
 
       self._format_attrs("uptime")
       self._format_attrs("loadavg")
@@ -291,6 +296,13 @@ class DXAgent(IOManager):
       self._format_attrs_list("rt-cache")
       self._format_attrs_list("ndisc-cache")
 
+      self.pad_health_metrics = curses.newpad(self.max_lines, self.width)
+      self._center_text(self.pad_health_metrics, "HEALTH\n\n",
+                        curses.A_BOLD) #, 
+
+      self.pad_health_metrics.addstr("Metrics\n\n", curses.A_BOLD)
+      self.pad_health_metrics.addstr("Symptoms\n\n", curses.A_BOLD)
+
    def _display(self):
       """
       refresh the display and reschedule itself
@@ -298,7 +310,11 @@ class DXAgent(IOManager):
       """
 
       self.height, self.width = self.window.getmaxyx()
-      self.pad.refresh(self.top, 0, 0, 0, self.height-1, self.width-1)
+
+      if self.screen == 0:
+         self.pad_raw_input.refresh(self.top, 0, 0, 0, self.height-1, self.width-1)
+      elif self.screen == 1:
+         self.pad_health_metrics.refresh(0, 0, 0, 0, self.height-1, self.width-1)
       self.scheduler.enter(0.1,1,self._display)
 
    def start_gui(self):
@@ -316,7 +332,8 @@ class DXAgent(IOManager):
       self.window.refresh()
 
       self.height, self.width = self.window.getmaxyx()
-      self.pad = curses.newpad(2**10, self.width)
+      self.pad_raw_input = curses.newpad(2**10, self.width)
+      self.pad_health_metrics = curses.newpad(2**10, self.width)
 
    def stop_gui(self):
       self.window.keypad(False)
@@ -335,6 +352,9 @@ class DXAgent(IOManager):
          self.top -= min(self.height-1,self.top)
       elif direction == self.DOWN and (self.top < self.max_lines-self.height-1):
          self.top += min(self.height-1,self.max_lines-self.top-self.height)
+
+   def switch_screen(self, direction):
+      self.screen = (self.screen+direction) % self.max_screens
 
    def run(self):
       """
@@ -361,9 +381,9 @@ class DXAgent(IOManager):
                elif c == curses.KEY_NPAGE:
                    self.paging(self.DOWN)
                elif c == curses.KEY_LEFT:
-                   pass
+                   self.switch_screen(self.UP)
                elif c == curses.KEY_RIGHT:
-                   pass
+                   self.switch_screen(self.DOWN)
                c = self.window.getch()
  
             self.scheduler.run(blocking=False)
