@@ -325,10 +325,13 @@ class DXAgent(IOManager):
       self.window.keypad(True)
       os.environ.setdefault('ESCDELAY', '25')
       self.window.nodelay(True)
+      curses.curs_set(0)
       
       curses.start_color()
-      curses.init_pair(1, curses.COLOR_CYAN, curses.COLOR_BLACK)
-      curses.init_pair(2, curses.COLOR_BLACK, curses.COLOR_CYAN)
+      curses.init_color(10, 1000, 700, 0)
+      curses.init_pair(1, 10, curses.COLOR_BLACK)
+      curses.init_pair(2, curses.COLOR_RED, curses.COLOR_BLACK)
+      
       self.window.refresh()
 
       self.height, self.width = self.window.getmaxyx()
