@@ -11,6 +11,7 @@ import os
 import sched
 import curses
 import time
+import string
 
 from agent.ios import IOManager
 from agent.sysinfo import SysInfo
@@ -40,13 +41,37 @@ class DXAgent(IOManager):
       self.top = 0 
       self.screen = 0
       self.max_screens = 2
-      self.max_lines = 2**10      
+      self.max_lines = 2**12  
 
       self._data = {}
 
    def _process_proc_meminfo(self):
       with open("/proc/meminfo", 'r') as f:
          self._data["meminfo"] = [tuple(e.rstrip(':') for e in l.rstrip().split()) for l in f.readlines()]
+
+   def _process_proc_stats(self):
+      attr_names = [ "pid", "comm", "state", "ppid", "pgrp", "sid",
+                     "tty_nr", "tty_pgrp", "flags", "min_flt", "cmin_flt",
+                     "maj_flt", "cmaj_flt", "utime", "stime", "cutime",
+                     "cstime", "priority", "nice", "num_threads", "itrealvalue",
+                     "starttime", "vsize", "rss", "rsslim", "startcode",
+                     "endcode", "startstack", "kstk_esp", "kstk_eip", "signal",
+                     "blocked", "sigignore", "sigcatch", "wchan", "nswap",
+                     "cnswap", "exit_signal", "processor", "rt_priority",
+                     "policy", "delayacct_blkio_ticks", "gtime", 
+                     "cgtime"]
+      self._data["stats"] = []
+      root_dir = "/proc/"
+      for d in next(os.walk(root_dir))[1]:
+
+         # not a proc
+         if not d.isdigit():
+            continue
+
+         path = root_dir+d+"/stat"
+         with open(path, 'r') as f:
+            
+            self._data["stats"].append([(attr_names[i], e) for i,e in enumerate(f.readline().rstrip().split()[:len(attr_names)])])
 
    def _process_proc_stat(self):
       attr_names = ["cpu", "user", "nice", "system", "idle", "iowait",
@@ -208,6 +233,7 @@ class DXAgent(IOManager):
       """
       self._process_proc_meminfo()
       self._process_proc_stat()
+      self._process_proc_stats()
       self._process_proc_loadavg()
       self._process_proc_swaps()
       self._process_proc_uptime()
@@ -282,6 +308,7 @@ class DXAgent(IOManager):
       self.pad_raw_input.addstr(str(self.sysinfo)+"\n")
       self.pad_raw_input.addstr("\nBareMetal:\n\n", curses.A_BOLD)
       self.pad_raw_input.addstr("bm_ifs: "+" ".join(self._data["bm_ifs"])+"\n\n")
+      self.pad_raw_input.addstr("proc_count: {}\n\n".format(len(self._data["stats"])))
 
       self._format_attrs("uptime")
       self._format_attrs("loadavg")
@@ -295,6 +322,7 @@ class DXAgent(IOManager):
       self._format_attrs_list("arp-cache")
       self._format_attrs_list("rt-cache")
       self._format_attrs_list("ndisc-cache")
+      self._format_attrs_list("stats")
 
       self.pad_health_metrics = curses.newpad(self.max_lines, self.width)
       self._center_text(self.pad_health_metrics, "HEALTH\n\n",
@@ -335,8 +363,8 @@ class DXAgent(IOManager):
       self.window.refresh()
 
       self.height, self.width = self.window.getmaxyx()
-      self.pad_raw_input = curses.newpad(2**10, self.width)
-      self.pad_health_metrics = curses.newpad(2**10, self.width)
+      self.pad_raw_input = curses.newpad(self.max_lines, self.width)
+      self.pad_health_metrics = curses.newpad(self.max_lines, self.width)
 
    def stop_gui(self):
       self.window.keypad(False)
