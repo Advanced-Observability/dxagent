@@ -12,8 +12,8 @@ import sched
 import curses
 import time
 
-from ios import IOManager
-from sysinfo import SysInfo
+from agent.ios import IOManager
+from agent.sysinfo import SysInfo
 
 ESCAPE = 27
 
