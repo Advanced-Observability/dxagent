@@ -10,6 +10,7 @@ import sys
 import os
 import sched
 import curses
+import time
 
 from ios import IOManager
 from sysinfo import SysInfo
@@ -28,9 +29,6 @@ class DXAgent(IOManager):
    DOWN = 1
 
    def __init__(self):
-      """
-
-      """
       super(DXAgent, self).__init__(self)
       self.load_ios()
       self.sysinfo = SysInfo()
@@ -38,10 +36,12 @@ class DXAgent(IOManager):
       self.msec_per_jiffy = os.sysconf(os.sysconf_names['SC_CLK_TCK'])
       self.info(self.sysinfo)
       self.scheduler = sched.scheduler()
+      
+      self.top = 0 
+      self.page = 0
+      self.max_lines = 2**10      
+
       self._data = {}
-      self._formatted_data = []
-      self.top = 0
-      self.max_lines = 10      
 
    def _process_proc_meminfo(self):
       with open("/proc/meminfo", 'r') as f:
@@ -167,6 +167,8 @@ class DXAgent(IOManager):
 
    def _input(self):
       """
+      parse input from
+
       /proc/<PID>/stat
       /proc/stat + stat/cpu k
       /proc/meminfo k
@@ -196,19 +198,9 @@ class DXAgent(IOManager):
 
       /proc/net/arp
       /proc/net/route
-
-
-       with ProtectedAccess('environ', "read process environment"):
-            with open(os.path.join(self.proc_tree, 'environ')) as handle:
-                contents = handle.read()
-            if contents:
-                for token in contents.split('\0'):
-                    name, _, value = token.partition('=')
-                    if name:
-                        variables[name] = value
-        return variables
       """
-      self.height, self.width = self.window.getmaxyx()
+      
+
       """
       baremetal health: Linux
 
@@ -242,29 +234,15 @@ class DXAgent(IOManager):
       """
 
    def process(self):
+      """
+      read input data, process and format it for
+      displaying. re-schedule itself.
+
+      """
+
       self._input()
       self._format()
-      self._display()
-
-#   def _format_string(self, str, attr=None):
-#      """
-#      format strings to fit in console
-#      """
-#      if not self._formatted_data:
-#         return
-
-#      idx=0
-#      while idx < len(str):
-#         # fill last line
-#         if not self._formatted_data[-1].endswith("\n") and len(self._formatted_data[-1]) < self.width:
-#            space_left = self.width-len(self._formatted_data[-1])
-#            self._formatted_data[-1] += str[idx:idx+space_left]
-#            idx += space_left
-#         
-#         # write new line
-#         else:
-#            self._formatted_data.append(str[idx:idx+self.width])
-#            idx += self.width
+      self.scheduler.enter(1,0,self.process)
 
    def _format_attrs(self, category):
       self.pad.addstr(category+"\n", curses.A_BOLD)
@@ -284,8 +262,13 @@ class DXAgent(IOManager):
       self.pad.addstr("\n")
 
    def _format(self):
+      """
+      format data for displaying
+
+      """
+
       self.height, self.width = self.window.getmaxyx()
-      self.pad = curses.newpad(2**10, self.width)
+      self.pad = curses.newpad(self.max_lines, self.width)
 
       self.pad.addstr("RAW INPUT\n")
    
@@ -308,11 +291,15 @@ class DXAgent(IOManager):
       self._format_attrs_list("rt-cache")
       self._format_attrs_list("ndisc-cache")
 
-      self.max_lines = 2**10
-
    def _display(self):
-      self.info(self.top)
+      """
+      refresh the display and reschedule itself
+
+      """
+
+      self.height, self.width = self.window.getmaxyx()
       self.pad.refresh(self.top, 0, 0, 0, self.height-1, self.width-1)
+      self.scheduler.enter(0.1,1,self._display)
 
    def start_gui(self):
 
@@ -351,10 +338,12 @@ class DXAgent(IOManager):
 
    def run(self):
       """
-      
+      main function
       """
       try:
          self.start_gui()
+         self.process()
+         self._display()
 
          while True:
 
@@ -376,9 +365,9 @@ class DXAgent(IOManager):
                elif c == curses.KEY_RIGHT:
                    pass
                c = self.window.getch()
-
-            self.scheduler.enter(1,0,self.process)
-            self.scheduler.run()
+ 
+            self.scheduler.run(blocking=False)
+            time.sleep(0.1)
 
       except KeyboardInterrupt:
          pass
@@ -389,5 +378,4 @@ class DXAgent(IOManager):
 if __name__ == '__main__':
    dxa = DXAgent()
    dxa.run()
-   #curses.wrapper(dxa.run)
 
