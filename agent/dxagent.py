@@ -62,6 +62,8 @@ class DXAgent(IOManager):
                      "cgtime"]
       self._data["stats"] = []
       root_dir = "/proc/"
+      proc_state = {"R":0, "S":0, "D":0, "T":0, "t":0, "X":0, "Z":0,
+                    "P":0,"I": 0, }
       for d in next(os.walk(root_dir))[1]:
 
          # not a proc
@@ -70,8 +72,24 @@ class DXAgent(IOManager):
 
          path = root_dir+d+"/stat"
          with open(path, 'r') as f:
+            line = f.readline().rstrip()
+            split = line.split('(')
+            pid = split[0].rstrip()
+            split = split[-1].split(')')
+            comm = split[0]         
             
-            self._data["stats"].append([(attr_names[i], e) for i,e in enumerate(f.readline().rstrip().split()[:len(attr_names)])])
+            self._data["stats"].append([(attr_names[i], e) for i,e in enumerate(([pid,comm]+split[-1].split())[:len(attr_names)])])
+         proc_state[self._data["stats"][-1][2][1]] += 1
+
+      # count procs
+      self._data["stats_global"] = [("proc_count",str(len(self._data["stats"])))]
+      # count proc states
+      proc_state_names = {"R":"run_count", "S":"sleep_count", "D":"wait_count", 
+         "T":"stopped_count", "t":"ts_count",   "X":"dead_count",
+         "Z":"zombie_count", "P":"parked_count", "I":"idle_count",
+      }
+      self._data["stats_global"].extend([(proc_state_names[d],str(v)) for d,v in proc_state.items()])
+      
 
    def _process_proc_stat(self):
       attr_names = ["cpu", "user", "nice", "system", "idle", "iowait",
@@ -308,15 +326,15 @@ class DXAgent(IOManager):
       self.pad_raw_input.addstr(str(self.sysinfo)+"\n")
       self.pad_raw_input.addstr("\nBareMetal:\n\n", curses.A_BOLD)
       self.pad_raw_input.addstr("bm_ifs: "+" ".join(self._data["bm_ifs"])+"\n\n")
-      self.pad_raw_input.addstr("proc_count: {}\n\n".format(len(self._data["stats"])))
 
+      self._format_attrs("stats_global")
       self._format_attrs("uptime")
       self._format_attrs("loadavg")
+      self._format_attrs_list("net/dev")
       self._format_attrs("meminfo")
       self._format_attrs_list("swaps")
       self._format_attrs("netstat")
-      self._format_attrs("snmp")
-      self._format_attrs_list("net/dev")
+      self._format_attrs("snmp")      
       self._format_attrs_list("stat/cpu")
       self._format_attrs("stat")
       self._format_attrs_list("arp-cache")
