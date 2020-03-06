@@ -209,6 +209,90 @@ class DXAgent(IOManager):
    def _process_sys_class_net(self):
       self._data["bm_ifs"] = os.listdir("/sys/class/net")
 
+   def _process_net_settings(self):
+      """
+      parse network kernel parameters from /pros/sys/
+      normally read through sysctl calls
+
+      """
+      self._data["proc/sys"] = []
+
+      with open("/proc/sys/net/core/rmem_default") as f:
+         self._data["proc/sys"].append(("net.core.rmem_default", f.read().rstrip(), "B"))
+      with open("/proc/sys/net/core/rmem_max") as f:
+         self._data["proc/sys"].append(("net.core.rmem_max", f.read().rstrip(), "B"))
+      with open("/proc/sys/net/core/wmem_default") as f:
+         self._data["proc/sys"].append(("net.core.wmem_default", f.read().rstrip(), "B"))
+      with open("/proc/sys/net/core/wmem_max") as f:
+         self._data["proc/sys"].append(("net.core.wmem_max", f.read().rstrip(), "B"))
+      with open("/proc/sys/net/core/default_qdisc") as f:
+         self._data["proc/sys"].append(("net.core.default_qdisc", f.read().rstrip()))
+      with open("/proc/sys/net/core/netdev_max_backlog") as f:
+         self._data["proc/sys"].append(("net.core.netdev_max_backlog", f.read().rstrip()))
+
+      attr_suffixes=["_min","_pressure", "_max"]
+      page_to_bytes=4096
+      with open("/proc/sys/net/ipv4/tcp_mem") as f:
+         self._data["proc/sys"].extend([("net.ipv4.tcp_mem"+attr_suffixes[i],
+            str(int(e)*page_to_bytes), "B") for i,e in 
+                  enumerate(f.read().rstrip().split())])
+
+      attr_suffixes=["_min","_default", "_max"]
+      with open("/proc/sys/net/ipv4/tcp_rmem") as f:
+         self._data["proc/sys"].extend([("net.ipv4.tcp_rmem"+attr_suffixes[i], e, "B")
+                        for i,e in enumerate(f.read().rstrip().split())])
+      with open("/proc/sys/net/ipv4/tcp_wmem") as f:
+         self._data["proc/sys"].extend([("net.ipv4.tcp_wmem"+attr_suffixes[i], e, "B")
+                        for i,e in enumerate(f.read().rstrip().split())])
+
+      with open("/proc/sys/net/ipv4/tcp_congestion_control") as f:
+         self._data["proc/sys"].append(("net.ipv4.tcp_congestion_control", 
+                                        f.read().rstrip()))
+
+      with open("/proc/sys/net/ipv4/tcp_sack") as f:
+         self._data["proc/sys"].append(("net.ipv4.tcp_sack", f.read().rstrip()))
+      with open("/proc/sys/net/ipv4/tcp_dsack") as f:
+         self._data["proc/sys"].append(("net.ipv4.tcp_dsack", f.read().rstrip()))
+      with open("/proc/sys/net/ipv4/tcp_fack") as f:
+         self._data["proc/sys"].append(("net.ipv4.tcp_fack", f.read().rstrip()))
+      with open("/proc/sys/net/ipv4/tcp_syn_retries") as f:
+         self._data["proc/sys"].append(("net.ipv4.tcp_syn_retries", f.read().rstrip()))
+      with open("/proc/sys/net/ipv4/tcp_slow_start_after_idle") as f:
+         self._data["proc/sys"].append(("net.ipv4.tcp_slow_start_after_idle", f.read().rstrip()))
+      with open("/proc/sys/net/ipv4/tcp_retries1") as f:
+         self._data["proc/sys"].append(("net.ipv4.tcp_retries1", f.read().rstrip()))
+      with open("/proc/sys/net/ipv4/tcp_retries2") as f:
+         self._data["proc/sys"].append(("net.ipv4.tcp_retries2", f.read().rstrip()))
+      with open("/proc/sys/net/ipv4/tcp_mtu_probing") as f:
+         self._data["proc/sys"].append(("net.ipv4.tcp_mtu_probing", f.read().rstrip()))
+      with open("/proc/sys/net/ipv4/tcp_max_syn_backlog") as f:
+         self._data["proc/sys"].append(("net.ipv4.tcp_max_syn_backlog", f.read().rstrip()))
+      with open("/proc/sys/net/ipv4/tcp_base_mss") as f:
+         self._data["proc/sys"].append(("net.ipv4.tcp_base_mss", f.read().rstrip()))
+      with open("/proc/sys/net/ipv4/tcp_min_snd_mss") as f:
+         self._data["proc/sys"].append(("net.ipv4.tcp_min_snd_mss", f.read().rstrip()))
+      with open("/proc/sys/net/ipv4/tcp_ecn_fallback") as f:
+         self._data["proc/sys"].append(("net.ipv4.tcp_ecn_fallback", f.read().rstrip()))
+      with open("/proc/sys/net/ipv4/tcp_ecn") as f:
+         self._data["proc/sys"].append(("net.ipv4.tcp_ecn", f.read().rstrip()))
+      with open("/proc/sys/net/ipv4/tcp_adv_win_scale") as f:
+         self._data["proc/sys"].append(("net.ipv4.tcp_adv_win_scale", f.read().rstrip()))
+      with open("/proc/sys/net/ipv4/tcp_window_scaling") as f:
+         self._data["proc/sys"].append(("net.ipv4.tcp_window_scaling", f.read().rstrip()))
+      with open("/proc/sys/net/ipv4/tcp_tw_reuse") as f:
+         self._data["proc/sys"].append(("net.ipv4.tcp_tw_reuse", f.read().rstrip()))
+      with open("/proc/sys/net/ipv4/tcp_syncookies") as f:
+         self._data["proc/sys"].append(("net.ipv4.tcp_syncookies", f.read().rstrip()))
+      with open("/proc/sys/net/ipv4/tcp_timestamps") as f:
+         self._data["proc/sys"].append(("net.ipv4.tcp_timestamps", f.read().rstrip()))
+      with open("/proc/sys/net/ipv4/tcp_no_metrics_save") as f:
+         self._data["proc/sys"].append(("net.ipv4.tcp_no_metrics_save", f.read().rstrip()))
+
+      with open("/proc/sys/net/ipv4/ip_forward") as f:
+         self._data["proc/sys"].append(("net.ipv4.ip_forward", f.read().rstrip()))
+      with open("/proc/sys/net/ipv4/ip_no_pmtu_disc") as f:
+         self._data["proc/sys"].append(("net.ipv4.ip_no_pmtu_disc", f.read().rstrip()))
+
    def _input(self):
       """
       parse input from
@@ -264,9 +348,20 @@ class DXAgent(IOManager):
       self._process_proc_net_dev()
       self._process_proc_net_arp()
       self._process_proc_net_route()
+      self._process_net_settings()
 
       # non-standards linux locations 
       self._process_sys_class_net()
+
+      """
+      VM 
+         vbox:https://www.virtualbox.org/manual/ch08.html
+         VBoxManage showvminfo
+         VBoxManage bandwidthctl
+         VBoxManage storagectl
+         VBoxManage metrics
+         https://pypi.org/project/pyvbox/
+      """
 
       """
       VPP
@@ -333,6 +428,7 @@ class DXAgent(IOManager):
       self._format_attrs_list("net/dev")
       self._format_attrs("meminfo")
       self._format_attrs_list("swaps")
+      self._format_attrs("proc/sys")
       self._format_attrs("netstat")
       self._format_attrs("snmp")      
       self._format_attrs_list("stat/cpu")
