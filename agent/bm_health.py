@@ -9,6 +9,7 @@ bm_health.py
 import os
 import netifaces
 import time
+import ipaddress
 
 class BMWatcher():
 
@@ -223,15 +224,36 @@ class BMWatcher():
       with open("/proc/net/dev", 'r') as f:
           self._data["net/dev"] = [[(attr_names[i],e.rstrip(':')) for i,e in enumerate(l.rstrip().split())] for l in f.readlines()[2:]]
 
+   def _inet_ntoa(self, addr):
+      """
+      addr is a hex network-ordered ip address
+
+      return numbers-and-dots string 
+      """
+      return str(ipaddress.ip_address(bytes(reversed(bytearray.fromhex(addr)))))
+
    def _process_proc_net_arp(self):
-      with open("/proc/net/arp", 'r') as f:
-         #attr_names = f.readline().split()
-         
-         self._data["net/arp"] = [(l.rstrip().split()) for l in f.readlines()[1:]]
+      attr_names = ["ip_addr", "type", "flags", "link_addr", "mask", "dev"]
+
+      with open("/proc/net/arp", 'r') as f:         
+         self._data["net/arp"] = [[(attr_names[i],e) for i,e in enumerate(l.rstrip().split())] for l in f.readlines()[1:]]
+
 
    def _process_proc_net_route(self):
+      attr_names = ["if_name", "dst", "gateway", "flags", "ref_cnt", "use",
+                    "metric", "mask", "mtu", "win", "irtt"]
+      self._data["net/route"] = []
+
       with open("/proc/net/route", 'r') as f:
-         self._data["net/route"] = [tuple(l.rstrip().split()) for l in f.readlines()[1:]]
+         for line in f.readlines()[1:]:
+            entry = []
+            for i,e in  enumerate(line.rstrip().split()):
+               if i in [1,2,7]: # indexes of addrs
+                  e=self._inet_ntoa(e)
+                  
+               entry.append((attr_names[i],e))
+            self._data["net/route"].append(entry)
+
 
    def _open_read_append(self, path, attr_name, list):
       """

@@ -125,12 +125,14 @@ class DXAgent(IOManager):
       self._format_attrs_list("swaps")
       self._format_attrs("proc/sys")
       self._format_attrs("netstat")
-      self._format_attrs("snmp")      
+      self._format_attrs("snmp")  
+      self._format_attrs_list("net/arp")
       self._format_attrs_list("stat/cpu")
       self._format_attrs("stat")
-      self._format_attrs_list("arp-cache")
       self._format_attrs_list("rt-cache")
       self._format_attrs_list("ndisc-cache")
+
+      self._format_attrs_list("net/route")
       self._format_attrs_list("stats")
 
       self.pad_health_metrics = curses.newpad(self.max_lines, self.width)
