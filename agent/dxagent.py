@@ -15,6 +15,9 @@ import string
 
 from agent.ios import IOManager
 from agent.sysinfo import SysInfo
+from agent.bm_health import BMWatcher
+from agent.vm_health import VMWatcher
+from agent.vpp_health import VPPWatcher
 
 ESCAPE = 27
 
@@ -33,11 +36,10 @@ class DXAgent(IOManager):
       super(DXAgent, self).__init__(self)
       self.load_ios()
       self.sysinfo = SysInfo()
-
-      self.msec_per_jiffy = os.sysconf(os.sysconf_names['SC_CLK_TCK'])
       self.info(self.sysinfo)
       self.scheduler = sched.scheduler()
       
+      #   
       self.top = 0 
       self.screen = 0
       self.max_screens = 2
@@ -45,329 +47,17 @@ class DXAgent(IOManager):
 
       self._data = {}
 
-   def _process_proc_meminfo(self):
-      with open("/proc/meminfo", 'r') as f:
-         self._data["meminfo"] = [tuple(e.rstrip(':') for e in l.rstrip().split()) for l in f.readlines()]
-
-   def _process_proc_stats(self):
-      attr_names = [ "pid", "comm", "state", "ppid", "pgrp", "sid",
-                     "tty_nr", "tty_pgrp", "flags", "min_flt", "cmin_flt",
-                     "maj_flt", "cmaj_flt", "utime", "stime", "cutime",
-                     "cstime", "priority", "nice", "num_threads", "itrealvalue",
-                     "starttime", "vsize", "rss", "rsslim", "startcode",
-                     "endcode", "startstack", "kstk_esp", "kstk_eip", "signal",
-                     "blocked", "sigignore", "sigcatch", "wchan", "nswap",
-                     "cnswap", "exit_signal", "processor", "rt_priority",
-                     "policy", "delayacct_blkio_ticks", "gtime", 
-                     "cgtime"]
-      self._data["stats"] = []
-      root_dir = "/proc/"
-      proc_state = {"R":0, "S":0, "D":0, "T":0, "t":0, "X":0, "Z":0,
-                    "P":0,"I": 0, }
-      for d in next(os.walk(root_dir))[1]:
-
-         # not a proc
-         if not d.isdigit():
-            continue
-
-         path = root_dir+d+"/stat"
-         with open(path, 'r') as f:
-            line = f.readline().rstrip()
-            split = line.split('(')
-            pid = split[0].rstrip()
-            split = split[-1].split(')')
-            comm = split[0]         
-            
-            self._data["stats"].append([(attr_names[i], e) for i,e in enumerate(([pid,comm]+split[-1].split())[:len(attr_names)])])
-         proc_state[self._data["stats"][-1][2][1]] += 1
-
-      # count procs
-      self._data["stats_global"] = [("proc_count",str(len(self._data["stats"])))]
-      # count proc states
-      proc_state_names = {"R":"run_count", "S":"sleep_count", "D":"wait_count", 
-         "T":"stopped_count", "t":"ts_count",   "X":"dead_count",
-         "Z":"zombie_count", "P":"parked_count", "I":"idle_count",
-      }
-      self._data["stats_global"].extend([(proc_state_names[d],str(v)) for d,v in proc_state.items()])
-      
-
-   def _process_proc_stat(self):
-      attr_names = ["cpu", "user", "nice", "system", "idle", "iowait",
-                    "irq", "softirq", "steal", "guest", "guest_nice"]
-
-      self._data["stat/cpu"] = []
-      self._data["stat"] = []
-
-      with open("/proc/stat", 'r') as f:
-         for l in f.readlines():
-            if l.startswith("cpu"):
-               self._data["stat/cpu"].append([(attr_names[i], e) for i,e in enumerate(l.rstrip().split())])
-            elif l.startswith("intr") or l.startswith("softirq"):
-               self._data["stat"].append(tuple(l.rstrip().split()[:2]))
-            else:
-               self._data["stat"].append(tuple(l.rstrip().split()))
-
-   def _process_proc_loadavg(self):
-      attr_names = ["1min", "5min", "15min", "runnable", "total"]
-      self._data["loadavg"] = []
-
-      with open("/proc/loadavg", 'r') as f:
-         for i, e in enumerate(f.readline().rstrip().split()):
-            if i == 3:
-               vals = e.split('/')
-               self._data["loadavg"].append((attr_names[i], vals[0]))
-               self._data["loadavg"].append((attr_names[i+1], vals[1]))
-               break
-            else:
-               self._data["loadavg"].append((attr_names[i], e))
-
-   def _process_proc_swaps(self):
-      """
-      [
-         [(attr[0], e), (attr[1], e), ..], # a single swap
-         [(attr[0], e), (attr[1], e), ..]
-      ]
-      """
-
-      attr_names = ["filename", "type", "size", "used", "priority"]
-      self._data["swaps"] = []     
-      with open("/proc/swaps", 'r') as f:
-         self._data["swaps"] = [[(attr_names[i],e) for i,e in enumerate(l.rstrip().split())] for l in f.readlines()[1:]]
-
-   def _process_proc_uptime(self):
-      attr_names = ["up", "idle"]
-      self._data["uptime"] = []
-
-      with open("/proc/uptime", 'r') as f:
-         self._data["uptime"] = [(attr_names[i], e) for i,e in enumerate(f.readline().rstrip().split())]
-
-   def _process_proc_diskstats(self):
-      attr_names = []
-      with open("/proc/diskstats", 'r') as f:
-         self._data["diskstats"] = [l.rstrip().split() for l in f.readlines()]
-
-   def _process_proc_net_netstat(self):
-
-      self._data["netstat"] = []
-      with open("/proc/net/netstat", 'r') as f:
-         while True:
-            attrs = f.readline().split()
-            vals = f.readline().split()
-            if not attrs:
-               break
-            prefix = attrs[0].rstrip(':')
-
-            self._data["netstat"] += [(prefix+attr, val) for attr,val in zip(attrs[1:], vals[1:])]
-
-   def _process_proc_net_snmp(self):
-
-      self._data["snmp"] = []
-      with open("/proc/net/snmp", 'r') as f:
-         while True:
-            attrs = f.readline().split()
-            vals = f.readline().split()
-            if not attrs:
-               break
-            prefix = attrs[0].rstrip(':')
-
-            self._data["snmp"] += [(prefix+attr, val) for attr,val in zip(attrs[1:], vals[1:])]
-
-   def _process_proc_net_stat_arp_cache(self):
-      with open("/proc/net/stat/arp_cache", 'r') as f:
-         attr_names = f.readline().split()
-         self._data["arp-cache"] = [[(attr_names[i], str(int(e,16))) for i,e in enumerate(l.rstrip().split())] for l in f.readlines()]
-
-   def _process_proc_net_stat_ndisc_cache(self):
-      with open("/proc/net/stat/ndisc_cache", 'r') as f:
-         attr_names = f.readline().split()
-         self._data["ndisc-cache"] = [[(attr_names[i],str(int(e,16))) for i,e in enumerate(l.rstrip().split())] for l in f.readlines()]
-
-   def _process_proc_net_stat_rt_cache(self):
-      with open("/proc/net/stat/rt_cache", 'r') as f:
-         attr_names = f.readline().split()
-         self._data["rt-cache"] = [[(attr_names[i],str(int(e,16))) for i,e in enumerate(l.rstrip().split())] for l in f.readlines()]
-
-   def _process_proc_net_dev(self):
-      attr_names = ["if_name", 
-                    "rx_bytes", "rx_packets", "rx_errs", "rx_drop", "rx_fifo",
-                    "rx_frame", "rx_compressed", "rx_multicast", 
-                    "tx_bytes", "tx_packets", "tx_errs", "tx_drop", "tx_fifo",
-                    "tx_cols", "tx_carrier", "tx_compressed"]
-      with open("/proc/net/dev", 'r') as f:
-          self._data["net/dev"] = [[(attr_names[i],e.rstrip(':')) for i,e in enumerate(l.rstrip().split())] for l in f.readlines()[2:]]
-
-   def _process_proc_net_arp(self):
-      with open("/proc/net/arp", 'r') as f:
-         #attr_names = f.readline().split()
-         
-         self._data["net/arp"] = [(l.rstrip().split()) for l in f.readlines()[1:]]
-
-   def _process_proc_net_route(self):
-      with open("/proc/net/route", 'r') as f:
-         self._data["net/route"] = [tuple(l.rstrip().split()) for l in f.readlines()[1:]]
-
-   def _process_sys_class_net(self):
-      self._data["bm_ifs"] = os.listdir("/sys/class/net")
-
-   def _process_net_settings(self):
-      """
-      parse network kernel parameters from /pros/sys/
-      normally read through sysctl calls
-
-      """
-      self._data["proc/sys"] = []
-
-      with open("/proc/sys/net/core/rmem_default") as f:
-         self._data["proc/sys"].append(("net.core.rmem_default", f.read().rstrip(), "B"))
-      with open("/proc/sys/net/core/rmem_max") as f:
-         self._data["proc/sys"].append(("net.core.rmem_max", f.read().rstrip(), "B"))
-      with open("/proc/sys/net/core/wmem_default") as f:
-         self._data["proc/sys"].append(("net.core.wmem_default", f.read().rstrip(), "B"))
-      with open("/proc/sys/net/core/wmem_max") as f:
-         self._data["proc/sys"].append(("net.core.wmem_max", f.read().rstrip(), "B"))
-      with open("/proc/sys/net/core/default_qdisc") as f:
-         self._data["proc/sys"].append(("net.core.default_qdisc", f.read().rstrip()))
-      with open("/proc/sys/net/core/netdev_max_backlog") as f:
-         self._data["proc/sys"].append(("net.core.netdev_max_backlog", f.read().rstrip()))
-
-      attr_suffixes=["_min","_pressure", "_max"]
-      page_to_bytes=4096
-      with open("/proc/sys/net/ipv4/tcp_mem") as f:
-         self._data["proc/sys"].extend([("net.ipv4.tcp_mem"+attr_suffixes[i],
-            str(int(e)*page_to_bytes), "B") for i,e in 
-                  enumerate(f.read().rstrip().split())])
-
-      attr_suffixes=["_min","_default", "_max"]
-      with open("/proc/sys/net/ipv4/tcp_rmem") as f:
-         self._data["proc/sys"].extend([("net.ipv4.tcp_rmem"+attr_suffixes[i], e, "B")
-                        for i,e in enumerate(f.read().rstrip().split())])
-      with open("/proc/sys/net/ipv4/tcp_wmem") as f:
-         self._data["proc/sys"].extend([("net.ipv4.tcp_wmem"+attr_suffixes[i], e, "B")
-                        for i,e in enumerate(f.read().rstrip().split())])
-
-      with open("/proc/sys/net/ipv4/tcp_congestion_control") as f:
-         self._data["proc/sys"].append(("net.ipv4.tcp_congestion_control", 
-                                        f.read().rstrip()))
-
-      with open("/proc/sys/net/ipv4/tcp_sack") as f:
-         self._data["proc/sys"].append(("net.ipv4.tcp_sack", f.read().rstrip()))
-      with open("/proc/sys/net/ipv4/tcp_dsack") as f:
-         self._data["proc/sys"].append(("net.ipv4.tcp_dsack", f.read().rstrip()))
-      with open("/proc/sys/net/ipv4/tcp_fack") as f:
-         self._data["proc/sys"].append(("net.ipv4.tcp_fack", f.read().rstrip()))
-      with open("/proc/sys/net/ipv4/tcp_syn_retries") as f:
-         self._data["proc/sys"].append(("net.ipv4.tcp_syn_retries", f.read().rstrip()))
-      with open("/proc/sys/net/ipv4/tcp_slow_start_after_idle") as f:
-         self._data["proc/sys"].append(("net.ipv4.tcp_slow_start_after_idle", f.read().rstrip()))
-      with open("/proc/sys/net/ipv4/tcp_retries1") as f:
-         self._data["proc/sys"].append(("net.ipv4.tcp_retries1", f.read().rstrip()))
-      with open("/proc/sys/net/ipv4/tcp_retries2") as f:
-         self._data["proc/sys"].append(("net.ipv4.tcp_retries2", f.read().rstrip()))
-      with open("/proc/sys/net/ipv4/tcp_mtu_probing") as f:
-         self._data["proc/sys"].append(("net.ipv4.tcp_mtu_probing", f.read().rstrip()))
-      with open("/proc/sys/net/ipv4/tcp_max_syn_backlog") as f:
-         self._data["proc/sys"].append(("net.ipv4.tcp_max_syn_backlog", f.read().rstrip()))
-      with open("/proc/sys/net/ipv4/tcp_base_mss") as f:
-         self._data["proc/sys"].append(("net.ipv4.tcp_base_mss", f.read().rstrip()))
-      with open("/proc/sys/net/ipv4/tcp_min_snd_mss") as f:
-         self._data["proc/sys"].append(("net.ipv4.tcp_min_snd_mss", f.read().rstrip()))
-      with open("/proc/sys/net/ipv4/tcp_ecn_fallback") as f:
-         self._data["proc/sys"].append(("net.ipv4.tcp_ecn_fallback", f.read().rstrip()))
-      with open("/proc/sys/net/ipv4/tcp_ecn") as f:
-         self._data["proc/sys"].append(("net.ipv4.tcp_ecn", f.read().rstrip()))
-      with open("/proc/sys/net/ipv4/tcp_adv_win_scale") as f:
-         self._data["proc/sys"].append(("net.ipv4.tcp_adv_win_scale", f.read().rstrip()))
-      with open("/proc/sys/net/ipv4/tcp_window_scaling") as f:
-         self._data["proc/sys"].append(("net.ipv4.tcp_window_scaling", f.read().rstrip()))
-      with open("/proc/sys/net/ipv4/tcp_tw_reuse") as f:
-         self._data["proc/sys"].append(("net.ipv4.tcp_tw_reuse", f.read().rstrip()))
-      with open("/proc/sys/net/ipv4/tcp_syncookies") as f:
-         self._data["proc/sys"].append(("net.ipv4.tcp_syncookies", f.read().rstrip()))
-      with open("/proc/sys/net/ipv4/tcp_timestamps") as f:
-         self._data["proc/sys"].append(("net.ipv4.tcp_timestamps", f.read().rstrip()))
-      with open("/proc/sys/net/ipv4/tcp_no_metrics_save") as f:
-         self._data["proc/sys"].append(("net.ipv4.tcp_no_metrics_save", f.read().rstrip()))
-
-      with open("/proc/sys/net/ipv4/ip_forward") as f:
-         self._data["proc/sys"].append(("net.ipv4.ip_forward", f.read().rstrip()))
-      with open("/proc/sys/net/ipv4/ip_no_pmtu_disc") as f:
-         self._data["proc/sys"].append(("net.ipv4.ip_no_pmtu_disc", f.read().rstrip()))
+      # watchers
+      self.bm_watcher = BMWatcher(self._data, self.info)
+      self.vm_watcher = VMWatcher(self._data)
+      self.vpp_watcher = VPPWatcher(self._data)
 
    def _input(self):
-      """
-      parse input from
-
-      /proc/<PID>/stat
-      /proc/stat + stat/cpu k
-      /proc/meminfo k
-      /proc/loadavg       k
-      /proc/swaps      k
-      /proc/uptime k
-      /proc/diskstats
-      /proc/net/netstat k
-      /proc/net/snmp k
-      /proc/net/stat/arp_cache k
-      /proc/net/stat/ndisc_cache k
-      /proc/net/stat/rt_cache k
-      /proc/net/dev (interfaces listed in /sys/class/net/*) k
-      /sys/class/net/enp4s0/
-
-      /proc/net/arp
-      /proc/net/tcp
-      /proc/net/udp
-      /proc/net/unix
+     
       
-      
-   fd = socket(PF_INET, SOCK_DGRAM, IPPROTO_IP)
-   ioctl(fd, SIOCGIFCONF, ...)
-   gets
-   ioctl(4, SIOCGIFCONF, {120, {{"lo", {AF_INET, inet_addr("127.0.0.1")}}, {"eth0", {AF_INET, inet_addr("10.6.23.69")}}, {"tun0", {AF_INET, inet_addr("10.253.10.151")}}}})
-      https://stackoverflow.com/questions/5281341/get-local-network-interface-addresses-using-only-proc
-
-      /proc/net/arp
-      /proc/net/route
-      """
-      
-
-      """
-      baremetal health: Linux
-
-      """
-      self._process_proc_meminfo()
-      self._process_proc_stat()
-      self._process_proc_stats()
-      self._process_proc_loadavg()
-      self._process_proc_swaps()
-      self._process_proc_uptime()
-      self._process_proc_diskstats()
-      self._process_proc_net_netstat()
-      self._process_proc_net_snmp()
-      self._process_proc_net_stat_arp_cache()
-      self._process_proc_net_stat_ndisc_cache()
-      self._process_proc_net_stat_rt_cache()
-      self._process_proc_net_dev()
-      self._process_proc_net_arp()
-      self._process_proc_net_route()
-      self._process_net_settings()
-
-      # non-standards linux locations 
-      self._process_sys_class_net()
-
-      """
-      VM 
-         vbox:https://www.virtualbox.org/manual/ch08.html
-         VBoxManage showvminfo
-         VBoxManage bandwidthctl
-         VBoxManage storagectl
-         VBoxManage metrics
-         https://pypi.org/project/pyvbox/
-      """
-
-      """
-      VPP
-
-      """
-
+      self.bm_watcher.input()
+      self.vm_watcher.input()
+      self.vpp_watcher.input()
       """
       ioam 
 
@@ -396,8 +86,13 @@ class DXAgent(IOManager):
       self.pad_raw_input.addstr(category+"\n", curses.A_BOLD)
       for l in self._data[category]:
          for e in l:
-            self.pad_raw_input.addstr(e[0]+": ")
-            self.pad_raw_input.addstr(" ".join(e[1:])+" ")
+            if type(e) is list:
+               for t in e:
+                  self.pad_raw_input.addstr(t[0]+": ")
+                  self.pad_raw_input.addstr(" ".join(t[1:])+" ")
+            else:
+               self.pad_raw_input.addstr(e[0]+": ")
+               self.pad_raw_input.addstr(" ".join(e[1:])+" ")
          self.pad_raw_input.addstr("\n")
       self.pad_raw_input.addstr("\n")
 
@@ -420,8 +115,8 @@ class DXAgent(IOManager):
       self.pad_raw_input.addstr("System:\n\n", curses.A_BOLD)
       self.pad_raw_input.addstr(str(self.sysinfo)+"\n")
       self.pad_raw_input.addstr("\nBareMetal:\n\n", curses.A_BOLD)
-      self.pad_raw_input.addstr("bm_ifs: "+" ".join(self._data["bm_ifs"])+"\n\n")
 
+      self._format_attrs_list("bm_ifs")
       self._format_attrs("stats_global")
       self._format_attrs("uptime")
       self._format_attrs("loadavg")
