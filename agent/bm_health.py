@@ -105,7 +105,7 @@ class BMWatcher():
                
                self._data["stats"].append([(attr_names[i], e) for i,e in enumerate(([pid,comm]+split[-1].split())[:len(attr_names)])])
             proc_state[self._data["stats"][-1][2][1]] += 1
-         except FileNotFoundError:
+         except:
             pass
 
       # count procs
@@ -233,6 +233,17 @@ class BMWatcher():
       with open("/proc/net/route", 'r') as f:
          self._data["net/route"] = [tuple(l.rstrip().split()) for l in f.readlines()[1:]]
 
+   def _open_read_append(self, path, attr_name, list):
+      """
+      append content of file at path to list, if it exists
+
+      """
+      try:
+         with open(path) as f:
+            list.append((attr_name, f.read().rstrip()))
+      except:
+         pass
+
    def _process_interfaces(self):
       """
       list interfaces and get their addresses
@@ -344,9 +355,38 @@ class BMWatcher():
 
             if_attrs.append(inet6_attrs)
 
+         # non-standard if attributes
+         # https://www.kernel.org/doc/Documentation/ABI/testing/sysfs-class-net
+         #
+         path_prefix="/sys/class/net/{}/".format(if_name)
+         self._open_read_append(path_prefix+"carrier_down_count",
+            "carrier_down_count", if_attrs)
+         self._open_read_append(path_prefix+"carrier_up_count",
+            "carrier_up_count", if_attrs)
+         self._open_read_append(path_prefix+"device/numa_node",
+            "numa_node", if_attrs)
+         self._open_read_append(path_prefix+"device/local_cpulist",
+            "local_cpulist", if_attrs)
+         self._open_read_append(path_prefix+"device/local_cpu",
+            "local_cpu", if_attrs)
+         self._open_read_append(path_prefix+"device/enable",
+            "enable", if_attrs)
+         self._open_read_append(path_prefix+"device/current_link_speed",
+            "current_link_speed", if_attrs)
+         self._open_read_append(path_prefix+"device/current_link_width",
+            "current_link_width", if_attrs)
+         self._open_read_append(path_prefix+"mtu",
+            "mtu", if_attrs)
+         self._open_read_append(path_prefix+"tx_queue_len",
+            "tx_queue_len", if_attrs)
+         self._open_read_append(path_prefix+"duplex",
+            "duplex", if_attrs)
+         self._open_read_append(path_prefix+"carrier",
+            "carrier", if_attrs)
+         self._open_read_append(path_prefix+"operstate",
+            "operstate", if_attrs)
+
          self._data["bm_ifs"].append(if_attrs)
-
-
 
    def _process_net_settings(self):
       """
