@@ -8,8 +8,9 @@ vpp_health.py
 
 class VPPWatcher():
 
-   def __init__(self, data):
+   def __init__(self, data, info):
       self._data = data
+      self.info = info
 
    def input(self):
       pass

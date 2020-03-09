@@ -40,15 +40,14 @@ class BMWatcher():
       /proc/net/stat/ndisc_cache k
       /proc/net/stat/rt_cache k
       /proc/net/dev (interfaces listed in /sys/class/net/*) k
-      /sys/class/net/enp4s0/
+      /sys/class/net/enp4s0/ k
 
-      /proc/net/arp
       /proc/net/tcp
       /proc/net/udp
       /proc/net/unix
 
-      /proc/net/arp
-      /proc/net/route
+      /proc/net/arp k
+      /proc/net/route k
       """
       self._process_proc_meminfo()
       self._process_proc_stat()

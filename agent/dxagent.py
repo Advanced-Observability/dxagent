@@ -49,8 +49,8 @@ class DXAgent(IOManager):
 
       # watchers
       self.bm_watcher = BMWatcher(self._data, self.info)
-      self.vm_watcher = VMWatcher(self._data)
-      self.vpp_watcher = VPPWatcher(self._data)
+      self.vm_watcher = VMWatcher(self._data, self.info)
+      self.vpp_watcher = VPPWatcher(self._data, self.info)
 
    def _input(self):
      
@@ -88,8 +88,13 @@ class DXAgent(IOManager):
          for e in l:
             if type(e) is list:
                for t in e:
-                  self.pad_raw_input.addstr(t[0]+": ")
-                  self.pad_raw_input.addstr(" ".join(t[1:])+" ")
+                  if type(t) is list:
+                     for tt in t:
+                        self.pad_raw_input.addstr(tt[0]+": ")
+                        self.pad_raw_input.addstr(" ".join(tt[1:])+" ")
+                  else:
+                     self.pad_raw_input.addstr(t[0]+": ")
+                     self.pad_raw_input.addstr(" ".join(t[1:])+" ")
             else:
                self.pad_raw_input.addstr(e[0]+": ")
                self.pad_raw_input.addstr(" ".join(e[1:])+" ")
@@ -131,8 +136,12 @@ class DXAgent(IOManager):
       self._format_attrs("stat")
       self._format_attrs_list("rt-cache")
       self._format_attrs_list("ndisc-cache")
-
       self._format_attrs_list("net/route")
+
+      self.pad_raw_input.addstr("\nVirtual Machines:\n\n", curses.A_BOLD)   
+      self._format_attrs("virtualbox/system")
+      self._format_attrs_list("virtualbox/vms")
+
       self._format_attrs_list("stats")
 
       self.pad_health_metrics = curses.newpad(self.max_lines, self.width)

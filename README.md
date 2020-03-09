@@ -21,10 +21,13 @@ arrow left, arrow right: switch between screens
    - Ubuntu: `sudo apt install python3-ethtool`
 
 - [pyvbox](https://pypi.org/project/pyvbox/)
-   - Ubuntu: `python3 -m pip install virtualbox`
+   - `python3 -m pip install virtualbox`
+
+- [virtualbox SDK](https://www.virtualbox.org/wiki/Downloads)
+   - `python vboxapisetup.py`
 
 - [netifaces](https://pypi.org/project/netifaces/)
-   - Ubuntu: `python3 -m pip install netifaces`
+   - `python3 -m pip install netifaces`
 
 ## Author
 
