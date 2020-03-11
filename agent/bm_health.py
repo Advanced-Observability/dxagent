@@ -10,6 +10,7 @@ import os
 import netifaces
 import time
 import ipaddress
+from agent.buffer import RingBuffer
 
 class BMWatcher():
 

@@ -58,7 +58,7 @@ class VMWatcher():
          ("version", self._vbox.version_normalized)
       ]
       self._data["virtualbox/vms"] = []
-
+      
       for m in self._vbox.machines:
 
          # check if machine is online/offline
