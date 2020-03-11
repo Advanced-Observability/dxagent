@@ -10,7 +10,7 @@ import os
 import netifaces
 import time
 import ipaddress
-from agent.buffer import RingBuffer
+from agent.buffer import init_rb_dict
 
 class BMWatcher():
 
@@ -18,7 +18,131 @@ class BMWatcher():
       self.msec_per_jiffy = os.sysconf(os.sysconf_names['SC_CLK_TCK'])
       self._data = data
       self.info = info
-   
+      self._init_dicts()
+
+   def _init_dicts(self):
+
+      # init categories whose input count are prone to change during execution
+      # e.g., interfaces 
+      self._data["net/dev"] = {}
+      self._data["bm_ifs"] = {}
+      self._data["swaps"] = {}
+      self._data["net/arp"] = {}
+
+      # uptime
+      attr_list = ["up", "idle"]
+      self._data["uptime"] = init_rb_dict(attr_list, type=str)
+
+      # stats_global
+      attr_list = ["proc_count", "run_count", "sleep_count", "wait_count", 
+         "stopped_count", "ts_count", "dead_count",
+         "zombie_count", "parked_count", "idle_count"]
+      self._data["stats_global"] = init_rb_dict(attr_list)
+
+      # loadavg
+      attr_list = ["1min", "5min", "15min", "runnable", "total"]
+      self._data["loadavg"] = init_rb_dict(attr_list,type=float)
+
+      # meminfo
+      attr_list, unit_list = [], []
+      with open("/proc/meminfo", 'r') as f:
+         for l in f.readlines():
+            elements=l.rstrip().split()
+            attr_list.append(elements[0].rstrip(':'))
+            unit_list.append(elements[2] if len(elements)>2 else None)
+      self._data["meminfo"] = init_rb_dict(attr_list, units=unit_list)
+
+      # netstat
+      attr_list = []
+      with open("/proc/net/netstat", 'r') as f:
+         while True:
+            attrs = f.readline().split()
+            _ = f.readline()
+            if not attrs:
+               break
+            prefix = attrs[0].rstrip(':')
+            attr_list.extend([prefix+attr for attr in attrs])
+      self._data["netstat"] = init_rb_dict(attr_list, counter=True)
+
+      # snmp
+      attr_list = []
+      with open("/proc/net/snmp", 'r') as f:
+         while True:
+            attrs = f.readline().split()
+            _ = f.readline()
+            if not attrs:
+               break
+            prefix = attrs[0].rstrip(':')
+            attr_list.extend([prefix+attr for attr in attrs])
+      self._data["snmp"] = init_rb_dict(attr_list, counter=True)
+
+
+      # stat and stat/cpu
+      attr_list = []
+      attr_list_cpu = ["user", "nice", "system", "idle", "iowait",
+                        "irq", "softirq", "steal", "guest", "guest_nice"]
+      self._data["stat/cpu"] = {}
+      with open("/proc/stat", 'r') as f:
+         for l in f.readlines():
+            label = l.split()[0]
+
+            if label.startswith("cpu"):
+               self._data["stat/cpu"][label] = init_rb_dict(attr_list_cpu)
+            else:
+               attr_list.append(label)
+
+      # XXX not portable
+      is_counter = [True, True, True, False, False, False, True]
+      self._data["stat"] = init_rb_dict(attr_list, counters=is_counter)
+
+      # proc/stat
+      attr_list = [
+         "net.core.rmem_default", "net.core.rmem_max", "net.core.wmem_default",
+         "net.core.wmem_max", "net.ipv4.tcp_mem_min", "net.ipv4.tcp_mem_pressure",
+         "net.ipv4.tcp_mem_max", "net.ipv4.tcp_rmem_min", "net.ipv4.tcp_rmem_default",
+         "net.ipv4.tcp_rmem_max", "net.ipv4.tcp_wmem_min", "net.ipv4.tcp_wmem_default",
+         "net.ipv4.tcp_wmem_max", "net.core.default_qdisc", "net.core.netdev_max_backlog", 
+         "net.ipv4.tcp_congestion_control", "net.ipv4.tcp_sack", "net.ipv4.tcp_dsack", 
+         "net.ipv4.tcp_fack", "net.ipv4.tcp_syn_retries", 
+         "net.ipv4.tcp_slow_start_after_idle", "net.ipv4.tcp_retries1", 
+         "net.ipv4.tcp_retries2", "net.ipv4.tcp_mtu_probing", 
+         "net.ipv4.tcp_max_syn_backlog", "net.ipv4.tcp_base_mss", 
+         "net.ipv4.tcp_min_snd_mss", "net.ipv4.tcp_ecn_fallback", "net.ipv4.tcp_ecn", 
+         "net.ipv4.tcp_adv_win_scale", "net.ipv4.tcp_window_scaling", 
+         "net.ipv4.tcp_tw_reuse", "net.ipv4.tcp_syncookies", "net.ipv4.tcp_timestamps", 
+         "net.ipv4.tcp_no_metrics_save", "net.ipv4.ip_forward", "net.ipv4.ip_no_pmtu_disc", 
+      ]
+      unit_list = [
+         "B", "B", "B", "B", "B", "B", "B", "B", "B", "B", 
+         "B", "B", "B", "", "", "", "", "", "", "", "", "", "", "", "", 
+         "", "", "", "", "", "", "", "", "", "", "", ""
+      ]
+      self._data["proc/sys"] =  init_rb_dict(attr_list, units=unit_list, type=str)
+
+      # rt-cache read attrs
+      self._data["rt-cache"] = {}
+      with open("/proc/net/stat/rt_cache", 'r') as f:
+         attr_list_rt_cache = f.readline().split()
+         cpu_count = len(f.readlines())
+
+      # arp-cache read attrs
+      self._data["arp-cache"] = {}
+      with open("/proc/net/stat/arp_cache", 'r') as f:
+         attr_list_arp_cache = f.readline().split()
+
+      # ndisc-cache read attrs
+      self._data["ndisc-cache"] = {}
+      with open("/proc/net/stat/ndisc_cache", 'r') as f:
+         attr_list_ndisc_cache = f.readline().split()
+
+      # generate dict for each cpu
+      for i in range(cpu_count):
+         cpu_label="cpu{}".format(i)
+
+         self._data["rt-cache"][cpu_label] = init_rb_dict(attr_list_rt_cache, type=int)
+         self._data["arp-cache"][cpu_label] = init_rb_dict(attr_list_arp_cache, type=int)
+         self._data["ndisc-cache"][cpu_label] = init_rb_dict(attr_list_ndisc_cache, type=int)
+      
    def input(self):
       """
       baremetal health: Linux
@@ -72,7 +196,9 @@ class BMWatcher():
 
    def _process_proc_meminfo(self):
       with open("/proc/meminfo", 'r') as f:
-         self._data["meminfo"] = [tuple(e.rstrip(':') for e in l.rstrip().split()) for l in f.readlines()]
+         for l in f.readlines():
+            elements = l.rstrip().split()
+            self._data["meminfo"][elements[0].rstrip(':')].append(int(elements[1]))
 
    def _process_proc_stats(self):
       attr_names = [ "pid", "comm", "state", "ppid", "pgrp", "sid",
@@ -110,64 +236,69 @@ class BMWatcher():
             pass
 
       # count procs
-      self._data["stats_global"] = [("proc_count",str(len(self._data["stats"])))]
+      self._data["stats_global"]["proc_count"].append(len(self._data["stats"]))
       # count proc states
       proc_state_names = {"R":"run_count", "S":"sleep_count", "D":"wait_count", 
          "T":"stopped_count", "t":"ts_count",   "X":"dead_count",
          "Z":"zombie_count", "P":"parked_count", "I":"idle_count",
       }
-      self._data["stats_global"].extend([(proc_state_names[d],str(v)) for d,v in proc_state.items()])
+      for d,v in proc_state.items():
+         self._data["stats_global"][proc_state_names[d]].append(v)
       
 
    def _process_proc_stat(self):
-      attr_names = ["cpu", "user", "nice", "system", "idle", "iowait",
+      attr_names = ["user", "nice", "system", "idle", "iowait",
                     "irq", "softirq", "steal", "guest", "guest_nice"]
-
-      self._data["stat/cpu"] = []
-      self._data["stat"] = []
 
       with open("/proc/stat", 'r') as f:
          for l in f.readlines():
             if l.startswith("cpu"):
-               self._data["stat/cpu"].append([(attr_names[i], e) for i,e in enumerate(l.rstrip().split())])
-            elif l.startswith("intr") or l.startswith("softirq"):
-               self._data["stat"].append(tuple(l.rstrip().split()[:2]))
+               split = l.rstrip().split()
+               cpu_label = split[0]
+               for i,e in enumerate(split[1:]):
+                  self._data["stat/cpu"][cpu_label][attr_names[i]].append(int(e))
+
             else:
-               self._data["stat"].append(tuple(l.rstrip().split()))
+               k, d = l.rstrip().split()[:2]
+               self._data["stat"][k].append(int(d))
 
    def _process_proc_loadavg(self):
       attr_names = ["1min", "5min", "15min", "runnable", "total"]
-      self._data["loadavg"] = []
 
       with open("/proc/loadavg", 'r') as f:
          for i, e in enumerate(f.readline().rstrip().split()):
             if i == 3:
                vals = e.split('/')
-               self._data["loadavg"].append((attr_names[i], vals[0]))
-               self._data["loadavg"].append((attr_names[i+1], vals[1]))
+               self._data["loadavg"][attr_names[i]].append(float(vals[0]))
+               self._data["loadavg"][attr_names[i+1]].append(float(vals[1]))
                break
             else:
-               self._data["loadavg"].append((attr_names[i], e))
+               self._data["loadavg"][attr_names[i]].append(float(e))
 
    def _process_proc_swaps(self):
       """
-      [
-         [(attr[0], e), (attr[1], e), ..], # a single swap
-         [(attr[0], e), (attr[1], e), ..]
-      ]
+      index is swap filename
       """
 
-      attr_names = ["filename", "type", "size", "used", "priority"]
-      self._data["swaps"] = []     
+      attr_names = ["type", "size", "used", "priority"] 
       with open("/proc/swaps", 'r') as f:
-         self._data["swaps"] = [[(attr_names[i],e) for i,e in enumerate(l.rstrip().split())] for l in f.readlines()[1:]]
+         for l in f.readlines()[1:]:
+            split = l.rstrip().split()
+
+            # create swap if needed
+            swap_label = split[0]
+            if swap_label not in self._data["swaps"]:
+               self._data["swaps"][swap_label] = init_rb_dict(attr_names)
+
+            for i,e in enumerate(split[1:]):
+               self._data["swaps"][swap_label][attr_names[i]].append(e)
 
    def _process_proc_uptime(self):
       attr_names = ["up", "idle"]
-      self._data["uptime"] = []
 
       with open("/proc/uptime", 'r') as f:
-         self._data["uptime"] = [(attr_names[i], e) for i,e in enumerate(f.readline().rstrip().split())]
+         for i,e in enumerate(f.readline().rstrip().split()):
+            self._data["uptime"][attr_names[i]].append(e)
 
    def _process_proc_diskstats(self):
       attr_names = []
@@ -176,7 +307,6 @@ class BMWatcher():
 
    def _process_proc_net_netstat(self):
 
-      self._data["netstat"] = []
       with open("/proc/net/netstat", 'r') as f:
          while True:
             attrs = f.readline().split()
@@ -184,12 +314,11 @@ class BMWatcher():
             if not attrs:
                break
             prefix = attrs[0].rstrip(':')
-
-            self._data["netstat"] += [(prefix+attr, val) for attr,val in zip(attrs[1:], vals[1:])]
+            for attr,val in zip(attrs[1:], vals[1:]):
+               self._data["netstat"][prefix+attr].append(int(val))
 
    def _process_proc_net_snmp(self):
 
-      self._data["snmp"] = []
       with open("/proc/net/snmp", 'r') as f:
          while True:
             attrs = f.readline().split()
@@ -197,32 +326,59 @@ class BMWatcher():
             if not attrs:
                break
             prefix = attrs[0].rstrip(':')
-
-            self._data["snmp"] += [(prefix+attr, val) for attr,val in zip(attrs[1:], vals[1:])]
+            for attr,val in zip(attrs[1:], vals[1:]):
+               self._data["snmp"][prefix+attr].append(int(val))
 
    def _process_proc_net_stat_arp_cache(self):
       with open("/proc/net/stat/arp_cache", 'r') as f:
          attr_names = f.readline().split()
-         self._data["arp-cache"] = [[(attr_names[i], str(int(e,16))) for i,e in enumerate(l.rstrip().split())] for l in f.readlines()]
+
+         for i,l in enumerate(f.readlines()):
+
+            cpu_label="cpu{}".format(i)
+            for i,e in enumerate(l.rstrip().split()):
+               self._data["arp-cache"][cpu_label][attr_names[i]].append(str(int(e,16)))
 
    def _process_proc_net_stat_ndisc_cache(self):
       with open("/proc/net/stat/ndisc_cache", 'r') as f:
          attr_names = f.readline().split()
-         self._data["ndisc-cache"] = [[(attr_names[i],str(int(e,16))) for i,e in enumerate(l.rstrip().split())] for l in f.readlines()]
+
+         for i,l in enumerate(f.readlines()):
+
+            cpu_label="cpu{}".format(i)
+            for i,e in enumerate(l.rstrip().split()):
+               self._data["ndisc-cache"][cpu_label][attr_names[i]].append(str(int(e,16)))
 
    def _process_proc_net_stat_rt_cache(self):
+      """
+
+      index is cpu label
+      """
       with open("/proc/net/stat/rt_cache", 'r') as f:
          attr_names = f.readline().split()
-         self._data["rt-cache"] = [[(attr_names[i],str(int(e,16))) for i,e in enumerate(l.rstrip().split())] for l in f.readlines()]
+         for i,l in enumerate(f.readlines()):
+
+            cpu_label="cpu{}".format(i)
+            for i,e in enumerate(l.rstrip().split()):
+               self._data["rt-cache"][cpu_label][attr_names[i]].append(str(int(e,16)))
 
    def _process_proc_net_dev(self):
-      attr_names = ["if_name", 
-                    "rx_bytes", "rx_packets", "rx_errs", "rx_drop", "rx_fifo",
+      attr_names = ["rx_bytes", "rx_packets", "rx_errs", "rx_drop", "rx_fifo",
                     "rx_frame", "rx_compressed", "rx_multicast", 
                     "tx_bytes", "tx_packets", "tx_errs", "tx_drop", "tx_fifo",
                     "tx_cols", "tx_carrier", "tx_compressed"]
+
       with open("/proc/net/dev", 'r') as f:
-          self._data["net/dev"] = [[(attr_names[i],e.rstrip(':')) for i,e in enumerate(l.rstrip().split())] for l in f.readlines()[2:]]
+
+         for l in f.readlines()[2:]:
+            attr_val = [e.rstrip(':') for e in l.rstrip().split()]
+            index = attr_val[0] 
+
+            if index not in self._data["net/dev"]:
+               self._data["net/dev"][index] = init_rb_dict(attr_names,counter=True)
+
+            for i,e in enumerate(attr_val[1:]):
+               self._data["net/dev"][index][attr_names[i]].append(int(e))
 
    def _inet_ntoa(self, addr):
       """
@@ -233,10 +389,22 @@ class BMWatcher():
       return str(ipaddress.ip_address(bytes(reversed(bytearray.fromhex(addr)))))
 
    def _process_proc_net_arp(self):
-      attr_names = ["ip_addr", "type", "flags", "link_addr", "mask", "dev"]
+      """
+      list index is ip address
+      """
+      attr_names = ["type", "flags", "link_addr", "mask", "dev"]
 
-      with open("/proc/net/arp", 'r') as f:         
-         self._data["net/arp"] = [[(attr_names[i],e) for i,e in enumerate(l.rstrip().split())] for l in f.readlines()[1:]]
+      with open("/proc/net/arp", 'r') as f:
+         for l in f.readlines()[1:]:
+            split = l.rstrip().split()
+
+            # create entry if needed
+            ip_addr = split[0]
+            if ip_addr not in self._data["net/arp"]:
+               self._data["net/arp"][ip_addr] = init_rb_dict(attr_names,type=str)
+
+            for i,e in enumerate(split[1:]):
+               self._data["net/arp"][ip_addr][attr_names[i]].append(e)
 
 
    def _process_proc_net_route(self):
@@ -255,14 +423,14 @@ class BMWatcher():
             self._data["net/route"].append(entry)
 
 
-   def _open_read_append(self, path, attr_name, list):
+   def _open_read_append(self, path, obj):
       """
-      append content of file at path to list, if it exists
+      append content of file at path to an object, if file exists
 
       """
       try:
          with open(path) as f:
-            list.append((attr_name, f.read().rstrip()))
+            obj.append(f.read().rstrip())
       except:
          pass
 
@@ -270,46 +438,49 @@ class BMWatcher():
       """
       list interfaces and get their addresses
 
-      [ 
-         ["if_name": 'lo', 
-          [("link_addr", "00:00:00:00:00"),
-           ("link_broadcast", "ff:ff:ff:ff:ff"),
-           ("link_peer" , "00:00:01:00:00")],
-
-          [("ip4_addr", "127.0.0.1"),
-           ("ip4_broadcast", "127.0.0.255"),
-           ("ip4_netmask" , "255.255.255.254")],
-
-          [("ip6_addr", "::dead:beef"),
-           ("ip6_broadcastr", "::ffff")
-          ],
-         ],
-
-         ["if_name": 'enp4s0',  
-            ...
-         ],
-      ]
+      index is if_name
 
       """
 
-      self._data["bm_ifs"] = []
+      attr_list = [
+         "link_addr", "link_broadcast", "link_peer",  
+         "link_gw_addr", "link_gw_if", "link_gw_default",  
+         "ip4_addr", "ip4_broadcast", "ip4_netmask", "ip4_peer",
+         "ip4_gw_addr", "ip4_gw_if", "ip4_gw_default",  
+         "ip6_addr", "ip6_broadcast", "ip6_netmask", "ip6_peer",  
+         "ip6_gw_addr", "ip6_gw_if", "ip6_gw_default",  
+         
+         "numa_node", "local_cpulist", "local_cpu",
+         "enable", "current_link_speed", "current_link_width",
+         "mtu", "tx_queue_len", "duplex", "carrier",
+          "operstate",
+
+         "carrier_down_count", "carrier_up_count",
+      ]
+
+      type_list = 31*[str] + 2*[int]
+      counter_list = 31*[False] + 2*[True]
+
       gws = netifaces.gateways()
       for if_name in netifaces.interfaces(): #os.listdir("/sys/class/net")
-         addrs = netifaces.ifaddresses(if_name)
-         if_attrs = [("if_name",if_name)]
+         
+         # create dict if interface was never observed
+         if if_name not in self._data["bm_ifs"]:
+            self._data["bm_ifs"][if_name] = init_rb_dict(attr_list, types=type_list, 
+                                                         counters=counter_list)
 
-         # eth
+         # link
+         addrs = netifaces.ifaddresses(if_name)
          if netifaces.AF_LINK in addrs:
-            link_attrs = []
 
             # addresses
             for item in addrs[netifaces.AF_LINK]:
                if "addr" in item:
-                  link_attrs.append(("link_addr", item["addr"]))
+                  self._data["bm_ifs"][if_name]["link_addr"].append(item["addr"])
                if "broadcast" in item:
-                  link_attrs.append(("link_broadcast", item["broadcast"]))
+                  self._data["bm_ifs"][if_name]["link_broadcast"].append(item["broadcast"])
                if "peer" in item:
-                  link_attrs.append(("link_peer", item["peer"]))
+                  self._data["bm_ifs"][if_name]["link_peer"].append(item["peer"])
 
             # gateways
             if netifaces.AF_LINK in gws:
@@ -317,26 +488,23 @@ class BMWatcher():
 
                   if item[1] != if_name:
                      continue
-                  link_attrs.append(("gateway_addr", item[0]))
-                  link_attrs.append(("gateway_if", item[1]))
-                  link_attrs.append(("gateway_default", str(int(item[2]))))
-
-            if_attrs.append(link_attrs)
+                  self._data["bm_ifs"][if_name]["link_gw_addr"].append(item[0])
+                  self._data["bm_ifs"][if_name]["link_gw_if"].append(item[1])
+                  self._data["bm_ifs"][if_name]["link_gw_default"].append(str(int(item[2])))
 
          # ip4
          if netifaces.AF_INET in addrs:
-            inet_attrs = []
 
             # addr
             for item in addrs[netifaces.AF_INET]:
                if "addr" in item:
-                  inet_attrs.append(("ip4_addr", item["addr"]))
+                  self._data["bm_ifs"][if_name]["ip4_addr"].append(item["addr"])
                if "broadcast" in item:
-                  inet_attrs.append(("ip4_broadcast", item["broadcast"]))
+                  self._data["bm_ifs"][if_name]["ip4_broadcast"].append(item["broadcast"])
                if "netmask" in item:
-                  inet_attrs.append(("ip4_netmask", item["netmask"]))
+                  self._data["bm_ifs"][if_name]["ip4_netmask"].append(item["netmask"])
                if "peer" in item:
-                  inet_attrs.append(("ip4_peer", item["peer"]))
+                  self._data["bm_ifs"][if_name]["ip4_peer"].append(item["peer"])
 
             # gateways
             if netifaces.AF_INET in gws:
@@ -344,26 +512,24 @@ class BMWatcher():
 
                   if item[1] != if_name:
                      continue
-                  link_attrs.append(("gateway_addr", item[0]))
-                  link_attrs.append(("gateway_if", item[1]))
-                  link_attrs.append(("gateway_default", str(int(item[2]))))
 
-            if_attrs.append(inet_attrs)
+                  self._data["bm_ifs"][if_name]["ip4_gw_addr"].append(item[0])
+                  self._data["bm_ifs"][if_name]["ip4_gw_if"].append(item[1])
+                  self._data["bm_ifs"][if_name]["ip4_gw_default"].append(str(int(item[2])))
 
          # ip6 addr
          if netifaces.AF_INET6 in addrs:
-            inet6_attrs = []
 
             # addr
             for item in addrs[netifaces.AF_INET6]:
                if "addr" in item:
-                  inet6_attrs.append(("ip6_addr", item["addr"]))
+                  self._data["bm_ifs"][if_name]["link_addr"].append(item["addr"])
                if "broadcast" in item:
-                  inet6_attrs.append(("ip6_broadcast", item["broadcast"]))
+                  self._data["bm_ifs"][if_name]["ip6_broadcast"].append(item["broadcast"])
                if "netmask" in item:
-                  inet6_attrs.append(("ip6_netmask", item["netmask"]))
+                  self._data["bm_ifs"][if_name]["ip6_netmask"].append(item["netmask"])
                if "peer" in item:
-                  inet6_attrs.append(("ip6_peer", item["peer"]))
+                  self._data["bm_ifs"][if_name]["ip6_peer"].append(item["peer"])
 
             # gateways
             if netifaces.AF_INET6 in gws:
@@ -371,44 +537,41 @@ class BMWatcher():
 
                   if item[1] != if_name:
                      continue
-                  link_attrs.append(("gateway_addr", item[0]))
-                  link_attrs.append(("gateway_if", item[1]))
-                  link_attrs.append(("gateway_default", str(int(item[2]))))
 
-            if_attrs.append(inet6_attrs)
-
+                  self._data["bm_ifs"][if_name]["ip6_gw_addr"].append(item[0])
+                  self._data["bm_ifs"][if_name]["ip6_gw_if"].append(item[1])
+                  self._data["bm_ifs"][if_name]["ip6_gw_default"].append(str(int(item[2])))
+         #
          # non-standard if attributes
          # https://www.kernel.org/doc/Documentation/ABI/testing/sysfs-class-net
          #
          path_prefix="/sys/class/net/{}/".format(if_name)
          self._open_read_append(path_prefix+"carrier_down_count",
-            "carrier_down_count", if_attrs)
+             self._data["bm_ifs"][if_name]["carrier_down_count"])
          self._open_read_append(path_prefix+"carrier_up_count",
-            "carrier_up_count", if_attrs)
+             self._data["bm_ifs"][if_name]["carrier_up_count"])
          self._open_read_append(path_prefix+"device/numa_node",
-            "numa_node", if_attrs)
+             self._data["bm_ifs"][if_name]["numa_node"])
          self._open_read_append(path_prefix+"device/local_cpulist",
-            "local_cpulist", if_attrs)
+             self._data["bm_ifs"][if_name]["local_cpulist"])
          self._open_read_append(path_prefix+"device/local_cpu",
-            "local_cpu", if_attrs)
+             self._data["bm_ifs"][if_name]["local_cpu"])
          self._open_read_append(path_prefix+"device/enable",
-            "enable", if_attrs)
+             self._data["bm_ifs"][if_name]["enable"])
          self._open_read_append(path_prefix+"device/current_link_speed",
-            "current_link_speed", if_attrs)
+             self._data["bm_ifs"][if_name]["current_link_speed"])
          self._open_read_append(path_prefix+"device/current_link_width",
-            "current_link_width", if_attrs)
+             self._data["bm_ifs"][if_name]["current_link_width"])
          self._open_read_append(path_prefix+"mtu",
-            "mtu", if_attrs)
+             self._data["bm_ifs"][if_name]["mtu"])
          self._open_read_append(path_prefix+"tx_queue_len",
-            "tx_queue_len", if_attrs)
+             self._data["bm_ifs"][if_name]["tx_queue_len"])
          self._open_read_append(path_prefix+"duplex",
-            "duplex", if_attrs)
+             self._data["bm_ifs"][if_name]["duplex"])
          self._open_read_append(path_prefix+"carrier",
-            "carrier", if_attrs)
+             self._data["bm_ifs"][if_name]["carrier"])
          self._open_read_append(path_prefix+"operstate",
-            "operstate", if_attrs)
-
-         self._data["bm_ifs"].append(if_attrs)
+             self._data["bm_ifs"][if_name]["operstate"])
 
    def _process_net_settings(self):
       """
@@ -416,80 +579,76 @@ class BMWatcher():
       normally read through sysctl calls
 
       """
-      self._data["proc/sys"] = []
 
       with open("/proc/sys/net/core/rmem_default") as f:
-         self._data["proc/sys"].append(("net.core.rmem_default", f.read().rstrip(), "B"))
+         self._data["proc/sys"]["net.core.rmem_default"].append(f.read().rstrip())
       with open("/proc/sys/net/core/rmem_max") as f:
-         self._data["proc/sys"].append(("net.core.rmem_max", f.read().rstrip(), "B"))
+         self._data["proc/sys"]["net.core.rmem_max"].append(f.read().rstrip())
       with open("/proc/sys/net/core/wmem_default") as f:
-         self._data["proc/sys"].append(("net.core.wmem_default", f.read().rstrip(), "B"))
+         self._data["proc/sys"]["net.core.wmem_default"].append(f.read().rstrip())
       with open("/proc/sys/net/core/wmem_max") as f:
-         self._data["proc/sys"].append(("net.core.wmem_max", f.read().rstrip(), "B"))
+         self._data["proc/sys"]["net.core.wmem_max"].append(f.read().rstrip())
       with open("/proc/sys/net/core/default_qdisc") as f:
-         self._data["proc/sys"].append(("net.core.default_qdisc", f.read().rstrip()))
+         self._data["proc/sys"]["net.core.default_qdisc"].append(f.read().rstrip())
       with open("/proc/sys/net/core/netdev_max_backlog") as f:
-         self._data["proc/sys"].append(("net.core.netdev_max_backlog", f.read().rstrip()))
+         self._data["proc/sys"]["net.core.netdev_max_backlog"].append(f.read().rstrip())
 
       attr_suffixes=["_min","_pressure", "_max"]
       page_to_bytes=4096
       with open("/proc/sys/net/ipv4/tcp_mem") as f:
-         self._data["proc/sys"].extend([("net.ipv4.tcp_mem"+attr_suffixes[i],
-            str(int(e)*page_to_bytes), "B") for i,e in 
-                  enumerate(f.read().rstrip().split())])
+         for i,e in enumerate(f.read().rstrip().split()):
+            self._data["proc/sys"]["net.ipv4.tcp_mem"+attr_suffixes[i]].append(str(int(e)*page_to_bytes))
 
       attr_suffixes=["_min","_default", "_max"]
       with open("/proc/sys/net/ipv4/tcp_rmem") as f:
-         self._data["proc/sys"].extend([("net.ipv4.tcp_rmem"+attr_suffixes[i], e, "B")
-                        for i,e in enumerate(f.read().rstrip().split())])
+         for i,e in enumerate(f.read().rstrip().split()):
+            self._data["proc/sys"]["net.ipv4.tcp_rmem"+attr_suffixes[i]].append(e)
       with open("/proc/sys/net/ipv4/tcp_wmem") as f:
-         self._data["proc/sys"].extend([("net.ipv4.tcp_wmem"+attr_suffixes[i], e, "B")
-                        for i,e in enumerate(f.read().rstrip().split())])
+         for i,e in enumerate(f.read().rstrip().split()):
+            self._data["proc/sys"]["net.ipv4.tcp_wmem"+attr_suffixes[i]].append(e)
 
       with open("/proc/sys/net/ipv4/tcp_congestion_control") as f:
-         self._data["proc/sys"].append(("net.ipv4.tcp_congestion_control", 
-                                        f.read().rstrip()))
-
+         self._data["proc/sys"]["net.ipv4.tcp_congestion_control"].append(f.read().rstrip())
       with open("/proc/sys/net/ipv4/tcp_sack") as f:
-         self._data["proc/sys"].append(("net.ipv4.tcp_sack", f.read().rstrip()))
+         self._data["proc/sys"]["net.ipv4.tcp_sack"].append(f.read().rstrip())
       with open("/proc/sys/net/ipv4/tcp_dsack") as f:
-         self._data["proc/sys"].append(("net.ipv4.tcp_dsack", f.read().rstrip()))
+         self._data["proc/sys"]["net.ipv4.tcp_dsack"].append(f.read().rstrip())
       with open("/proc/sys/net/ipv4/tcp_fack") as f:
-         self._data["proc/sys"].append(("net.ipv4.tcp_fack", f.read().rstrip()))
+         self._data["proc/sys"]["net.ipv4.tcp_fack"].append(f.read().rstrip())
       with open("/proc/sys/net/ipv4/tcp_syn_retries") as f:
-         self._data["proc/sys"].append(("net.ipv4.tcp_syn_retries", f.read().rstrip()))
+         self._data["proc/sys"]["net.ipv4.tcp_syn_retries"].append(f.read().rstrip())
       with open("/proc/sys/net/ipv4/tcp_slow_start_after_idle") as f:
-         self._data["proc/sys"].append(("net.ipv4.tcp_slow_start_after_idle", f.read().rstrip()))
+         self._data["proc/sys"]["net.ipv4.tcp_slow_start_after_idle"].append(f.read().rstrip())
       with open("/proc/sys/net/ipv4/tcp_retries1") as f:
-         self._data["proc/sys"].append(("net.ipv4.tcp_retries1", f.read().rstrip()))
+         self._data["proc/sys"]["net.ipv4.tcp_retries1"].append(f.read().rstrip())
       with open("/proc/sys/net/ipv4/tcp_retries2") as f:
-         self._data["proc/sys"].append(("net.ipv4.tcp_retries2", f.read().rstrip()))
+         self._data["proc/sys"]["net.ipv4.tcp_retries2"].append(f.read().rstrip())
       with open("/proc/sys/net/ipv4/tcp_mtu_probing") as f:
-         self._data["proc/sys"].append(("net.ipv4.tcp_mtu_probing", f.read().rstrip()))
+         self._data["proc/sys"]["net.ipv4.tcp_mtu_probing"].append(f.read().rstrip())
       with open("/proc/sys/net/ipv4/tcp_max_syn_backlog") as f:
-         self._data["proc/sys"].append(("net.ipv4.tcp_max_syn_backlog", f.read().rstrip()))
+         self._data["proc/sys"]["net.ipv4.tcp_max_syn_backlog"].append(f.read().rstrip())
       with open("/proc/sys/net/ipv4/tcp_base_mss") as f:
-         self._data["proc/sys"].append(("net.ipv4.tcp_base_mss", f.read().rstrip()))
+         self._data["proc/sys"]["net.ipv4.tcp_base_mss"].append(f.read().rstrip())
       with open("/proc/sys/net/ipv4/tcp_min_snd_mss") as f:
-         self._data["proc/sys"].append(("net.ipv4.tcp_min_snd_mss", f.read().rstrip()))
+         self._data["proc/sys"]["net.ipv4.tcp_min_snd_mss"].append(f.read().rstrip())
       with open("/proc/sys/net/ipv4/tcp_ecn_fallback") as f:
-         self._data["proc/sys"].append(("net.ipv4.tcp_ecn_fallback", f.read().rstrip()))
+         self._data["proc/sys"]["net.ipv4.tcp_ecn_fallback"].append(f.read().rstrip())
       with open("/proc/sys/net/ipv4/tcp_ecn") as f:
-         self._data["proc/sys"].append(("net.ipv4.tcp_ecn", f.read().rstrip()))
+         self._data["proc/sys"]["net.ipv4.tcp_ecn"].append(f.read().rstrip())
       with open("/proc/sys/net/ipv4/tcp_adv_win_scale") as f:
-         self._data["proc/sys"].append(("net.ipv4.tcp_adv_win_scale", f.read().rstrip()))
+         self._data["proc/sys"]["net.ipv4.tcp_adv_win_scale"].append(f.read().rstrip())
       with open("/proc/sys/net/ipv4/tcp_window_scaling") as f:
-         self._data["proc/sys"].append(("net.ipv4.tcp_window_scaling", f.read().rstrip()))
+         self._data["proc/sys"]["net.ipv4.tcp_window_scaling"].append(f.read().rstrip())
       with open("/proc/sys/net/ipv4/tcp_tw_reuse") as f:
-         self._data["proc/sys"].append(("net.ipv4.tcp_tw_reuse", f.read().rstrip()))
+         self._data["proc/sys"]["net.ipv4.tcp_tw_reuse"].append(f.read().rstrip())
       with open("/proc/sys/net/ipv4/tcp_syncookies") as f:
-         self._data["proc/sys"].append(("net.ipv4.tcp_syncookies", f.read().rstrip()))
+         self._data["proc/sys"]["net.ipv4.tcp_syncookies"].append(f.read().rstrip())
       with open("/proc/sys/net/ipv4/tcp_timestamps") as f:
-         self._data["proc/sys"].append(("net.ipv4.tcp_timestamps", f.read().rstrip()))
+         self._data["proc/sys"]["net.ipv4.tcp_timestamps"].append(f.read().rstrip())
       with open("/proc/sys/net/ipv4/tcp_no_metrics_save") as f:
-         self._data["proc/sys"].append(("net.ipv4.tcp_no_metrics_save", f.read().rstrip()))
+         self._data["proc/sys"]["net.ipv4.tcp_no_metrics_save"].append(f.read().rstrip())
 
       with open("/proc/sys/net/ipv4/ip_forward") as f:
-         self._data["proc/sys"].append(("net.ipv4.ip_forward", f.read().rstrip()))
+         self._data["proc/sys"]["net.ipv4.ip_forward"].append(f.read().rstrip())
       with open("/proc/sys/net/ipv4/ip_no_pmtu_disc") as f:
-         self._data["proc/sys"].append(("net.ipv4.ip_no_pmtu_disc", f.read().rstrip()))
+         self._data["proc/sys"]["net.ipv4.ip_no_pmtu_disc"].append(f.read().rstrip())

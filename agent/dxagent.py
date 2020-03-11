@@ -75,14 +75,40 @@ class DXAgent(IOManager):
       self.scheduler.enter(1,0,self.process)
 
    def _format_attrs(self, category):
+      """
+      format a list of tuples into a curses pad
+ 
+      """
       self.pad_raw_input.addstr(category+"\n", curses.A_BOLD)
       for e in self._data[category]:
          self.pad_raw_input.addstr(e[0]+": ")
          self.pad_raw_input.addstr(" ".join(e[1:])+" ")
-      self.pad_raw_input.addstr("\n")
-      self.pad_raw_input.addstr("\n")
+      self.pad_raw_input.addstr("\n\n")
+
+   def _format_attrs_rb(self, category):
+      """
+      format a dict of ringbuffers into a curses pad
+ 
+      """
+      self.pad_raw_input.addstr(category+"\n", curses.A_BOLD)
+      for k,d in self._data[category].items():
+         if d.is_empty():
+            continue
+
+         if d.unit():
+            self.pad_raw_input.addstr("{}: {} {} ({}) ".format(k,d.top(),d.unit(),
+               d.dynamicity()))
+         else:
+            self.pad_raw_input.addstr("{}: {} ({}) ".format(k,d.top(),
+                  d.dynamicity()))
+            
+      self.pad_raw_input.addstr("\n\n")
 
    def _format_attrs_list(self, category):
+      """
+      format a list of list (opt:of list) of tuples into a curses pad
+ 
+      """
       self.pad_raw_input.addstr(category+"\n", curses.A_BOLD)
       for l in self._data[category]:
          for e in l:
@@ -99,6 +125,26 @@ class DXAgent(IOManager):
                self.pad_raw_input.addstr(e[0]+": ")
                self.pad_raw_input.addstr(" ".join(e[1:])+" ")
          self.pad_raw_input.addstr("\n")
+      self.pad_raw_input.addstr("\n")
+
+   def _format_attrs_list_rb(self, category):
+      """
+      format a dict of dict of ringbuffers into a curses pad
+ 
+      """
+      self.pad_raw_input.addstr(category+"\n", curses.A_BOLD)
+
+      for k,d in self._data[category].items():
+         self.pad_raw_input.addstr(k+": \n")
+
+         for kk,dd in d.items():
+            if dd.is_empty():
+               continue
+
+            self.pad_raw_input.addstr("{}: {} ({}) ".format(kk,dd.top(),dd.dynamicity()))
+
+         self.pad_raw_input.addstr("\n")
+
       self.pad_raw_input.addstr("\n")
 
    def _center_text(self, pad, text, *args):
@@ -121,27 +167,29 @@ class DXAgent(IOManager):
       self.pad_raw_input.addstr(str(self.sysinfo)+"\n")
       self.pad_raw_input.addstr("\nBareMetal:\n\n", curses.A_BOLD)
 
-      self._format_attrs_list("bm_ifs")
-      self._format_attrs("stats_global")
-      self._format_attrs("uptime")
-      self._format_attrs("loadavg")
-      self._format_attrs_list("net/dev")
-      self._format_attrs("meminfo")
-      self._format_attrs_list("swaps")
-      self._format_attrs("proc/sys")
-      self._format_attrs("netstat")
-      self._format_attrs("snmp")  
-      self._format_attrs_list("net/arp")
-      self._format_attrs_list("stat/cpu")
-      self._format_attrs("stat")
-      self._format_attrs_list("rt-cache")
-      self._format_attrs_list("ndisc-cache")
+      self._format_attrs_list_rb("bm_ifs")
+      self._format_attrs_rb("stats_global")
+      self._format_attrs_rb("uptime")
+      self._format_attrs_rb("loadavg")
+      self._format_attrs_list_rb("net/dev")
+      self._format_attrs_rb("meminfo")
+      self._format_attrs_list_rb("swaps")
+      self._format_attrs_rb("proc/sys")
+      self._format_attrs_rb("netstat")
+      self._format_attrs_rb("snmp")  
+      self._format_attrs_list_rb("net/arp")
+      self._format_attrs_list_rb("stat/cpu")
+      self._format_attrs_rb("stat")
+      self._format_attrs_list_rb("rt-cache")
+      self._format_attrs_list_rb("arp-cache")
+      self._format_attrs_list_rb("ndisc-cache")
       self._format_attrs_list("net/route")
 
       self.pad_raw_input.addstr("\nVirtual Machines:\n\n", curses.A_BOLD)   
       self._format_attrs("virtualbox/system")
       self._format_attrs_list("virtualbox/vms")
 
+      # XXX: very verbose at the end
       self._format_attrs_list("stats")
 
       self.pad_health_metrics = curses.newpad(self.max_lines, self.width)

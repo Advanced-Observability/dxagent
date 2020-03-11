@@ -8,6 +8,7 @@ vm_health.py
 
 import virtualbox
 from virtualbox.library import MachineState
+from agent.buffer import init_rb_dict
 
 # vbox states without pseudo-states
 _virtualbox_states = [
