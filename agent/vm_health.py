@@ -103,7 +103,6 @@ class VMWatcher():
 
          # probe for guest metrics
          val, metric_attrs, _, units, scales, _, _, _ = self.vbox_perf.query_metrics_data([], [m])
-         self.info(val)
          vm_attrs.extend([(attr, str(val[i]/scales[i]), units[i]) for i,attr in enumerate(metric_attrs)])
 
          self._data["virtualbox/vms"].append(vm_attrs)
