@@ -63,7 +63,7 @@ class VMWatcher():
       attr_list = ["cpu", "state", "accessible", "id", "os_type_id", "cpu_cap", 
          "mem_size", "vram_size", "firmware", "chipset", "session_state", 
          "session_name", "session_pid",  "last_state_change",  "snapshot_count",
-         "io_cache_enabled",  "io_cache_size", "net_count",
+         "io_cache_enabled",  "io_cache_size", "/VirtualBox/GuestInfo/Net/Count",
          'CPU/Load/User', 'CPU/Load/User:avg', 'CPU/Load/User:min', 'CPU/Load/User:max',
          'CPU/Load/Kernel', 'CPU/Load/Kernel:avg', 'CPU/Load/Kernel:min',
          'CPU/Load/Kernel:max', 'RAM/Usage/Used', 'RAM/Usage/Used:avg',
@@ -143,7 +143,7 @@ class VMWatcher():
          # probe for guest networks
          guestinfo_prefix="/VirtualBox/GuestInfo/Net/"
          net_count =  m.get_guest_property(guestinfo_prefix+"Count")[0]
-         vm_attrs.append(("net_count", net_count))
+         vm_attrs.append(("/VirtualBox/GuestInfo/Net/Count", net_count))
 
          # probe for guest metrics
          val, metric_attrs, _, _, scales, _, _, _ = self.vbox_perf.query_metrics_data([], [m])
