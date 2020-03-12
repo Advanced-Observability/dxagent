@@ -29,6 +29,12 @@ arrow left, arrow right: switch between screens
 - [netifaces](https://pypi.org/project/netifaces/)
    - `python3 -m pip install netifaces`
 
+## Important files
+
+- `dxagent`
+
+- `fields.csv` lists all monitored fields
+
 ## Author
 
 Korian Edeline
