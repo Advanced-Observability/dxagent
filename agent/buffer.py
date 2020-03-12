@@ -54,6 +54,19 @@ class RingBuffer(collections.deque):
    def is_empty(self):
       return not self
 
+   def append(self, e):
+      """
+      overload collections.deque to cast val before
+      appending
+
+      """
+      if self.type == int:
+         super().append(int(e))
+      elif self.type == float:
+         super().append(float(e))
+      elif self.type == str:
+         super().append(str(e))
+
    def top(self):
       """
       @return last value

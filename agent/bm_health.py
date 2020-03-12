@@ -199,7 +199,7 @@ class BMWatcher():
       with open("/proc/meminfo", 'r') as f:
          for l in f.readlines():
             elements = l.rstrip().split()
-            self._data["meminfo"][elements[0].rstrip(':')].append(int(elements[1]))
+            self._data["meminfo"][elements[0].rstrip(':')].append(elements[1])
 
    def _process_proc_stats(self):
       attr_names = [ "comm", "state", "ppid", "pgrp", "sid",
@@ -239,7 +239,7 @@ class BMWatcher():
 
                # READ 
                for i,e in enumerate( ([comm]+split[-1].split())[:len(attr_names)] ):
-                  self._data["stats"][pid][attr_names[i]].append(e if i<2 else int(e))
+                  self._data["stats"][pid][attr_names[i]].append(e)
             
             active_procs.append(pid)
             proc_state[self._data["stats"][pid]["state"].top()] += 1
@@ -272,11 +272,11 @@ class BMWatcher():
                split = l.rstrip().split()
                cpu_label = split[0]
                for i,e in enumerate(split[1:]):
-                  self._data["stat/cpu"][cpu_label][attr_names[i]].append(int(e))
+                  self._data["stat/cpu"][cpu_label][attr_names[i]].append(e)
 
             else:
                k, d = l.rstrip().split()[:2]
-               self._data["stat"][k].append(int(d))
+               self._data["stat"][k].append(d)
 
    def _process_proc_loadavg(self):
       attr_names = ["1min", "5min", "15min", "runnable", "total"]
@@ -285,11 +285,11 @@ class BMWatcher():
          for i, e in enumerate(f.readline().rstrip().split()):
             if i == 3:
                vals = e.split('/')
-               self._data["loadavg"][attr_names[i]].append(float(vals[0]))
-               self._data["loadavg"][attr_names[i+1]].append(float(vals[1]))
+               self._data["loadavg"][attr_names[i]].append(vals[0])
+               self._data["loadavg"][attr_names[i+1]].append(vals[1])
                break
             else:
-               self._data["loadavg"][attr_names[i]].append(float(e))
+               self._data["loadavg"][attr_names[i]].append(e)
 
    def _process_proc_swaps(self):
       """
@@ -306,7 +306,7 @@ class BMWatcher():
             swap_label = split[0]
             active_swaps.append(swap_label)
             if swap_label not in self._data["swaps"]:
-               self._data["swaps"][swap_label] = init_rb_dict(attr_names)
+               self._data["swaps"][swap_label] = init_rb_dict(attr_names, type=str)
 
             for i,e in enumerate(split[1:]):
                self._data["swaps"][swap_label][attr_names[i]].append(e)
@@ -338,7 +338,7 @@ class BMWatcher():
                break
             prefix = attrs[0].rstrip(':')
             for attr,val in zip(attrs[1:], vals[1:]):
-               self._data["netstat"][prefix+attr].append(int(val))
+               self._data["netstat"][prefix+attr].append(val)
 
    def _process_proc_net_snmp(self):
 
@@ -350,7 +350,7 @@ class BMWatcher():
                break
             prefix = attrs[0].rstrip(':')
             for attr,val in zip(attrs[1:], vals[1:]):
-               self._data["snmp"][prefix+attr].append(int(val))
+               self._data["snmp"][prefix+attr].append(val)
 
    def _process_proc_net_stat_arp_cache(self):
       with open("/proc/net/stat/arp_cache", 'r') as f:
@@ -360,7 +360,7 @@ class BMWatcher():
 
             cpu_label="cpu{}".format(i)
             for i,e in enumerate(l.rstrip().split()):
-               self._data["arp-cache"][cpu_label][attr_names[i]].append(str(int(e,16)))
+               self._data["arp-cache"][cpu_label][attr_names[i]].append(int(e,16))
 
    def _process_proc_net_stat_ndisc_cache(self):
       with open("/proc/net/stat/ndisc_cache", 'r') as f:
@@ -370,7 +370,7 @@ class BMWatcher():
 
             cpu_label="cpu{}".format(i)
             for i,e in enumerate(l.rstrip().split()):
-               self._data["ndisc-cache"][cpu_label][attr_names[i]].append(str(int(e,16)))
+               self._data["ndisc-cache"][cpu_label][attr_names[i]].append(int(e,16))
 
    def _process_proc_net_stat_rt_cache(self):
       """
@@ -383,7 +383,7 @@ class BMWatcher():
 
             cpu_label="cpu{}".format(i)
             for i,e in enumerate(l.rstrip().split()):
-               self._data["rt-cache"][cpu_label][attr_names[i]].append(str(int(e,16)))
+               self._data["rt-cache"][cpu_label][attr_names[i]].append(int(e,16))
 
    def _process_proc_net_dev(self):
       attr_names = ["rx_bytes", "rx_packets", "rx_errs", "rx_drop", "rx_fifo",
@@ -402,7 +402,7 @@ class BMWatcher():
                self._data["net/dev"][index] = init_rb_dict(attr_names,counter=True)
 
             for i,e in enumerate(attr_val[1:]):
-               self._data["net/dev"][index][attr_names[i]].append(int(e))
+               self._data["net/dev"][index][attr_names[i]].append(e)
 
             active_ifs.append(index)
 
@@ -530,7 +530,7 @@ class BMWatcher():
                      continue
                   self._data["bm_ifs"][if_name]["link_gw_addr"].append(item[0])
                   self._data["bm_ifs"][if_name]["link_gw_if"].append(item[1])
-                  self._data["bm_ifs"][if_name]["link_gw_default"].append(str(int(item[2])))
+                  self._data["bm_ifs"][if_name]["link_gw_default"].append(item[2])
 
          # ip4
          if netifaces.AF_INET in addrs:
@@ -555,7 +555,7 @@ class BMWatcher():
 
                   self._data["bm_ifs"][if_name]["ip4_gw_addr"].append(item[0])
                   self._data["bm_ifs"][if_name]["ip4_gw_if"].append(item[1])
-                  self._data["bm_ifs"][if_name]["ip4_gw_default"].append(str(int(item[2])))
+                  self._data["bm_ifs"][if_name]["ip4_gw_default"].append(item[2])
 
          # ip6 addr
          if netifaces.AF_INET6 in addrs:
@@ -580,7 +580,7 @@ class BMWatcher():
 
                   self._data["bm_ifs"][if_name]["ip6_gw_addr"].append(item[0])
                   self._data["bm_ifs"][if_name]["ip6_gw_if"].append(item[1])
-                  self._data["bm_ifs"][if_name]["ip6_gw_default"].append(str(int(item[2])))
+                  self._data["bm_ifs"][if_name]["ip6_gw_default"].append(tem[2])
          #
          # non-standard if attributes
          # https://www.kernel.org/doc/Documentation/ABI/testing/sysfs-class-net
@@ -642,7 +642,8 @@ class BMWatcher():
       page_to_bytes=4096
       with open("/proc/sys/net/ipv4/tcp_mem") as f:
          for i,e in enumerate(f.read().rstrip().split()):
-            self._data["proc/sys"]["net.ipv4.tcp_mem"+attr_suffixes[i]].append(str(int(e)*page_to_bytes))
+            self._data["proc/sys"]["net.ipv4.tcp_mem"+attr_suffixes[i]].append(
+                  int(e)*page_to_bytes)
 
       attr_suffixes=["_min","_default", "_max"]
       with open("/proc/sys/net/ipv4/tcp_rmem") as f:

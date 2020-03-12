@@ -46,9 +46,6 @@ class IOManager():
       """
 
       parser = argparse.ArgumentParser(description='Diagnostic Agent')
-#      #parser.add_argument('username', nargs=1, help='PlanetLab username', type=str)
-#      #parser.add_argument('login', nargs=1, help='PlanetLab website username', type=str)
-#      #parser.add_argument('password', nargs=1, help='PlanetLab website password', type=str)
 
       parser.add_argument('-l' , '--log-file', type=str, default="dxagent.log",
                          help='log file location (default: dxagent.log)')
@@ -56,6 +53,8 @@ class IOManager():
       parser.add_argument('-c' , '--config', type=str, default="./dxagent.ini",
                          help='configuration file location')
       parser.add_argument('-d' , '--debug', action='store_true',
+                         help='increase output level') 
+      parser.add_argument('-v' , '--verbose', action='store_true',
                          help='increase output level') 
 
       self.args = parser.parse_args()

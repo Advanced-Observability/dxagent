@@ -122,10 +122,10 @@ meminfo,Hugepagesize,int,0,kB,
 meminfo,Hugetlb,int,0,kB,
 meminfo,DirectMap4k,int,0,kB,
 meminfo,DirectMap2M,int,0,kB,
-swaps,type,int,0,,swap_name
-swaps,size,int,0,,swap_name
-swaps,used,int,0,,swap_name
-swaps,priority,int,0,,swap_name
+swaps,type,str,0,,swap_name
+swaps,size,str,0,,swap_name
+swaps,used,str,0,,swap_name
+swaps,priority,str,0,,swap_name
 proc/sys,net.core.rmem_default,int,0,B,
 proc/sys,net.core.rmem_max,int,0,B,
 proc/sys,net.core.wmem_default,int,0,B,

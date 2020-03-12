@@ -136,9 +136,13 @@ class DXAgent(IOManager):
          for kk,dd in d.items():
             if dd.is_empty():
                continue
-            #.info(dd.dynamicity())
-            #self.pad_raw_input.addstr("{}: {} ".format(kk,dd.dynamicity()))
-            self.pad_raw_input.addstr("{}: {} ({}) ".format(kk,dd.top(),dd.dynamicity()))
+
+            if dd.unit():
+               self.pad_raw_input.addstr("{}: {} {} ({}) ".format(kk,dd.top(),dd.unit(),
+                  dd.dynamicity()))
+            else:
+               self.pad_raw_input.addstr("{}: {} ({}) ".format(kk,dd.top(),
+                     dd.dynamicity()))
 
          self.pad_raw_input.addstr("\n")
 
@@ -183,11 +187,12 @@ class DXAgent(IOManager):
       self._format_attrs_list("net/route")
 
       self.pad_raw_input.addstr("\nVirtual Machines:\n\n", curses.A_BOLD)   
-      self._format_attrs("virtualbox/system")
-      self._format_attrs_list("virtualbox/vms")
+      self._format_attrs_rb("virtualbox/system")
+      self._format_attrs_list_rb("virtualbox/vms")
 
-      # XXX: very verbose at the end
-      self._format_attrs_list_rb("stats")
+      # XXX: very verbose at the end, also very greedy
+      if self.args.verbose:
+         self._format_attrs_list_rb("stats")
 
       self.pad_health_metrics = curses.newpad(self.max_lines, self.width)
       self._center_text(self.pad_health_metrics, "HEALTH\n\n",
