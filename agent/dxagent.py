@@ -43,7 +43,7 @@ class DXAgent(IOManager):
       self.top = 0 
       self.screen = 0
       self.max_screens = 2
-      self.max_lines = 2**12  
+      self.max_lines = 2**14
 
       self._data = {}
 
@@ -53,15 +53,11 @@ class DXAgent(IOManager):
       self.vpp_watcher = VPPWatcher(self._data, self.info)
 
    def _input(self):
-     
-      
+
       self.bm_watcher.input()
       self.vm_watcher.input()
       self.vpp_watcher.input()
-      """
-      ioam 
-
-      """
+      # XXX: ioam
 
    def process(self):
       """
@@ -140,7 +136,8 @@ class DXAgent(IOManager):
          for kk,dd in d.items():
             if dd.is_empty():
                continue
-
+            #.info(dd.dynamicity())
+            #self.pad_raw_input.addstr("{}: {} ".format(kk,dd.dynamicity()))
             self.pad_raw_input.addstr("{}: {} ({}) ".format(kk,dd.top(),dd.dynamicity()))
 
          self.pad_raw_input.addstr("\n")
@@ -190,7 +187,7 @@ class DXAgent(IOManager):
       self._format_attrs_list("virtualbox/vms")
 
       # XXX: very verbose at the end
-      self._format_attrs_list("stats")
+      self._format_attrs_list_rb("stats")
 
       self.pad_health_metrics = curses.newpad(self.max_lines, self.width)
       self._center_text(self.pad_health_metrics, "HEALTH\n\n",

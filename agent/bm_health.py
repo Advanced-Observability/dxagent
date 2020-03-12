@@ -23,11 +23,12 @@ class BMWatcher():
    def _init_dicts(self):
 
       # init categories whose input count are prone to change during execution
-      # e.g., interfaces 
+      # e.g., interfaces , processes
       self._data["net/dev"] = {}
       self._data["bm_ifs"] = {}
       self._data["swaps"] = {}
       self._data["net/arp"] = {}
+      self._data["stats"] = {}
 
       # uptime
       attr_list = ["up", "idle"]
@@ -201,7 +202,7 @@ class BMWatcher():
             self._data["meminfo"][elements[0].rstrip(':')].append(int(elements[1]))
 
    def _process_proc_stats(self):
-      attr_names = [ "pid", "comm", "state", "ppid", "pgrp", "sid",
+      attr_names = [ "comm", "state", "ppid", "pgrp", "sid",
                      "tty_nr", "tty_pgrp", "flags", "min_flt", "cmin_flt",
                      "maj_flt", "cmaj_flt", "utime", "stime", "cutime",
                      "cstime", "priority", "nice", "num_threads", "itrealvalue",
@@ -211,10 +212,12 @@ class BMWatcher():
                      "cnswap", "exit_signal", "processor", "rt_priority",
                      "policy", "delayacct_blkio_ticks", "gtime", 
                      "cgtime"]
-      self._data["stats"] = []
+      attr_types = 2*[str] + 41*[int]
+
       root_dir = "/proc/"
       proc_state = {"R":0, "S":0, "D":0, "T":0, "t":0, "X":0, "Z":0,
                     "P":0,"I": 0, }
+      active_procs = []
       for d in next(os.walk(root_dir))[1]:
 
          # not a proc
@@ -228,12 +231,25 @@ class BMWatcher():
                split = line.split('(')
                pid = split[0].rstrip()
                split = split[-1].split(')')
-               comm = split[0]         
-               
-               self._data["stats"].append([(attr_names[i], e) for i,e in enumerate(([pid,comm]+split[-1].split())[:len(attr_names)])])
-            proc_state[self._data["stats"][-1][2][1]] += 1
+               comm = split[0]
+
+               # create new rb if needed
+               if pid not in self._data["stats"]:
+                  self._data["stats"][pid] = init_rb_dict(attr_names, types=attr_types)
+
+               # READ 
+               for i,e in enumerate( ([comm]+split[-1].split())[:len(attr_names)] ):
+                  self._data["stats"][pid][attr_names[i]].append(e if i<2 else int(e))
+            
+            active_procs.append(pid)
+            proc_state[self._data["stats"][pid]["state"].top()] += 1
          except:
             pass
+
+      # cleanup expired procs
+      for monitored_pid in list(self._data["stats"].keys()):
+         if monitored_pid not in active_procs:
+            del self._data["stats"][monitored_pid]
 
       # count procs
       self._data["stats_global"]["proc_count"].append(len(self._data["stats"]))
@@ -280,18 +296,25 @@ class BMWatcher():
       index is swap filename
       """
 
-      attr_names = ["type", "size", "used", "priority"] 
+      attr_names = ["type", "size", "used", "priority"]
+      active_swaps = []
       with open("/proc/swaps", 'r') as f:
          for l in f.readlines()[1:]:
             split = l.rstrip().split()
 
             # create swap if needed
             swap_label = split[0]
+            active_swaps.append(swap_label)
             if swap_label not in self._data["swaps"]:
                self._data["swaps"][swap_label] = init_rb_dict(attr_names)
 
             for i,e in enumerate(split[1:]):
                self._data["swaps"][swap_label][attr_names[i]].append(e)
+
+      # cleanup unmounted/deleted swaps
+      for monitored_swaps in list(self._data["swaps"].keys()):
+         if monitored_swaps not in active_swaps:
+            del self._data["swaps"][monitored_swaps]
 
    def _process_proc_uptime(self):
       attr_names = ["up", "idle"]
@@ -368,6 +391,7 @@ class BMWatcher():
                     "tx_bytes", "tx_packets", "tx_errs", "tx_drop", "tx_fifo",
                     "tx_cols", "tx_carrier", "tx_compressed"]
 
+      active_ifs = []
       with open("/proc/net/dev", 'r') as f:
 
          for l in f.readlines()[2:]:
@@ -379,6 +403,13 @@ class BMWatcher():
 
             for i,e in enumerate(attr_val[1:]):
                self._data["net/dev"][index][attr_names[i]].append(int(e))
+
+            active_ifs.append(index)
+
+      # cleanup expired ifs
+      for monitored_ifs in list(self._data["net/dev"].keys()):
+         if monitored_ifs not in active_ifs:
+            del self._data["net/dev"][monitored_ifs]
 
    def _inet_ntoa(self, addr):
       """
@@ -394,17 +425,24 @@ class BMWatcher():
       """
       attr_names = ["type", "flags", "link_addr", "mask", "dev"]
 
+      active_entry=[]
       with open("/proc/net/arp", 'r') as f:
          for l in f.readlines()[1:]:
             split = l.rstrip().split()
 
             # create entry if needed
             ip_addr = split[0]
+            active_entry.append(ip_addr)
             if ip_addr not in self._data["net/arp"]:
                self._data["net/arp"][ip_addr] = init_rb_dict(attr_names,type=str)
 
             for i,e in enumerate(split[1:]):
                self._data["net/arp"][ip_addr][attr_names[i]].append(e)
+
+      # cleanup old entries
+      for monitored_entry in list(self._data["net/arp"].keys()):
+         if monitored_entry not in active_entry:
+            del self._data["net/arp"][monitored_entry]
 
 
    def _process_proc_net_route(self):
@@ -462,9 +500,11 @@ class BMWatcher():
       counter_list = 31*[False] + 2*[True]
 
       gws = netifaces.gateways()
+      active_ifs = []
       for if_name in netifaces.interfaces(): #os.listdir("/sys/class/net")
          
          # create dict if interface was never observed
+         active_ifs.append(if_name)
          if if_name not in self._data["bm_ifs"]:
             self._data["bm_ifs"][if_name] = init_rb_dict(attr_list, types=type_list, 
                                                          counters=counter_list)
@@ -572,6 +612,11 @@ class BMWatcher():
              self._data["bm_ifs"][if_name]["carrier"])
          self._open_read_append(path_prefix+"operstate",
              self._data["bm_ifs"][if_name]["operstate"])
+
+      # cleanup expired ifs
+      for monitored_ifs in list(self._data["bm_ifs"].keys()):
+         if monitored_ifs not in active_ifs:
+            del self._data["bm_ifs"][monitored_ifs]
 
    def _process_net_settings(self):
       """
