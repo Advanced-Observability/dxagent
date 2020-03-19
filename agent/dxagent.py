@@ -91,12 +91,18 @@ class DXAgent(IOManager):
          if d.is_empty():
             continue
 
+         self.pad_raw_input.addstr("{}: ".format(k))
+
+         value, severity = d.top()
+         self.pad_raw_input.addstr("{} ".format(value), 
+            curses.color_pair(severity.value))
+
          if d.unit():
-            self.pad_raw_input.addstr("{}: {} {} ({}) ".format(k,d.top(),d.unit(),
-               d.dynamicity()))
-         else:
-            self.pad_raw_input.addstr("{}: {} ({}) ".format(k,d.top(),
-                  d.dynamicity()))
+            self.pad_raw_input.addstr("{} ".format(d.unit()))
+
+         value, severity = d.dynamicity()
+         self.pad_raw_input.addstr("({}) ".format(value),
+            curses.color_pair(severity.value))
             
       self.pad_raw_input.addstr("\n\n")
 
@@ -137,12 +143,18 @@ class DXAgent(IOManager):
             if dd.is_empty():
                continue
 
+            self.pad_raw_input.addstr("{}: ".format(kk))
+
+            value, severity = dd.top()
+            self.pad_raw_input.addstr("{} ".format(value), 
+               curses.color_pair(severity.value))
+
             if dd.unit():
-               self.pad_raw_input.addstr("{}: {} {} ({}) ".format(kk,dd.top(),dd.unit(),
-                  dd.dynamicity()))
-            else:
-               self.pad_raw_input.addstr("{}: {} ({}) ".format(kk,dd.top(),
-                     dd.dynamicity()))
+               self.pad_raw_input.addstr("{} ".format(dd.unit()))
+
+            value, severity = dd.dynamicity()
+            self.pad_raw_input.addstr("({}) ".format(value),
+               curses.color_pair(severity.value))
 
          self.pad_raw_input.addstr("\n")
 

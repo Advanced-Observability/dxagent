@@ -242,7 +242,7 @@ class BMWatcher():
                   self._data["stats"][pid][attr_names[i]].append(e)
             
             active_procs.append(pid)
-            proc_state[self._data["stats"][pid]["state"].top()] += 1
+            proc_state[self._data["stats"][pid]["state"]._top()] += 1
          except:
             pass
 
@@ -563,7 +563,7 @@ class BMWatcher():
             # addr
             for item in addrs[netifaces.AF_INET6]:
                if "addr" in item:
-                  self._data["bm_ifs"][if_name]["link_addr"].append(item["addr"])
+                  self._data["bm_ifs"][if_name]["ip6_addr"].append(item["addr"])
                if "broadcast" in item:
                   self._data["bm_ifs"][if_name]["ip6_broadcast"].append(item["broadcast"])
                if "netmask" in item:

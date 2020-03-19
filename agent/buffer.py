@@ -8,6 +8,7 @@ buffer.py
 
 import numpy as np
 import collections
+from enum import Enum
 
 # max number of collected values
 _BUFFER_SIZE=60
@@ -32,6 +33,15 @@ def init_rb_dict(keys, type=int, types=None,
                            counter=counters[i] if counters else counter, 
                            unit=units[i] if units else unit) 
             for i,attr in enumerate(keys)}
+
+class Severity(Enum):
+   """
+   Severity indicator
+
+   """
+   GREEN=0
+   ORANGE=1
+   RED=2
 
 class RingBuffer(collections.deque):
 
@@ -65,9 +75,9 @@ class RingBuffer(collections.deque):
       elif self.type == float:
          super().append(float(e))
       elif self.type == str:
-         super().append(str(e))
+         super().append(str(e))    
 
-   def top(self):
+   def _top(self):
       """
       @return last value
 
@@ -79,6 +89,32 @@ class RingBuffer(collections.deque):
             return ""
          else:
             return 0
+
+   def top(self):
+      """
+      @return a tuple composed of
+         top value
+         severity indicator
+
+      """
+      return self._top(), self._top_severity()
+
+   def _top_severity(self):
+      """
+      @return a severity level for monitored value
+
+      """
+      if not self.counter and (self.type == int or self.type == float):
+
+         if self._top() > self.mean()*10:
+            return Severity.RED
+         elif self._top() > self.mean()*3:
+            return Severity.ORANGE
+
+      elif self.type == str:
+         return Severity.GREEN
+
+      return Severity.GREEN
 
    def mean(self):
       """
@@ -124,7 +160,7 @@ class RingBuffer(collections.deque):
       """
       return not self.is_empty() and self.count(self.__getitem__(0)) != len(self)
 
-   def dynamicity(self):
+   def _dynamicity(self):
       """
 
       @return delta() if counter is True
@@ -137,6 +173,30 @@ class RingBuffer(collections.deque):
          return self.delta()
       else:
          return self.mean()
+
+   def dynamicity(self):
+      """
+      @return a tuple composed of
+         dynamicity value
+         severity indicator
+
+      """
+      return self._dynamicity(), self._dynamicity_severity()
+
+   def _dynamicity_severity(self):
+      """
+      @return a severity level for monitored value dynamicity
+
+      """
+
+      if self.type == str and self.has_changed():
+         return Severity.ORANGE
+      elif self.counter:
+         return Severity.GREEN
+      else:
+         return Severity.GREEN
+
+      return Severity.GREEN
 
    def unit(self):
       return self._unit

@@ -166,6 +166,8 @@ class VMWatcher():
                d = str(m.get_guest_property(attr)[0])
                self._data["virtualbox/vms"][name][attr].append(d)
 
+         # 
+
       # renew registration for new vms XXX
       self.vbox_perf.setup_metrics([], self._vbox.machines, _virtualbox_metrics_sampling_period, 
                                   _virtualbox_metrics_sampling_count)
