@@ -12,6 +12,7 @@ vm_libs=[]
 try:
    import virtualbox
    from virtualbox.library import MachineState
+   import vboxapi
    vm_libs.append("virtualbox")
 except:
    pass
