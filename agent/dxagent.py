@@ -13,6 +13,7 @@ import curses
 import time
 import string
 
+import agent
 from agent.ios import IOManager
 from agent.sysinfo import SysInfo
 from agent.bm_health import BMWatcher
@@ -198,9 +199,11 @@ class DXAgent(IOManager):
       self._format_attrs_list_rb("ndisc-cache")
       self._format_attrs_list("net/route")
 
-      self.pad_raw_input.addstr("\nVirtual Machines:\n\n", curses.A_BOLD)   
-      self._format_attrs_rb("virtualbox/system")
-      self._format_attrs_list_rb("virtualbox/vms")
+      self.pad_raw_input.addstr("\nVirtual Machines:\n\n", curses.A_BOLD)
+
+      if "virtualbox" in agent.vm_health.vm_libs:
+         self._format_attrs_rb("virtualbox/system")
+         self._format_attrs_list_rb("virtualbox/vms")
 
       # XXX: very verbose at the end, also very greedy
       if self.args.verbose:

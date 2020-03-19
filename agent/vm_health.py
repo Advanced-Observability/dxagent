@@ -6,8 +6,16 @@ vm_health.py
 @author: K.Edeline
 """
 
-import virtualbox
-from virtualbox.library import MachineState
+# list of supported vm api libs
+vm_libs=[]
+
+try:
+   import virtualbox
+   from virtualbox.library import MachineState
+   vm_libs.append("virtualbox")
+except:
+   pass
+
 from agent.buffer import init_rb_dict
 
 # vbox states without pseudo-states
@@ -37,18 +45,24 @@ class VMWatcher():
    def __init__(self, data, info):
       self._data = data
       self.info = info
-      self._vbox = virtualbox.VirtualBox()
 
-      # setup performance metric collection for all vms
-      self.vbox_perf = self._vbox.performance_collector # IPerformanceCollecto
-      self.vbox_perf.setup_metrics([], self._vbox.machines, _virtualbox_metrics_sampling_period, 
-                                  _virtualbox_metrics_sampling_count)
+      if "virtualbox" in vm_libs:
+         self._vbox = virtualbox.VirtualBox()
 
-      attr_list = ["version"]
-      self._data["virtualbox/system"] = init_rb_dict(attr_list, type=str)
-      self._data["virtualbox/vms"] = {}
+         # setup performance metric collection for all vms
+         self.vbox_perf = self._vbox.performance_collector # IPerformanceCollecto
+         self.vbox_perf.setup_metrics([], self._vbox.machines, _virtualbox_metrics_sampling_period, 
+                                     _virtualbox_metrics_sampling_count)
+
+         attr_list = ["version"]
+         self._data["virtualbox/system"] = init_rb_dict(attr_list, type=str)
+         self._data["virtualbox/vms"] = {}
 
    def input(self):
+      if "virtualbox" in vm_libs:
+         self._input_virtualbox()
+
+   def _input_virtualbox(self):
       """
       VM (virtualbox)
          VBoxManage showvminfo

@@ -24,7 +24,7 @@ arrow left, arrow right: switch between screens
    - `python3 -m pip install virtualbox`
 
 - [virtualbox SDK](https://www.virtualbox.org/wiki/Downloads)
-   - `python vboxapisetup.py`
+   - `python vboxapisetup.py install`
 
 - [netifaces](https://pypi.org/project/netifaces/)
    - `python3 -m pip install netifaces`
