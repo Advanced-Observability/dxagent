@@ -203,3 +203,4 @@ class RingBuffer(collections.deque):
 
    def is_counter(self):
       return self.counter
+

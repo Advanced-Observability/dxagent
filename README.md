@@ -20,14 +20,19 @@ arrow left, arrow right: switch between screens
 - [python3-ethtool](https://pypi.org/project/ethtool/)
    - Ubuntu: `sudo apt install python3-ethtool`
 
+- [netifaces](https://pypi.org/project/netifaces/)
+   - `python3 -m pip install netifaces`
+
+## Optional Libs
+
 - [pyvbox](https://pypi.org/project/pyvbox/)
    - `python3 -m pip install virtualbox`
 
 - [virtualbox SDK](https://www.virtualbox.org/wiki/Downloads)
    - `python vboxapisetup.py install`
 
-- [netifaces](https://pypi.org/project/netifaces/)
-   - `python3 -m pip install netifaces`
+- [VPP Python API](https://wiki.fd.io/view/VPP/Python_API)
+   - `python3 -m pip vpp-papi`
 
 ## Important files
 

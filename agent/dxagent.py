@@ -172,11 +172,13 @@ class DXAgent(IOManager):
       """
 
       self.height, self.width = self.window.getmaxyx()
-      self.pad_raw_input = curses.newpad(self.max_lines, self.width)
 
+      # Raw input Pad
+      self.pad_raw_input = curses.newpad(self.max_lines, self.width)
       self._center_text(self.pad_raw_input, "RAW INPUT   \n",
                         curses.A_BOLD)
-                         
+                 
+      # baremetal        
       self.pad_raw_input.addstr("System:\n\n", curses.A_BOLD)
       self.pad_raw_input.addstr(str(self.sysinfo)+"\n")
       self.pad_raw_input.addstr("\nBareMetal:\n\n", curses.A_BOLD)
@@ -199,16 +201,30 @@ class DXAgent(IOManager):
       self._format_attrs_list_rb("ndisc-cache")
       self._format_attrs_list("net/route")
 
+      # VM
       self.pad_raw_input.addstr("\nVirtual Machines:\n\n", curses.A_BOLD)
 
       if "virtualbox" in agent.vm_health.vm_libs:
          self._format_attrs_rb("virtualbox/system")
          self._format_attrs_list_rb("virtualbox/vms")
 
+      # VPP
+      self.pad_raw_input.addstr("\nVPP:\n\n", curses.A_BOLD)
+
+      if "vpp" in agent.vpp_health.kbnets_libs:
+         self._format_attrs_rb("vpp/system")
+         self._format_attrs_list_rb("vpp/api/if")
+         self._format_attrs_rb("vpp/stats/sys") 
+         self._format_attrs_list_rb("vpp/stats/buffer-pool")
+         self._format_attrs_list_rb("vpp/stats/workers")  
+         self._format_attrs_list_rb("vpp/stats/if")  
+         self._format_attrs_list_rb("vpp/stats/err")   
+
       # XXX: very verbose at the end, also very greedy
       if self.args.verbose:
          self._format_attrs_list_rb("stats")
 
+      # Health metrics Pad
       self.pad_health_metrics = curses.newpad(self.max_lines, self.width)
       self._center_text(self.pad_health_metrics, "HEALTH\n\n",
                         curses.A_BOLD) #, 
@@ -250,6 +266,14 @@ class DXAgent(IOManager):
       self.height, self.width = self.window.getmaxyx()
       self.pad_raw_input = curses.newpad(self.max_lines, self.width)
       self.pad_health_metrics = curses.newpad(self.max_lines, self.width)
+
+   def exit(self):
+      """
+      cleanup before exiting
+
+      """
+      self.vpp_watcher.exit()
+      self.stop_gui()
 
    def stop_gui(self):
       self.window.keypad(False)
@@ -308,7 +332,7 @@ class DXAgent(IOManager):
       except KeyboardInterrupt:
          pass
       finally:
-         self.stop_gui()
+         self.exit()
       
 
 if __name__ == '__main__':
