@@ -31,8 +31,8 @@ arrow left, arrow right: switch between screens
 - [virtualbox SDK](https://www.virtualbox.org/wiki/Downloads)
    - `python vboxapisetup.py install`
 
-- [VPP Python API](https://wiki.fd.io/view/VPP/Python_API)
-   - `python3 -m pip vpp-papi`
+- [VPP Python3 API](https://wiki.fd.io/view/VPP/Python_API)
+   - `sudo apt install python3-vpp-api`
 
 ## Important files
 
