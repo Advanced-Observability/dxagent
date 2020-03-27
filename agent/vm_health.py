@@ -59,6 +59,36 @@ class VMWatcher():
          self._data["virtualbox/system"] = init_rb_dict(attr_list, type=str)
          self._data["virtualbox/vms"] = {}
 
+         # create guest sessions for each active machine
+         self._vbox_sessions       = []
+         self._vbox_guest_sessions = []
+         for m in self._vbox.machines:
+            if not self.virtualbox_vm_is_active(m):
+               continue
+
+            s=m.create_session()
+            self._vbox_sessions.append(s)
+            gs=s.console.guest.create_session("root","vagrant")
+            self._vbox_guest_sessions.append(gs)
+
+   def exit(self):
+      """
+      exit vmwatcher gracefuly
+
+      """
+      if "virtualbox" in vm_libs:
+
+         # close sessions         
+         for gs in self._vbox_guest_sessions:
+            gs.close()
+#         for s in self._vbox_sessions:
+#            s.unlock_machine()
+         
+   def virtualbox_vm_is_active(self, machine):
+         state = machine.state
+         return (state >= MachineState.first_online
+               and state <= MachineState.last_online)
+
    def input(self):
       if "virtualbox" in vm_libs:
          self._input_virtualbox()
@@ -123,11 +153,10 @@ class VMWatcher():
       for m in self._vbox.machines:
 
          # check if machine is online/offline
-         state = m.state
-         if not (state >= MachineState.first_online
-               and state <= MachineState.last_online):
+         if not self.virtualbox_vm_is_active(m):
             continue
-         state = _virtualbox_states[int(state)]
+
+         state = _virtualbox_states[int(m.state)]
          name = m.name
 
          # add entry if needed
@@ -181,7 +210,14 @@ class VMWatcher():
                d = str(m.get_guest_property(attr)[0])
                self._data["virtualbox/vms"][name][attr].append(d)
 
-         # 
+      # look for vpp-in-vm through guest sessions
+      for gs in self._vbox_guest_sessions:
+         pass
+         #s=gs.execute("/vagrant/dxagent/dump-vpp")[1]
+         #for k,d in eval(s):
+         #   if k not in self._data:
+         #      self._data
+         #a=eval(s)
 
       # renew registration for new vms XXX
       self.vbox_perf.setup_metrics([], self._vbox.machines, _virtualbox_metrics_sampling_period, 

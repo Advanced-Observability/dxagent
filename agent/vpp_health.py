@@ -22,82 +22,89 @@ from agent.buffer import RingBuffer
 
 class VPPWatcher():
 
-   def __init__(self, data, info): 
+   def __init__(self, data={}, info=None, use_api=True, use_stats=True): 
       self._data = data
       self.info = info
+      self.use_api=use_api and os.path.exists('/run/vpp/api.sock')
+      self.use_stats=use_stats and os.path.exists('/run/vpp/stats.sock')
 
       # connect to VPP process (baremetal)
       if "vpp" in kbnets_libs:
-         vpp_json_dir = "/usr/share/vpp/api/core/"
 
-         # connect to API socket
-         jsonfiles = []
-         for root, dirnames, filenames in os.walk(vpp_json_dir):
-             for filename in fnmatch.filter(filenames, '*.api.json'):
-                 jsonfiles.append(os.path.join(vpp_json_dir, filename))
+         if self.use_api:
+            vpp_json_dir = "/usr/share/vpp/api/core/"
 
-         self.vpp = VPP(jsonfiles)
-         self.vpp.connect("dxagent")
+            # connect to API socket
+            jsonfiles = []
+            for root, dirnames, filenames in os.walk(vpp_json_dir):
+                for filename in fnmatch.filter(filenames, '*.api.json'):
+                    jsonfiles.append(os.path.join(vpp_json_dir, filename))
 
-         # init api fields
-         self._data["vpp/api/if"] = {}
-         attr_list = ["version"]
-         self._data["vpp/system"] = init_rb_dict(attr_list, type=str)
+            self.vpp = VPP(jsonfiles)
+            self.vpp.connect("dxagent")
 
-         # connect to stats socket
-         self.stats = VPPStats('/run/vpp/stats.sock')
-         self.stats.connect()    
+            # init api fields
+            self._data["vpp/api/if"] = {}
+            attr_list = ["version"]
+            self._data["vpp/system"] = init_rb_dict(attr_list, type=str)
 
-         # init system stats
-         attr_names = [
-            '/sys/vector_rate', '/sys/num_worker_threads', '/sys/input_rate',
-            '/mem/statseg/total', '/mem/statseg/used', 
-            
-         ]
-         attr_types = [float, int, float, float, float]
-         self._data["vpp/stats/sys"] = init_rb_dict(attr_names, types=attr_types)
-         attr_names[0] += '$' # XXX
-         self._dir_sys = self.stats.ls(attr_names)
+         if self.use_stats:
 
-         # numa stats (per numa node ?)
-         self._dir_buffer_pool = self.stats.ls(['/buffer-pool'])
-         self._data["vpp/stats/buffer-pool"] = {}
+            # connect to stats socket
+            self.stats = VPPStats('/run/vpp/stats.sock')
+            self.stats.connect()  
 
-         # workers stats (per worker)
-         attr_names = [
-            '/sys/vector_rate_per_worker', '/sys/node/clocks', '/sys/node/vectors',
-            '/sys/node/calls', '/sys/node/suspends', '/sys/node/names'
-            
-         ]
-         self._dir_workers = self.stats.ls(attr_names)
-         self._data["vpp/stats/workers"] = {}
+            # init system stats
+            attr_names = [
+               '/sys/vector_rate', '/sys/num_worker_threads', '/sys/input_rate',
+               '/mem/statseg/total', '/mem/statseg/used', 
+               
+            ]
+            attr_types = [float, int, float, float, float]
+            self._data["vpp/stats/sys"] = init_rb_dict(attr_names, types=attr_types)
+            attr_names[0] += '$' # XXX
+            self._dir_sys = self.stats.ls(attr_names)
 
-         # if stats (per if)
-         self._dir_if_names = self.stats.ls(['/if/names'])
-         attr_names = [
-            '/if/drops', '/if/punt', '/if/ip4', '/if/ip6',
-            '/if/rx-no-buf', '/if/rx-miss', '/if/rx-error', '/if/tx-error',
-            '/if/mpls', 'if/rx', '/if/rx-unicast', '/if/rx-multicast',
-            '/if/rx-broadcast', '/if/tx', '/if/tx-unicast', '/if/tx-multicast',
-            '/if/tx-broadcast'
-         ]
-         self._dir_if = self.stats.ls(attr_names)
-         self._data["vpp/stats/if"] = {}
+            # numa stats (per numa node ?)
+            self._dir_buffer_pool = self.stats.ls(['/buffer-pool'])
+            self._data["vpp/stats/buffer-pool"] = {}
 
-         # node stats (per node)
-         attr_names = [
-            '/err/'
-         ]
-         self._dir_err = self.stats.ls(attr_names)
-         self._data["vpp/stats/err"] = {}  
+            # workers stats (per worker)
+            attr_names = [
+               '/sys/vector_rate_per_worker', '/sys/node/clocks', '/sys/node/vectors',
+               '/sys/node/calls', '/sys/node/suspends', '/sys/node/names'
+               
+            ]
+            self._dir_workers = self.stats.ls(attr_names)
+            self._data["vpp/stats/workers"] = {}
+
+            # if stats (per if)
+            self._dir_if_names = self.stats.ls(['/if/names'])
+            attr_names = [
+               '/if/drops', '/if/punt', '/if/ip4', '/if/ip6',
+               '/if/rx-no-buf', '/if/rx-miss', '/if/rx-error', '/if/tx-error',
+               '/if/mpls', 'if/rx', '/if/rx-unicast', '/if/rx-multicast',
+               '/if/rx-broadcast', '/if/tx', '/if/tx-unicast', '/if/tx-multicast',
+               '/if/tx-broadcast'
+            ]
+            self._dir_if = self.stats.ls(attr_names)
+            self._data["vpp/stats/if"] = {}
+
+            # node stats (per node)
+            attr_names = [
+               '/err/'
+            ]
+            self._dir_err = self.stats.ls(attr_names)
+            self._data["vpp/stats/err"] = {}  
       
 
    def input(self):
       if "vpp" not in kbnets_libs:
          return
-
-      self._input_api()
-      self._input_stats()
+      if self.use_api:
+         self._input_api()
+      if self.use_stats:
+         self._input_stats()
 
    def _input_api(self):
       """
@@ -211,24 +218,31 @@ class VPPWatcher():
       # node stats (per node)
       for k,d in self.stats.dump(self._dir_err).items():
          
-         # add node entry if needed
          node_name = k.split('/')[2]
+         # skip ip6 nodes because nobody uses ip6
+         if "6" in node_name:
+            continue
+
+         # add node entry if needed
          if node_name not in self._data["vpp/stats/err"]:
             self._data["vpp/stats/err"][node_name] = {}
-
          # add field entry if needed XXX: fix this
          err_name = k.split('/')[3]
          if err_name not in self._data["vpp/stats/err"][node_name]:
             self._data["vpp/stats/err"][node_name][err_name] = RingBuffer(counter=True)
 
          self._data["vpp/stats/err"][node_name][err_name].append(sum(d))
-         
+
+   def dump(self):
+      print(self._data)
 
    def exit(self):
 
       if "vpp" in kbnets_libs:
-         self.vpp.disconnect()
-         self.stats.disconnect()
+         if self.use_api:
+            self.vpp.disconnect()
+         if self.use_stats:
+            self.stats.disconnect()
 
   
 

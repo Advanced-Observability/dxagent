@@ -204,3 +204,13 @@ class RingBuffer(collections.deque):
    def is_counter(self):
       return self.counter
 
+   def __repr__(self):
+      return self.__str__()
+
+   def __str__(self):
+      if self.type == str:
+         return "'{}'".format(self.top()[0])
+      else:
+         return "{}".format(self.top()[0])
+
+
