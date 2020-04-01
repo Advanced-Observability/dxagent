@@ -59,9 +59,11 @@ class DXAgent(IOManager):
       self.col_sizes=[36,32,0]
 
       # navigation vars  
-      self.top = 0 
+      
       self.screen = 0
       self.max_screens = 4
+      self.top = [0 for _ in range(self.max_screens)]
+      self.current = [0 for _ in range(self.max_screens)]
       self.max_lines = 2**14
 
       self._data = {}
@@ -300,7 +302,7 @@ class DXAgent(IOManager):
          curses.A_BOLD | curses.color_pair(10) if pad_index == 3 else 0)
       #self.header.addstr(" | ")
       
-   def _append_content(self, s, screen_index, flags=None):
+   def _append_content(self, s, screen_index, flags=0):
       """
       content is a list of screen content
       each screen content is a list of (str, flags) tuples
@@ -370,15 +372,17 @@ class DXAgent(IOManager):
       """
       fill pad from visible content
       """
-      visible_content = self.content[self.screen][self.top:self.top+self.pad_height]
+      top = self.top[self.screen]
+      visible_content = self.content[self.screen][top:top+self.pad_height]
+      current = self.current[self.screen]-top
 
       for i,(s,flags) in enumerate(visible_content):
-         if not flags:
-            self.pad.addstr(i,0,s)
-         elif type(flags) is list:
+
+         if type(flags) is list:
             pass
          else:
-            self.pad.addstr(i,0,s,flags)
+            self.pad.addstr(i,0,s,flags if i != current else flags | curses.color_pair(10))
+
       # empty strings
       for i in range(len(visible_content), self.pad_height):
          self.pad.addstr(i,0,'\n')
@@ -457,25 +461,41 @@ class DXAgent(IOManager):
       curses.endwin()
 
    def scroll(self, direction):
-      if direction == self.UP and self.top > 0:
-         self.top += direction
-      elif direction == self.DOWN and (self.top < self.max_lines-self.height):
-         self.top += direction
+      if direction == self.UP and self.current[self.screen] > 0:
+
+         self.current[self.screen] += direction
+         if self.current[self.screen] < self.top[self.screen]:
+            self.top[self.screen] += direction
+
+      elif direction == self.DOWN and (self.current[self.screen] 
+                             < len(self.content[self.screen])):
+
+         self.current[self.screen] += direction
+         if self.current[self.screen] >= self.top[self.screen]+self.pad_height-1:
+            self.top[self.screen] += direction
 
    def paging(self, direction):
-      if direction == self.UP and self.top > 0:
-         self.top -= min(self.height-1,self.top)
-      elif direction == self.DOWN and (self.top < self.max_lines-self.height-1):
-         self.top += min(self.height-1,self.max_lines-self.top-self.height)
+      if direction == self.UP and self.current[self.screen] > 0:
+
+         self.current[self.screen] -= min(self.pad_height-1,self.current[self.screen])
+         self.top[self.screen] -= min(self.pad_height-1,self.top[self.screen])
+
+      elif direction == self.DOWN and (self.current[self.screen] 
+                             < len(self.content[self.screen])):
+
+         self.current[self.screen] += min(self.pad_height-1,
+              len(self.content[self.screen])-self.current[self.screen])
+         self.top[self.screen] += min(self.pad_height-1,
+              len(self.content[self.screen])-self.top[self.screen]-self.pad_height)
 
    def switch_screen(self, direction):
       self.screen = (self.screen+direction) % self.max_screens
       self._format_header(self.screen)
-      self.pad.clear()
 
    def run(self):
       """
       main function
+
       """
       try:
          self.start_gui()
