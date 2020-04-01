@@ -22,6 +22,21 @@ from agent.vpp_health import VPPWatcher
 
 ESCAPE = 27
 
+# keyboard input processing delay
+KEYBOARD_INPUT_RATE=0.05
+
+# screen refresh delay
+SCREEN_REFRESH_RATE=0.05
+
+# input processing delay
+INPUT_RATE=3.0
+
+HLINE_CHAR=u'\u2500'
+VLINE_CHAR=u'\u2502'
+TTEE_CHAR=u'\u252c'
+BTEE_CHAR=u'\u2534'
+CROSS_CHAR=u'\u253c'
+
 class DXAgent(IOManager):
 
    """
@@ -41,7 +56,7 @@ class DXAgent(IOManager):
       self.scheduler = sched.scheduler()
       
       # 
-      self.col_sizes=[36,24,0]
+      self.col_sizes=[36,32,0]
 
       # navigation vars  
       self.top = 0 
@@ -72,50 +87,50 @@ class DXAgent(IOManager):
 
       self._input()
       self._format()
-      self.scheduler.enter(1,0,self.process)
+      self.scheduler.enter(INPUT_RATE,0,self.process)
 
    def _format_attrs(self, category, pad_index):
       """
       format a list of tuples into a curses pad
  
       """
-      self.pads[pad_index].addstr(category+"\n", curses.A_BOLD)
+      self._append_content(self._center_text(category+"\n"),
+                           pad_index, curses.A_BOLD)
       for e in self._data[category]:
-         self.pads[pad_index].addstr(e[0]+": ")
-         self.pads[pad_index].addstr(" ".join(e[1:])+" ")
-      self.pads[pad_index].addstr("\n\n")
+         self._append_content(e[0]+": "+" ".join(e[1:])+"\n", pad_index)
+      self._append_content("\n", pad_index)
 
    def _format_attrs_rb(self, category, pad_index):
       """
       format a dict of ringbuffers into a curses pad
  
       """
-      self._center_text(category+"\n", pad_index, curses.A_BOLD)
-      self._draw_hline_top(pad_index)
+      self._append_content(self._center_text(category+"\n"),
+                           pad_index, curses.A_BOLD)
+      self._append_content(self.hline_top(self.col_sizes), pad_index)
 
       for k,d in self._data[category].items():
          if d.is_empty():
             continue
 
-         self.pads[pad_index].addnstr((" {}"+" "*self.col_sizes[0]).format(k), 
-            self.col_sizes[0])
-         self.pads[pad_index].addch(curses.ACS_VLINE)
+         s = (" {}"+" "*self.col_sizes[0]).format(k)[:self.col_sizes[0]]
+         s += VLINE_CHAR
 
          value, severity = d.top()
          if d.unit():
-            self.pads[pad_index].addnstr(("{} {}"+" "*self.col_sizes[1]).format(
-               value, d.unit()), self.col_sizes[1], curses.color_pair(severity.value))  
+            s += ("{} {}"+" "*self.col_sizes[1]).format(value, 
+                  d.unit())[:self.col_sizes[1]]
          else:
-            self.pads[pad_index].addnstr(("{}"+" "*self.col_sizes[1]).format(value), 
-               self.col_sizes[1], curses.color_pair(severity.value))  
-
-         self.pads[pad_index].addch(curses.ACS_VLINE)
+            s += ("{}"+" "*self.col_sizes[1]).format(value)[:self.col_sizes[1]]
+         #curses.color_pair(severity.value))  
+         s += VLINE_CHAR
 
          value, severity = d.dynamicity()
-         self.pads[pad_index].addstr("{}\n".format(value),
-            curses.color_pair(severity.value))
-            
-      self._draw_hline_bottom(pad_index)
+         s += "{}\n".format(value)
+
+         self._append_content(s, pad_index)         
+
+      self._append_content(self.hline_bottom(self.col_sizes), pad_index)
 
    def _format_attrs_list(self, category, pad_index):
       """
@@ -123,8 +138,9 @@ class DXAgent(IOManager):
  
       """
 
-      self._center_text(category+"\n", pad_index, curses.A_BOLD)
-      self._draw_hline_top(pad_index)
+      self._append_content(self._center_text(category+"\n"),
+                           pad_index, curses.A_BOLD)
+      self._append_content(self.hline_top(self.col_sizes), pad_index)
 
       for l in self._data[category]:
          for e in l:
@@ -132,125 +148,165 @@ class DXAgent(IOManager):
                for t in e:
                   if type(t) is list:
                      for tt in t:
-                        self.pads[pad_index].addstr(" "+tt[0]+": ")
-                        self.pads[pad_index].addstr(" ".join(tt[1:])+"\n")
+                        self._append_content(" "+tt[0]+": "+" ".join(tt[1:])+"\n", 
+                                             pad_index)
                   else:
-                     self.pads[pad_index].addstr(" "+t[0]+": ")
-                     self.pads[pad_index].addstr(" ".join(t[1:])+"\n")
+                     self._append_content(" "+t[0]+": "+" ".join(t[1:])+"\n",
+                                         pad_index)
             else:
-               self.pads[pad_index].addstr(" "+e[0]+": ")
-               self.pads[pad_index].addstr(" ".join(e[1:])+"\n")
-         self._draw_hline(pad_index)
+               self._append_content(" "+e[0]+": "+" ".join(e[1:])+"\n", pad_index)
+
+         self._append_content(self.hline(self.col_sizes), pad_index)
 
    def _format_attrs_list_rb(self, category, pad_index):
       """
       format a dict of dict of ringbuffers into a curses pad
  
       """
-      self._center_text(category+"\n", pad_index, curses.A_BOLD)
-      self._draw_hline_top(pad_index)
+
+      self._append_content(self._center_text(category+"\n"),
+                           pad_index, curses.A_BOLD)
+      self._append_content(self.hline_top(self.col_sizes), pad_index)
 
       for i,(k,d) in enumerate(self._data[category].items()):
 
-         self.pads[pad_index].addstr(" "*self.col_sizes[0])
-         self.pads[pad_index].addch(curses.ACS_VLINE)
-         self.pads[pad_index].addnstr(k+" "*self.col_sizes[1], self.col_sizes[1])
-         self.pads[pad_index].addch(curses.ACS_VLINE)
-         self.pads[pad_index].addch('\n')
+         s = " "*self.col_sizes[0]+VLINE_CHAR
+         s +=  (k+" "*self.col_sizes[1])[:self.col_sizes[1]]
+         s += VLINE_CHAR+'\n'
+         self._append_content(s, pad_index)
 
          for kk,dd in d.items():
             if dd.is_empty():
                continue
 
-            self.pads[pad_index].addnstr((" {}"+" "*self.col_sizes[0]).format(kk), 
-               self.col_sizes[0])
-            self.pads[pad_index].addch(curses.ACS_VLINE)
+            s = (" {}"+" "*self.col_sizes[0]).format(kk)[:self.col_sizes[0]]
+            s += VLINE_CHAR
       
             value, severity = dd.top()
             if dd.unit():
-               self.pads[pad_index].addnstr(("{} {}"+" "*self.col_sizes[1]).format(
-                  value, dd.unit()), self.col_sizes[1], 
-                     curses.color_pair(severity.value))  
+               s += ("{} {}"+" "*self.col_sizes[1]).format(
+                  value, dd.unit())[:self.col_sizes[1]]
             else:
-               self.pads[pad_index].addnstr(("{}"+" "*self.col_sizes[1]).format(
-                  value), self.col_sizes[1], curses.color_pair(severity.value))  
+               s += ("{}"+" "*self.col_sizes[1]).format(
+                  value)[:self.col_sizes[1]]
 
-            self.pads[pad_index].addch(curses.ACS_VLINE)
-
+            s += VLINE_CHAR
             value, severity = dd.dynamicity()
-            self.pads[pad_index].addstr("{}\n".format(value),
-               curses.color_pair(severity.value))
+            s += "{}\n".format(value)
+
+            self._append_content(s, pad_index)
 
          if i == len(self._data[category])-1:
-            self._draw_hline_bottom(pad_index)
+            self._append_content(self.hline_bottom(self.col_sizes), pad_index)
          else:
-            self._draw_hline(pad_index)
+            self._append_content(self.hline_x(self.col_sizes), pad_index)
 
-   def _center_text(self, text, pad_index, *args):
-      padding = int((self.width-len(text))/2)
-      self.pads[pad_index].addstr(padding*" ")
-      self.pads[pad_index].addstr(text, *args)
+   def _format_attrs_list_rb_percpu(self, category, pad_index):
+      """
+      format a dict of dict of ringbuffers into a curses pad
+ 
+      """
+      cpu_slice = 8
+      cpu_count = self.bm_watcher.cpu_count
+      col_sizes=[20,8,8,8,8,8,8,8,0]
+      keys = self._data[category]["cpu0"].keys()
 
-   def _draw_hline(self, pad_index):
-      for _ in range(self.col_sizes[0]):
-         self.pads[pad_index].addch(curses.ACS_HLINE)
+      self._append_content(self._center_text(category+"\n"),
+                           pad_index, curses.A_BOLD)
+      self._append_content(self.hline(self.col_sizes), pad_index)
 
-      self.pads[pad_index].addch(curses.ACS_PLUS)
+      for i in range(0,cpu_count,cpu_slice):
 
-      for _ in range(self.col_sizes[1]):
-         self.pads[pad_index].addch(curses.ACS_HLINE)
+         self._append_content(
+            self._center_text("cpu{}-cpu{}".format(i,i+cpu_slice-1)+"\n"),
+            pad_index)
+         self._append_content(self.hline_top(col_sizes), pad_index)
 
-      self.pads[pad_index].addch(curses.ACS_PLUS)
-      for _ in range(self.width-self.col_sizes[0]-self.col_sizes[1]-2):
-         self.pads[pad_index].addch(curses.ACS_HLINE)
+         for k in keys:
+            s = (" {}"+" "*col_sizes[0]).format(k)[:col_sizes[0]]
+            s += VLINE_CHAR
 
-   def _draw_hline_bottom(self, pad_index):
-      for _ in range(self.col_sizes[0]):
-         self.pads[pad_index].addch(curses.ACS_HLINE)
+            for cpu_index in range(i,i+cpu_slice):
 
-      self.pads[pad_index].addch(curses.ACS_BTEE)
-      for _ in range(self.col_sizes[1]):
-         self.pads[pad_index].addch(curses.ACS_HLINE)
+               cpu_label="cpu{}".format(i)
+               d = self._data[category][cpu_label][k]
+               value, severity = d.top()
+               s += ("{}"+" "*8).format(value)[:col_sizes[1]]
+               if cpu_index < i+cpu_slice-1:
+                  s += VLINE_CHAR
 
-      self.pads[pad_index].addch(curses.ACS_BTEE)
-      for _ in range(self.width-self.col_sizes[0]-self.col_sizes[1]-2):
-         self.pads[pad_index].addch(curses.ACS_HLINE)
+            s += '\n'
+            self._append_content(s, pad_index)
 
-   def _draw_hline_top(self, pad_index):
-      for _ in range(self.col_sizes[0]):
-         self.pads[pad_index].addch(curses.ACS_HLINE)
+         if cpu_count-i <= cpu_slice:
+            self._append_content(self.hline_bottom(col_sizes), pad_index)
+         else:
+            self._append_content(self.hline_x(col_sizes), pad_index)
 
-      self.pads[pad_index].addch(curses.ACS_TTEE)
-      for _ in range(self.col_sizes[1]):
-         self.pads[pad_index].addch(curses.ACS_HLINE)
+   def _center_text(self, text):
+      padding = int((self.pad_width-len(text))/2)
+      return padding*" "+text
 
-      self.pads[pad_index].addch(curses.ACS_TTEE)
-      for _ in range(self.width-self.col_sizes[0]-self.col_sizes[1]-2):
-         self.pads[pad_index].addch(curses.ACS_HLINE)
+   def hline(self, col_sizes=[0]):
+      return self._hline(col_sizes, HLINE_CHAR)
+
+   def hline_x(self, col_sizes=[0]):
+      return self._hline(col_sizes, CROSS_CHAR)
+
+   def hline_bottom(self, col_sizes=[0]):
+      return self._hline(col_sizes, BTEE_CHAR)
+
+   def hline_top(self, col_sizes=[0]):
+      return self._hline(col_sizes, TTEE_CHAR)
+
+   def _hline(self, col_sizes, sep_char):
+      """
+      draw a horizontal line, add a sep_char between each
+      column, last column has max size that fits pad.
+      
+      """
+      s=""
+      for i, col_size in enumerate(col_sizes):
+
+         if i == len(col_sizes) - 1:
+            col_size = self.pad_width-sum(col_sizes)-len(col_sizes)+1
+         s += col_size*HLINE_CHAR
+
+         if i < len(col_sizes) - 1:
+            s += sep_char
+
+      return s
 
    def _format_header(self, pad_index):
       """
 
       """
+      self.header.clear()
 
       full_str="Baremetal | Virtual Machines | VPP | Health"
       padding = int((self.width-len(full_str))/2)
-      self.pads[pad_index].addstr(padding*" ")
+      self.header.addstr(padding*" ")
       
-      self.pads[pad_index].addstr("Baremetal", 
+      self.header.addstr("Baremetal", 
          curses.A_BOLD | curses.color_pair(10) if pad_index == 0 else 0)
-      self.pads[pad_index].addstr(" | ")
-      self.pads[pad_index].addstr("Virtual Machines", 
+      self.header.addstr(" | ")
+      self.header.addstr("Virtual Machines", 
          curses.A_BOLD | curses.color_pair(10) if pad_index == 1 else 0)
-      self.pads[pad_index].addstr(" | ")
-      self.pads[pad_index].addstr("VPP", 
+      self.header.addstr(" | ")
+      self.header.addstr("VPP", 
          curses.A_BOLD | curses.color_pair(10) if pad_index == 2 else 0)
-      self.pads[pad_index].addstr(" | ")
-      self.pads[pad_index].addstr("Health", 
+      self.header.addstr(" | ")
+      self.header.addstr("Health", 
          curses.A_BOLD | curses.color_pair(10) if pad_index == 3 else 0)
-      self.pads[pad_index].addstr(" | ")
+      #self.header.addstr(" | ")
       
-      self.pads[pad_index].addstr("\n\n\n")
+   def _append_content(self, s, screen_index, flags=None):
+      """
+      content is a list of screen content
+      each screen content is a list of (str, flags) tuples
+
+      """
+      self.content[screen_index].append((s,flags))
 
    def _format(self):
       """
@@ -258,16 +314,13 @@ class DXAgent(IOManager):
 
       """
 
-      self.height, self.width = self.window.getmaxyx()
-      self.pads = [curses.newpad(self.max_lines, self.width) 
-                     for _ in range(self.max_screens)]
+      self._init_pads()
 
-      # Raw input Pad
-      self._format_header(0)
-                 
-      # baremetal   
-      self.pads[0].addstr("System:\n\n", curses.A_BOLD)
-      self.pads[0].addstr(str(self.sysinfo)+"\n\n")
+      # baremetal 
+      self._append_content("System:\n", 0, curses.A_BOLD)
+      self._append_content("\n", 0)
+      self._append_content(str(self.sysinfo)+"\n", 0)
+      self._append_content("\n", 0)
 
       self._format_attrs_list_rb("bm_ifs", 0)
       self._format_attrs_rb("stats_global", 0)
@@ -280,11 +333,11 @@ class DXAgent(IOManager):
       self._format_attrs_rb("netstat", 0)
       self._format_attrs_rb("snmp", 0)
       self._format_attrs_list_rb("net/arp", 0)
-      self._format_attrs_list_rb("stat/cpu", 0)
+      self._format_attrs_list_rb_percpu("stat/cpu", 0)
       self._format_attrs_rb("stat", 0)
-      self._format_attrs_list_rb("rt-cache", 0)
-      self._format_attrs_list_rb("arp-cache", 0)
-      self._format_attrs_list_rb("ndisc-cache", 0)
+      self._format_attrs_list_rb_percpu("rt-cache", 0)
+      self._format_attrs_list_rb_percpu("arp-cache", 0)
+      self._format_attrs_list_rb_percpu("ndisc-cache", 0)
       self._format_attrs_list("net/route", 0)
 
       # XXX: very verbose at the end, also very greedy
@@ -292,15 +345,11 @@ class DXAgent(IOManager):
          self._format_attrs_list_rb("stats", 0)
 
       # VM
-      self._format_header(1)
-
       if "virtualbox" in agent.vm_health.vm_libs:
          self._format_attrs_rb("virtualbox/system", 1)
          self._format_attrs_list_rb("virtualbox/vms", 1)
 
       # VPP
-      self._format_header(2)
-
       if "vpp" in agent.vpp_health.kbnets_libs:
          if self.vpp_watcher.use_api:
             self._format_attrs_rb("vpp/system", 2)
@@ -314,10 +363,25 @@ class DXAgent(IOManager):
             self._format_attrs_list_rb("vpp/stats/err", 2)
 
       # Health metrics Pad
-      self._format_header(3)
+      self._append_content("Metrics\n", 3, curses.A_BOLD)
+      self._append_content("Symptoms\n", 3, curses.A_BOLD)
 
-      self.pads[3].addstr("Metrics\n\n", curses.A_BOLD)
-      self.pads[3].addstr("Symptoms\n\n", curses.A_BOLD)
+   def _fill_pad(self):
+      """
+      fill pad from visible content
+      """
+      visible_content = self.content[self.screen][self.top:self.top+self.pad_height]
+
+      for i,(s,flags) in enumerate(visible_content):
+         if not flags:
+            self.pad.addstr(i,0,s)
+         elif type(flags) is list:
+            pass
+         else:
+            self.pad.addstr(i,0,s,flags)
+      # empty strings
+      for i in range(len(visible_content), self.pad_height):
+         self.pad.addstr(i,0,'\n')
 
    def _display(self):
       """
@@ -326,9 +390,14 @@ class DXAgent(IOManager):
       """
 
       self.height, self.width = self.window.getmaxyx()
-      self.pads[self.screen].refresh(self.top, 0, 0, 0, 
-                                     self.height-1, self.width-1)
-      self.scheduler.enter(0.1,1,self._display)
+      self._fill_pad()
+      try:
+         self.header.refresh(0, 0, 0, 0, 1, self.width)
+         self.pad.refresh(0, 0, 2, 1, 
+                          self.pad_height, self.pad_width)
+      except:
+         pass
+      self.scheduler.enter(SCREEN_REFRESH_RATE,1,self._display)
 
    def start_gui(self):
 
@@ -348,10 +417,28 @@ class DXAgent(IOManager):
       curses.init_pair(10, curses.COLOR_BLACK, curses.COLOR_WHITE)      
 
       self.window.refresh()
+      self._init_pads()
 
+      self.header = curses.newpad(1, self.width)
+      self._format_header(0)
+
+   def _clear_pads(self):
+      """
+      if screen was not resized, clear pads
+      otherwise create new pads
+
+      """
+      if (self.height, self.width) == self.window.getmaxyx():
+         self.pad.clear()
+      else:
+         self._init_pads()
+
+   def _init_pads(self):
       self.height, self.width = self.window.getmaxyx()
-      self.pads = [curses.newpad(self.max_lines, self.width) 
-                     for _ in range(self.max_screens)]
+      self.pad_height, self.pad_width = self.height-2, self.width-2
+
+      self.content = [[] for _ in range(self.max_screens)]
+      self.pad = curses.newpad(self.pad_height+1, self.pad_width)  
 
    def exit(self):
       """
@@ -362,7 +449,6 @@ class DXAgent(IOManager):
 
       self.vm_watcher.exit()
       self.vpp_watcher.exit()
-
 
    def stop_gui(self):
       self.window.keypad(False)
@@ -384,6 +470,8 @@ class DXAgent(IOManager):
 
    def switch_screen(self, direction):
       self.screen = (self.screen+direction) % self.max_screens
+      self._format_header(self.screen)
+      self.pad.clear()
 
    def run(self):
       """
@@ -416,7 +504,7 @@ class DXAgent(IOManager):
                c = self.window.getch()
  
             self.scheduler.run(blocking=False)
-            time.sleep(0.1)
+            time.sleep(KEYBOARD_INPUT_RATE)
 
       except KeyboardInterrupt:
          pass

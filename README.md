@@ -23,6 +23,16 @@ arrow left, arrow right: switch between screens
 - [netifaces](https://pypi.org/project/netifaces/)
    - `python3 -m pip install netifaces`
 
+To enable stats add following section to you VPP config:
+
+  ```sh
+  statseg {
+  	default
+  	per-node-counters on
+  }
+  ```
+
+
 ## Optional Libs
 
 - [pyvbox](https://pypi.org/project/pyvbox/)

@@ -124,7 +124,7 @@ class BMWatcher():
       self._data["rt-cache"] = {}
       with open("/proc/net/stat/rt_cache", 'r') as f:
          attr_list_rt_cache = f.readline().split()
-         cpu_count = len(f.readlines())
+         self.cpu_count = len(f.readlines())
 
       # arp-cache read attrs
       self._data["arp-cache"] = {}
@@ -137,7 +137,7 @@ class BMWatcher():
          attr_list_ndisc_cache = f.readline().split()
 
       # generate dict for each cpu
-      for i in range(cpu_count):
+      for i in range(self.cpu_count):
          cpu_label="cpu{}".format(i)
 
          self._data["rt-cache"][cpu_label] = init_rb_dict(attr_list_rt_cache, type=int)
