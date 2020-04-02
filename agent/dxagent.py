@@ -55,11 +55,7 @@ class DXAgent(IOManager):
       self.info(self.sysinfo)
       self.scheduler = sched.scheduler()
       
-      # 
-      self.col_sizes=[36,32,0]
-
       # navigation vars  
-      
       self.screen = 0
       self.max_screens = 4
       self.top = [0 for _ in range(self.max_screens)]
@@ -91,6 +87,26 @@ class DXAgent(IOManager):
       self._format()
       self.scheduler.enter(INPUT_RATE,0,self.process)
 
+   def resize_columns(self):
+      """
+      find column sizes from screen width
+
+      """
+      self.col_sizes=[36,32,32]
+      self.col_sizes_cpu=[20,8,8,8,8,8,8,8,8]
+      shrink_factor = 0.85
+
+      while ((self.width <= sum(self.col_sizes)+len(self.col_sizes))
+         or (self.width <= sum(self.col_sizes_cpu)+len(self.col_sizes_cpu))):
+
+         self.col_sizes = [int(c*shrink_factor) for c in self.col_sizes]
+         self.col_sizes_cpu = [int(c*shrink_factor) for c in self.col_sizes_cpu]
+
+      self.col_sizes[-1] = 0
+      self.col_sizes_cpu[-1] = 0
+
+      self._format_header(self.screen)    
+         
    def _format_attrs(self, category, pad_index):
       """
       format a list of tuples into a curses pad
@@ -210,7 +226,6 @@ class DXAgent(IOManager):
       """
       cpu_slice = 8
       cpu_count = self.bm_watcher.cpu_count
-      col_sizes=[20,8,8,8,8,8,8,8,0]
       keys = self._data[category]["cpu0"].keys()
 
       self._append_content(self._center_text(category+"\n"),
@@ -222,10 +237,10 @@ class DXAgent(IOManager):
          self._append_content(
             self._center_text("cpu{}-cpu{}".format(i,i+cpu_slice-1)+"\n"),
             pad_index)
-         self._append_content(self.hline_top(col_sizes), pad_index)
+         self._append_content(self.hline_top(self.col_sizes_cpu), pad_index)
 
          for k in keys:
-            s = (" {}"+" "*col_sizes[0]).format(k)[:col_sizes[0]]
+            s = (" {}"+" "*self.col_sizes_cpu[0]).format(k)[:self.col_sizes_cpu[0]]
             s += VLINE_CHAR
 
             for cpu_index in range(i,i+cpu_slice):
@@ -233,7 +248,7 @@ class DXAgent(IOManager):
                cpu_label="cpu{}".format(i)
                d = self._data[category][cpu_label][k]
                value, severity = d.top()
-               s += ("{}"+" "*8).format(value)[:col_sizes[1]]
+               s += ("{}"+" "*8).format(value)[:self.col_sizes_cpu[1]]
                if cpu_index < i+cpu_slice-1:
                   s += VLINE_CHAR
 
@@ -241,9 +256,9 @@ class DXAgent(IOManager):
             self._append_content(s, pad_index)
 
          if cpu_count-i <= cpu_slice:
-            self._append_content(self.hline_bottom(col_sizes), pad_index)
+            self._append_content(self.hline_bottom(self.col_sizes_cpu), pad_index)
          else:
-            self._append_content(self.hline_x(col_sizes), pad_index)
+            self._append_content(self.hline_x(self.col_sizes_cpu), pad_index)
 
    def _center_text(self, text):
       padding = int((self.pad_width-len(text))/2)
@@ -286,21 +301,40 @@ class DXAgent(IOManager):
       self.header.clear()
 
       full_str="Baremetal | Virtual Machines | VPP | Health"
-      padding = int((self.width-len(full_str))/2)
-      self.header.addstr(padding*" ")
-      
-      self.header.addstr("Baremetal", 
-         curses.A_BOLD | curses.color_pair(10) if pad_index == 0 else 0)
-      self.header.addstr(" | ")
-      self.header.addstr("Virtual Machines", 
-         curses.A_BOLD | curses.color_pair(10) if pad_index == 1 else 0)
-      self.header.addstr(" | ")
-      self.header.addstr("VPP", 
-         curses.A_BOLD | curses.color_pair(10) if pad_index == 2 else 0)
-      self.header.addstr(" | ")
-      self.header.addstr("Health", 
-         curses.A_BOLD | curses.color_pair(10) if pad_index == 3 else 0)
-      #self.header.addstr(" | ")
+      short_str="BM | VM | VPP | H"
+      if self.width > len(full_str):
+         padding = int((self.width-len(full_str))/2)
+         self.header.addstr(padding*" ")
+         
+         self.header.addstr("Baremetal", 
+            curses.A_BOLD | curses.color_pair(10) if pad_index == 0 else 0)
+         self.header.addstr(" | ")
+         self.header.addstr("Virtual Machines", 
+            curses.A_BOLD | curses.color_pair(10) if pad_index == 1 else 0)
+         self.header.addstr(" | ")
+         self.header.addstr("VPP", 
+            curses.A_BOLD | curses.color_pair(10) if pad_index == 2 else 0)
+         self.header.addstr(" | ")
+         self.header.addstr("Health", 
+            curses.A_BOLD | curses.color_pair(10) if pad_index == 3 else 0)
+
+      elif self.width > len(short_str):
+         padding = int((self.width-len(short_str))/2)
+         self.header.addstr(padding*" ")
+         
+         self.header.addstr("B", 
+            curses.A_BOLD | curses.color_pair(10) if pad_index == 0 else 0)
+         self.header.addstr(" | ")
+         self.header.addstr("VM", 
+            curses.A_BOLD | curses.color_pair(10) if pad_index == 1 else 0)
+         self.header.addstr(" | ")
+         self.header.addstr("VPP", 
+            curses.A_BOLD | curses.color_pair(10) if pad_index == 2 else 0)
+         self.header.addstr(" | ")
+         self.header.addstr("H", 
+            curses.A_BOLD | curses.color_pair(10) if pad_index == 3 else 0)
+      else:
+         self.header.addstr("...")
       
    def _append_content(self, s, screen_index, flags=0):
       """
@@ -317,6 +351,7 @@ class DXAgent(IOManager):
       """
 
       self._init_pads()
+      self.resize_columns()
 
       # baremetal 
       self._append_content("System:\n", 0, curses.A_BOLD)
@@ -371,13 +406,15 @@ class DXAgent(IOManager):
    def _fill_pad(self):
       """
       fill pad from visible content
+
       """
+
       top = self.top[self.screen]
-      visible_content = self.content[self.screen][top:top+self.pad_height]
       current = self.current[self.screen]-top
+      visible_content = self.content[self.screen][top:top+self.pad_height]
 
       for i,(s,flags) in enumerate(visible_content):
-
+         
          if type(flags) is list:
             pass
          else:
@@ -393,7 +430,10 @@ class DXAgent(IOManager):
 
       """
 
-      self.height, self.width = self.window.getmaxyx()
+      if (self.height, self.width) != self.window.getmaxyx():
+         self._init_pads()
+         self.resize_columns()
+
       self._fill_pad()
       try:
          self.header.refresh(0, 0, 0, 0, 1, self.width)
@@ -422,8 +462,8 @@ class DXAgent(IOManager):
 
       self.window.refresh()
       self._init_pads()
-
       self.header = curses.newpad(1, self.width)
+      self.resize_columns()
       self._format_header(0)
 
    def _clear_pads(self):
@@ -442,7 +482,8 @@ class DXAgent(IOManager):
       self.pad_height, self.pad_width = self.height-2, self.width-2
 
       self.content = [[] for _ in range(self.max_screens)]
-      self.pad = curses.newpad(self.pad_height+1, self.pad_width)  
+      self.pad = curses.newpad(self.pad_height+1, self.pad_width)
+      self.header = curses.newpad(1, self.width)
 
    def exit(self):
       """
