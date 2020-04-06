@@ -509,7 +509,7 @@ class DXAgent(IOManager):
             self.top[self.screen] += direction
 
       elif direction == self.DOWN and (self.current[self.screen] 
-                             < len(self.content[self.screen])):
+                             < len(self.content[self.screen])-1):
 
          self.current[self.screen] += direction
          if self.current[self.screen] >= self.top[self.screen]+self.pad_height-1:
@@ -525,9 +525,11 @@ class DXAgent(IOManager):
                              < len(self.content[self.screen])):
 
          self.current[self.screen] += min(self.pad_height-1,
-              len(self.content[self.screen])-self.current[self.screen])
+              len(self.content[self.screen])-self.current[self.screen]-1)         
          self.top[self.screen] += min(self.pad_height-1,
-              len(self.content[self.screen])-self.top[self.screen]-self.pad_height)
+           max(0,len(self.content[self.screen])-self.top[self.screen]-self.pad_height+1))
+         self.info(self.current[self.screen])
+         self.info(self.top[self.screen])
 
    def switch_screen(self, direction):
       self.screen = (self.screen+direction) % self.max_screens
