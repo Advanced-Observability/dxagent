@@ -58,6 +58,7 @@ class VMWatcher():
          attr_list = ["version"]
          self._data["virtualbox/system"] = init_rb_dict(attr_list, type=str)
          self._data["virtualbox/vms"] = {}
+         self.vbox_vm_count = 0
 
          # create guest sessions for each active machine
          self._vbox_sessions       = []
@@ -149,7 +150,8 @@ class VMWatcher():
       ]
 
       self._data["virtualbox/system"]["version"].append(self._vbox.version_normalized)
-      
+      self.vbox_vm_count = 0
+
       for m in self._vbox.machines:
 
          # check if machine is online/offline
@@ -158,6 +160,7 @@ class VMWatcher():
 
          state = _virtualbox_states[int(m.state)]
          name = m.name
+         self.vbox_vm_count += 1
 
          # add entry if needed
          if name not in self._data["virtualbox/vms"]:

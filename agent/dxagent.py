@@ -107,6 +107,7 @@ class DXAgent(IOManager):
 
       self._format_header(self.screen)
       self._format_top_pad(self.screen)
+      self._format_colname_pad(self.screen)
          
    def _format_attrs(self, category, pad_index):
       """
@@ -230,7 +231,6 @@ class DXAgent(IOManager):
             s += "{}".format(value)
             if severity:
                flags.append((len(s),0))
-            #s += "\n"
 
             self._append_content(s, pad_index, flags, fill=True)
 
@@ -277,7 +277,6 @@ class DXAgent(IOManager):
                if cpu_index < i+cpu_slice-1:
                   s += VLINE_CHAR
 
-            #s += '\n'
             self._append_content(s, pad_index, flags, fill=True)
 
          if cpu_count-i <= cpu_slice:
@@ -285,13 +284,16 @@ class DXAgent(IOManager):
          else:
             self._append_content(self.hline_x(self.col_sizes_cpu), pad_index)
 
-   def _center_text(self, s):
+   def _center_text(self, s, width=None):
       """
       return a pad-fitting string with s centered in blanks
 
       """
-      padding = int((self.pad_width-len(s))/2)
-      rest = (self.pad_width-len(s)) % 2
+      if not width:
+         width = self.pad_width
+
+      padding = int((width-len(s))/2)
+      rest = (width-len(s)) % 2
       return padding*" "+s+padding*" "+ rest*" "
 
    def _fill_line(self, s):
@@ -376,10 +378,48 @@ class DXAgent(IOManager):
    def _format_top_pad(self, pad_index):
       self.top_pad.clear()
 
-      self.top_pad.addstr(self._center_text("System:"), curses.A_BOLD)
-      self.top_pad.addstr(self._center_text(str(self.sysinfo)))
+      if pad_index == 0:
+         self.top_pad.addstr(self._center_text(str(self.sysinfo)))
+      
+      elif pad_index == 1:
+         if "virtualbox" in agent.vm_health.vm_libs:
+            s = "virtualbox: "
+            v,_=self._data["virtualbox/system"]["version"].top()
+            s += v
+            s += " active-count: {}".format(self.vm_watcher.vbox_vm_count)
+            self.top_pad.addstr(self._center_text(s))
+            
+
+      elif pad_index == 2:
+         if self.vpp_watcher.use_api:
+            v,_ = self._data["vpp/system"]["version"].top()
+            v = "vpp: "+v
+            self.top_pad.addstr(self._center_text(v))
+
+      elif pad_index == 3:
+         pass
+      
+   def _format_colname_pad(self, pad_index):
+      self.colname_pad.clear()
+
+      s=""
+      s += (self._center_text("name",
+                             width=self.col_sizes[0])
+        + " " +  self._center_text("value",
+                             width=self.col_sizes[1]))
+      s += self._center_text("dynamicity",
+                             width=self.pad_width-len(s)-1)
       
       
+      if pad_index == 0:
+         self.colname_pad.addstr(s)
+      elif pad_index == 1:
+         self.colname_pad.addstr(s)
+      elif pad_index == 2:
+         self.colname_pad.addstr(s)
+      elif pad_index == 3:
+         pass
+
    def _append_content(self, s, screen_index, flags=0, fill=False):
       """
       content is a list of screen content
@@ -426,7 +466,6 @@ class DXAgent(IOManager):
 
       # VM
       if "virtualbox" in agent.vm_health.vm_libs:
-         self._format_attrs_rb("virtualbox/system", 1)
          self._format_attrs_list_rb("virtualbox/vms", 1)
 
       # VPP
@@ -487,11 +526,15 @@ class DXAgent(IOManager):
          self.resize_columns()
 
       self._fill_pad()
+      
       try:
-         self.header.refresh(0, 0, 0, 0, 1, self.width)
-         self.top_pad.refresh(0, 0, 2, 1, 3, self.pad_width)
-         self.pad.refresh(0, 0, 2+self.top_pad_height, 1, 
-                          self.pad_height, self.pad_width)
+         self.header.refresh(0, 0, 0, 0, 0, self.width-1)
+         self.top_pad.refresh(0, 0, 2, 1, self.top_pad_height+2, self.pad_width-2)
+         self.colname_pad.refresh(0, 0, 5, 1, 
+                                  5, self.pad_width-1)
+         self.pad.refresh(0, 0, 3+self.top_pad_height, 1, 
+                          self.height-2,
+                          self.pad_width)
       except:
          pass
 
@@ -521,6 +564,7 @@ class DXAgent(IOManager):
       self.resize_columns()
       self._format_header(0)
       self._format_top_pad(0)
+      self._format_colname_pad(0)
 
    def _clear_pads(self):
       """
@@ -535,14 +579,14 @@ class DXAgent(IOManager):
 
    def _init_pads(self):
       self.height, self.width = self.window.getmaxyx()
-      self.pad_height, self.pad_width = self.height-2, self.width-2
+      self.pad_height, self.pad_width = self.height-6, self.width-2
       self.top_pad_height, self.top_pad_width = 3, self.pad_width
       self.content = [[] for _ in range(self.max_screens)]
 
-      self.pad = curses.newpad(self.pad_height+1, self.pad_width)
       self.header = curses.newpad(1, self.width)
-      self.top_pad = curses.newpad(3, self.width)
-
+      self.top_pad = curses.newpad(3, self.pad_width)
+      self.colname_pad = curses.newpad(1, self.pad_width)
+      self.pad = curses.newpad(self.pad_height+1, self.pad_width)
 
    def exit(self):
       """
@@ -592,6 +636,7 @@ class DXAgent(IOManager):
       self.screen = (self.screen+direction) % self.max_screens
       self._format_header(self.screen)
       self._format_top_pad(self.screen)
+      self._format_colname_pad(self.screen)
 
    def run(self):
       """
