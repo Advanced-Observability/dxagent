@@ -29,6 +29,7 @@ class BMWatcher():
       self._data["swaps"] = {}
       self._data["net/arp"] = {}
       self._data["stats"] = {}
+      self._data["diskstats"] = {}
 
       # uptime
       attr_list = ["up", "idle"]
@@ -324,9 +325,40 @@ class BMWatcher():
             self._data["uptime"][attr_names[i]].append(e)
 
    def _process_proc_diskstats(self):
-      attr_names = []
+      attr_names = [
+         "device_major", "device_minor", "device_name",
+         "reads_completed", "reads_merged", "sectors_read",
+         "time_reading", "writes_completed", "writes_merged",
+         "sectors_written", "time_writting", "current_io",
+         "time_io", "time_io_weighted", "discards_completed",
+         "discards_merged", "sectors_discarded", "time_discarding"
+      ]
+      attr_units = [  "", "", "", "", "", "", "ms", "",
+         "", "", "ms", "", "ms", "ms", "", "", "", "ms"
+      ]
+      attr_counters = [ False, False, False, True, True, True,
+         False, True, True, True, False, False, False, False, # ??
+         True, True, True, False
+      ]
+
       with open("/proc/diskstats", 'r') as f:
-         self._data["diskstats"] = [l.rstrip().split() for l in f.readlines()]
+         for disk in f.readlines():
+
+            attr_val = disk.rstrip().split()
+            dev_name = attr_val[2]
+            if "loop" in dev_name:
+               continue
+
+            # add disk if not tracked
+            if dev_name not in self._data["diskstats"]:
+               self._data["diskstats"][dev_name] = init_rb_dict(
+                    attr_names, counters=attr_counters, units=attr_units,
+                     type=int)
+
+            for i,v in enumerate(attr_val):
+               if i == 2:
+                  continue
+               self._data["diskstats"][dev_name][attr_names[i]].append(v)
 
    def _process_proc_net_netstat(self):
 

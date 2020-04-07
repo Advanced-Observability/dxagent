@@ -447,8 +447,9 @@ class DXAgent(IOManager):
       self._format_attrs_list_rb_percpu("arp-cache", 0)
       self._format_attrs_list_rb_percpu("ndisc-cache", 0)
 
-      self._format_attrs_rb("meminfo", 1)
+      self._format_attrs_list_rb("diskstats", 1)
       self._format_attrs_list_rb("swaps", 1)
+      self._format_attrs_rb("meminfo", 1)
 
       self._format_attrs_rb("stats_global", 2)
       self._format_attrs_rb("loadavg", 2)
