@@ -133,7 +133,7 @@ class RingBuffer(collections.deque):
       except:
          return 0
 
-   def delta(self):
+   def delta(self, first=0):
       """
       @return delta value on entire buffer.
       
@@ -143,7 +143,7 @@ class RingBuffer(collections.deque):
       """
       
       try:
-         delta = self.__getitem__(-1) - self.__getitem__(0)
+         delta = self.__getitem__(-1) - self.__getitem__(first)
          if self.type == float:
             return round(delta, 2)
          elif self.type == int:

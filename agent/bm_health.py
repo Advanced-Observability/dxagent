@@ -81,15 +81,32 @@ class BMWatcher():
 
       # stat and stat/cpu
       attr_list = []
-      attr_list_cpu = ["user", "nice", "system", "idle", "iowait",
-                        "irq", "softirq", "steal", "guest", "guest_nice"]
+      attr_list_cpu = [
+         "user_time", "nice_time", "system_time", "idle_time", 
+         "iowait_time", "irq_time", "softirq_time", "steal_time", 
+         "guest_time", "guest_nice_time", "system_all_time",
+         "idle_all_time", "guest_all_time", "total_time",
+
+         "user_period", "nice_period", "system_period", "idle_period", 
+         "iowait_period", "irq_period", "softirq_period", "steal_period", 
+         "guest_period", "guest_nice_period", "system_all_period",
+         "idle_all_period", "guest_all_period", "total_period",
+
+         "user_perc", "nice_perc", "system_perc", "idle_perc", 
+         "iowait_perc", "irq_perc", "softirq_perc", "steal_perc", 
+         "guest_perc", "guest_nice_perc", "system_all_perc",
+         "idle_all_perc", "guest_all_perc",
+       ]
+      attr_units = ["ms"] * 28 + ["%"] * 13
+
       self._data["stat/cpu"] = {}
       with open("/proc/stat", 'r') as f:
          for l in f.readlines():
             label = l.split()[0]
 
             if label.startswith("cpu"):
-               self._data["stat/cpu"][label] = init_rb_dict(attr_list_cpu)
+               self._data["stat/cpu"][label] = init_rb_dict(attr_list_cpu,
+                                                            units=attr_units)
             else:
                attr_list.append(label)
 
@@ -261,19 +278,76 @@ class BMWatcher():
       }
       for d,v in proc_state.items():
          self._data["stats_global"][proc_state_names[d]].append(v)
-      
 
    def _process_proc_stat(self):
-      attr_names = ["user", "nice", "system", "idle", "iowait",
-                    "irq", "softirq", "steal", "guest", "guest_nice"]
+      time_names = [
+         "user_time", "nice_time", "system_time", "idle_time", 
+         "iowait_time", "irq_time", "softirq_time", "steal_time", 
+         "guest_time", "guest_nice_time", "system_all_time",
+         "idle_all_time", "guest_all_time", "total_time",
+      ]
+      period_names = [
+         "user_period", "nice_period", "system_period", "idle_period", 
+         "iowait_period", "irq_period", "softirq_period", "steal_period", 
+         "guest_period", "guest_nice_period", "system_all_period",
+         "idle_all_period", "guest_all_period",
+       ]
+      perc_names = [
+         "user_perc", "nice_perc", "system_perc", "idle_perc", 
+         "iowait_perc", "irq_perc", "softirq_perc", "steal_perc", 
+         "guest_perc", "guest_nice_perc", "system_all_perc",
+         "idle_all_perc", "guest_all_perc",
+      ]
 
       with open("/proc/stat", 'r') as f:
          for l in f.readlines():
             if l.startswith("cpu"):
                split = l.rstrip().split()
                cpu_label = split[0]
-               for i,e in enumerate(split[1:]):
-                  self._data["stat/cpu"][cpu_label][attr_names[i]].append(e)
+
+               split = [int(s) for s in split[1:]]
+               # compute more metrics
+               #
+               # Guest time is already in usertime
+               usertime = split[0] - split[8]
+               nicetime = split[1] - split[9]
+               #  kernels >= 2.6
+               idlealltime = split[3] + split[4]
+               systemalltime = split[2] + split[5] + split[6]
+               virtalltime = split[8] + split[9]
+               totaltime = (usertime + nicetime + systemalltime + idlealltime
+                           + split[7] + virtalltime)
+
+               attr_val = [ 
+                  usertime, nicetime, split[2], split[3], split[4],
+                  split[5], split[6], split[7], split[8], split[9], 
+                  systemalltime, idlealltime, virtalltime, totaltime
+               ]
+               # append time attrs 
+               for k,v in zip(time_names, attr_val):
+                  v *= self.msec_per_jiffy
+                  self._data["stat/cpu"][cpu_label][k].append(v)
+
+               # compute total period first
+               totalperiod = self._data["stat/cpu"][cpu_label]["total_time"].delta(
+                                                                   first=-2)
+               self._data["stat/cpu"][cpu_label]["total_period"].append(
+                                                                totalperiod)
+
+               def ratio(v, total):
+                  try:
+                     return v/total*100.0
+                  except:
+                     return 0
+
+               # compute&append period attrs
+               for tname,pname,percname in zip(time_names, 
+                                               period_names, 
+                                               perc_names):
+                  v = self._data["stat/cpu"][cpu_label][tname].delta(first=-2)
+                  self._data["stat/cpu"][cpu_label][pname].append(v)
+                  self._data["stat/cpu"][cpu_label][percname].append(
+                                                   ratio(v,totalperiod))
 
             else:
                k, d = l.rstrip().split()[:2]

@@ -94,7 +94,7 @@ class DXAgent(IOManager):
 
       """
       self.col_sizes=[36,32,32]
-      self.col_sizes_cpu=[20,8,8,8,8,8,8,8,8]
+      self.col_sizes_cpu=[20,12,12,12,12,12,12,12,12]
       shrink_factor = 0.85
 
       while ((self.width <= sum(self.col_sizes)+len(self.col_sizes))
@@ -272,7 +272,13 @@ class DXAgent(IOManager):
                value, severity = d.top()
                if severity:
                   flags.append((len(s),curses.color_pair(severity.value)))
-               s += ("{}"+" "*8).format(value)[:self.col_sizes_cpu[1]]
+               if d.unit():
+                  s += ("{} {}"+" "*self.col_sizes_cpu[1]).format(
+                        value, d.unit())[:self.col_sizes_cpu[1]]
+               else:
+                  s += ("{}"+" "*self.col_sizes_cpu[1]).format(
+                        value)[:self.col_sizes_cpu[1]]
+
                if severity:
                   flags.append((len(s),0))
                if cpu_index < i+cpu_slice-1:
