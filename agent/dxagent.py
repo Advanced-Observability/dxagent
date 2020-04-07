@@ -12,6 +12,7 @@ import sched
 import curses
 import time
 import string
+import datetime
 
 import agent
 from agent.ios import IOManager
@@ -57,7 +58,7 @@ class DXAgent(IOManager):
       
       # navigation vars  
       self.screen = 0
-      self.max_screens = 4
+      self.max_screens = 7
       self.top = [0 for _ in range(self.max_screens)]
       self.current = [0 for _ in range(self.max_screens)]
       self.max_lines = 2**14
@@ -105,9 +106,9 @@ class DXAgent(IOManager):
       self.col_sizes[-1] = 0
       self.col_sizes_cpu[-1] = 0
 
-      self._format_header(self.screen)
-      self._format_top_pad(self.screen)
-      self._format_colname_pad(self.screen)
+      self._format_header()
+      self._format_top_pad()
+      self._format_colname_pad()
          
    def _format_attrs(self, category, pad_index):
       """
@@ -266,7 +267,7 @@ class DXAgent(IOManager):
 
             for cpu_index in range(i,i+cpu_slice):
 
-               cpu_label="cpu{}".format(i)
+               cpu_label="cpu{}".format(cpu_index)
                d = self._data[category][cpu_label][k]
                value, severity = d.top()
                if severity:
@@ -333,55 +334,57 @@ class DXAgent(IOManager):
 
       return s
 
-   def _format_header(self, pad_index):
+   def _fill_header(self, names, s):
+      """
+      fill header pad with names
+
+      """
+      padding = int((self.width-len(s))/2)
+      self.header.addstr(padding*" ")
+
+      for i,name in enumerate(names):
+
+         self.header.addstr(name, 
+            curses.A_BOLD | curses.color_pair(10) if self.screen == i else 0)
+         if i != len(names)-1:
+            self.header.addstr(" | ")
+
+   def _format_header(self):
       """
 
       """
       self.header.clear()
 
-      full_str="Baremetal | Virtual Machines | VPP | Health"
-      short_str="BM | VM | VPP | H"
-      if self.width > len(full_str):
-         padding = int((self.width-len(full_str))/2)
-         self.header.addstr(padding*" ")
-         
-         self.header.addstr("Baremetal", 
-            curses.A_BOLD | curses.color_pair(10) if pad_index == 0 else 0)
-         self.header.addstr(" | ")
-         self.header.addstr("Virtual Machines", 
-            curses.A_BOLD | curses.color_pair(10) if pad_index == 1 else 0)
-         self.header.addstr(" | ")
-         self.header.addstr("VPP", 
-            curses.A_BOLD | curses.color_pair(10) if pad_index == 2 else 0)
-         self.header.addstr(" | ")
-         self.header.addstr("Health", 
-            curses.A_BOLD | curses.color_pair(10) if pad_index == 3 else 0)
+      screen_names = ["CPU", "Memory", "Processes", "Networking",
+                      "Virtual Machines", "VPP", "Health"]
+      short_names = ["CPU", "Mem", "Proc", "Net",
+                      "VMs", "VPP", "H"]
+      this_name = [screen_names[self.screen]]
+      
+      full_str  = " | ".join(screen_names)
+      short_str = " | ".join(short_names)
+      min_str = screen_names[self.screen]
+      
+      names = [screen_names, short_names, this_name]   
+      strs = [full_str, short_str, min_str]
 
-      elif self.width > len(short_str):
-         padding = int((self.width-len(short_str))/2)
-         self.header.addstr(padding*" ")
-         
-         self.header.addstr("B", 
-            curses.A_BOLD | curses.color_pair(10) if pad_index == 0 else 0)
-         self.header.addstr(" | ")
-         self.header.addstr("VM", 
-            curses.A_BOLD | curses.color_pair(10) if pad_index == 1 else 0)
-         self.header.addstr(" | ")
-         self.header.addstr("VPP", 
-            curses.A_BOLD | curses.color_pair(10) if pad_index == 2 else 0)
-         self.header.addstr(" | ")
-         self.header.addstr("H", 
-            curses.A_BOLD | curses.color_pair(10) if pad_index == 3 else 0)
-      else:
-         self.header.addstr("...")
+      for names, s in zip(names, strs):
 
-   def _format_top_pad(self, pad_index):
+         if self.width > len(s):
+            self._fill_header(names, s)
+            break    
+
+   def _format_top_pad(self):
       self.top_pad.clear()
 
-      if pad_index == 0:
+      if self.screen in [0, 1, 2, 3]:
          self.top_pad.addstr(self._center_text(str(self.sysinfo)))
+         sec,_ = self._data["uptime"]["up"].top()
+         if sec:
+            uptime=datetime.timedelta(seconds=int(float(sec)))
+            self.top_pad.addstr(self._center_text("uptime: {}".format(str(uptime))))
       
-      elif pad_index == 1:
+      elif self.screen == 4:
          if "virtualbox" in agent.vm_health.vm_libs:
             s = "virtualbox: "
             v,_=self._data["virtualbox/system"]["version"].top()
@@ -390,16 +393,16 @@ class DXAgent(IOManager):
             self.top_pad.addstr(self._center_text(s))
             
 
-      elif pad_index == 2:
+      elif self.screen == 5:
          if self.vpp_watcher.use_api:
             v,_ = self._data["vpp/system"]["version"].top()
             v = "vpp: "+v
             self.top_pad.addstr(self._center_text(v))
 
-      elif pad_index == 3:
+      elif self.screen == 6:
          pass
       
-   def _format_colname_pad(self, pad_index):
+   def _format_colname_pad(self):
       self.colname_pad.clear()
 
       s=""
@@ -410,14 +413,11 @@ class DXAgent(IOManager):
       s += self._center_text("dynamicity",
                              width=self.pad_width-len(s)-1)
       
-      
-      if pad_index == 0:
+      if self.screen == 0:
+         pass
+      elif self.screen in [1, 2, 3, 4, 5]:
          self.colname_pad.addstr(s)
-      elif pad_index == 1:
-         self.colname_pad.addstr(s)
-      elif pad_index == 2:
-         self.colname_pad.addstr(s)
-      elif pad_index == 3:
+      elif self.screen == 6:
          pass
 
    def _append_content(self, s, screen_index, flags=0, fill=False):
@@ -442,48 +442,50 @@ class DXAgent(IOManager):
       self.resize_columns()
 
       # baremetal 
-      self._format_attrs_list_rb("bm_ifs", 0)
-      self._format_attrs_rb("stats_global", 0)
-      self._format_attrs_rb("uptime", 0)
-      self._format_attrs_rb("loadavg", 0)
-      self._format_attrs_list_rb("net/dev", 0)
-      self._format_attrs_rb("meminfo", 0)
-      self._format_attrs_list_rb("swaps", 0)
-      self._format_attrs_rb("proc/sys", 0)
-      self._format_attrs_rb("netstat", 0)
-      self._format_attrs_rb("snmp", 0)
-      self._format_attrs_list_rb("net/arp", 0)
       self._format_attrs_list_rb_percpu("stat/cpu", 0)
-      self._format_attrs_rb("stat", 0)
       self._format_attrs_list_rb_percpu("rt-cache", 0)
       self._format_attrs_list_rb_percpu("arp-cache", 0)
       self._format_attrs_list_rb_percpu("ndisc-cache", 0)
-      self._format_attrs_list("net/route", 0)
+
+      self._format_attrs_rb("meminfo", 1)
+      self._format_attrs_list_rb("swaps", 1)
+
+      self._format_attrs_rb("stats_global", 2)
+      self._format_attrs_rb("loadavg", 2)
+      self._format_attrs_rb("stat", 2)
 
       # XXX: very verbose at the end, also very greedy
       if self.args.verbose:
-         self._format_attrs_list_rb("stats", 0)
+         self._format_attrs_list_rb("stats", 2)
+
+      self._format_attrs_list_rb("bm_ifs", 3)
+      self._format_attrs_list_rb("net/dev", 3)
+      self._format_attrs_rb("proc/sys", 3)
+      self._format_attrs_rb("netstat", 3)
+      self._format_attrs_rb("snmp", 3)
+      self._format_attrs_list_rb("net/arp", 3)
+      self._format_attrs_list("net/route", 3)
 
       # VM
       if "virtualbox" in agent.vm_health.vm_libs:
-         self._format_attrs_list_rb("virtualbox/vms", 1)
+         self._format_attrs_list_rb("virtualbox/vms", 4)
 
       # VPP
       if "vpp" in agent.vpp_health.kbnets_libs:
          if self.vpp_watcher.use_api:
-            self._format_attrs_rb("vpp/system", 2)
-            self._format_attrs_list_rb("vpp/api/if", 2)
+            self._format_attrs_rb("vpp/system", 5)
+            self._format_attrs_list_rb("vpp/api/if", 5)
 
          if self.vpp_watcher.use_stats:
-            self._format_attrs_rb("vpp/stats/sys", 2) 
-            self._format_attrs_list_rb("vpp/stats/buffer-pool", 2)
-            self._format_attrs_list_rb("vpp/stats/workers", 2) 
-            self._format_attrs_list_rb("vpp/stats/if", 2)
-            self._format_attrs_list_rb("vpp/stats/err", 2)
+            self._format_attrs_rb("vpp/stats/sys", 5) 
+            self._format_attrs_list_rb("vpp/stats/buffer-pool", 5)
+            self._format_attrs_list_rb("vpp/stats/workers", 5) 
+            self._format_attrs_list_rb("vpp/stats/if", 5)
+            self._format_attrs_list_rb("vpp/stats/err", 5)
 
       # Health metrics Pad
-      self._append_content("Metrics", 3, curses.A_BOLD, fill=True)
-      self._append_content("Symptoms", 3, curses.A_BOLD, fill=True)
+      self._append_content("Metrics", 6, curses.A_BOLD, fill=True)
+      self._append_content("Symptoms", 6, curses.A_BOLD, fill=True)
 
    def _fill_pad(self):
       """
@@ -524,10 +526,10 @@ class DXAgent(IOManager):
       if (self.height, self.width) != self.window.getmaxyx():
          self._init_pads()
          self.resize_columns()
-
-      self._fill_pad()
       
       try:
+         self._fill_pad()
+
          self.header.refresh(0, 0, 0, 0, 0, self.width-1)
          self.top_pad.refresh(0, 0, 2, 1, self.top_pad_height+2, self.pad_width-2)
          self.colname_pad.refresh(0, 0, 5, 1, 
@@ -562,9 +564,9 @@ class DXAgent(IOManager):
       self.window.refresh()
       self._init_pads()
       self.resize_columns()
-      self._format_header(0)
-      self._format_top_pad(0)
-      self._format_colname_pad(0)
+      self._format_header()
+      self._format_top_pad()
+      self._format_colname_pad()
 
    def _clear_pads(self):
       """
@@ -634,9 +636,9 @@ class DXAgent(IOManager):
 
    def switch_screen(self, direction):
       self.screen = (self.screen+direction) % self.max_screens
-      self._format_header(self.screen)
-      self._format_top_pad(self.screen)
-      self._format_colname_pad(self.screen)
+      self._format_header()
+      self._format_top_pad()
+      self._format_colname_pad()
 
    def run(self):
       """
