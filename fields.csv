@@ -143,6 +143,17 @@ diskstats,time_discarding,int,0,ms,device_name
 diskstats,current_io,int,0,,device_name
 diskstats,time_io,int,0,ms,device_name
 diskstats,time_io_weighted,int,0,ms,device_name
+diskstats,size,int,0,KB,device_name
+diskstats,fs_spec,str,0,,device_name
+diskstats,fs_file,str,0,,device_name
+diskstats,fs_vfstype,str,0,,device_name
+diskstats,fs_mntops,str,0,,device_name
+diskstats,total,int,0,KB,device_name
+diskstats,free_root,int,0,KB,device_name
+diskstats,free_user,int,0,KB,device_name
+diskstats,used,int,0,KB,device_name
+diskstats,total_user,int,0,KB,device_name
+diskstats,usage_user,int,0,%,device_name
 proc/sys,net.core.rmem_default,int,0,B,
 proc/sys,net.core.rmem_max,int,0,B,
 proc/sys,net.core.wmem_default,int,0,B,

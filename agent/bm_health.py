@@ -325,40 +325,130 @@ class BMWatcher():
             self._data["uptime"][attr_names[i]].append(e)
 
    def _process_proc_diskstats(self):
+
+      mount_names = ["fs_spec", "fs_file", "fs_vfstype", 
+         "fs_mntops"]#, "fs_freq", "fs_passno"]
+      mount_counters = [False]*4
+      mount_units = [ "" ]*4
+      mount_types = [str]*4
+
       attr_names = [
          "device_major", "device_minor", "device_name",
          "reads_completed", "reads_merged", "sectors_read",
          "time_reading", "writes_completed", "writes_merged",
          "sectors_written", "time_writting", "current_io",
          "time_io", "time_io_weighted", "discards_completed",
-         "discards_merged", "sectors_discarded", "time_discarding"
-      ]
+         "discards_merged", "sectors_discarded", "time_discarding",
+         "size", "total", "free_root", "free_user", 
+         "used", "total_user", "usage_user"
+      ] + mount_names
       attr_units = [  "", "", "", "", "", "", "ms", "",
-         "", "", "ms", "", "ms", "ms", "", "", "", "ms"
-      ]
+         "", "", "ms", "", "ms", "ms", "", "", "", "ms", "KB",
+         "KB","KB","KB","KB","KB","%",
+         
+      ] + mount_units
       attr_counters = [ False, False, False, True, True, True,
          False, True, True, True, False, False, False, False, # ??
-         True, True, True, False
-      ]
+         True, True, True, False, False, False, False, False, 
+         False,  False, False,
+      ] + mount_counters
+      attr_types = [ int ] * 25 + mount_types
 
-      with open("/proc/diskstats", 'r') as f:
-         for disk in f.readlines():
 
-            attr_val = disk.rstrip().split()
-            dev_name = attr_val[2]
-            if "loop" in dev_name:
+      mounted_devs = []
+      with open("/proc/mounts") as f:
+
+         for l in f.readlines():
+            attr_val = l.rstrip().split()[:-2]
+            dev_name = attr_val[0].split("/")[-1]
+
+            if not dev_name[-1].isdigit():
                continue
 
             # add disk if not tracked
             if dev_name not in self._data["diskstats"]:
                self._data["diskstats"][dev_name] = init_rb_dict(
                     attr_names, counters=attr_counters, units=attr_units,
-                     type=int)
+                     types=attr_types)     
+            mounted_devs.append(dev_name)
+
+            for i,attr in enumerate(attr_val):
+               (self._data["diskstats"][dev_name]
+                              [mount_names[i]].append(attr))       
+
+      with open("/proc/partitions") as f:
+
+         for l in f.readlines()[2:]:
+            attr_val = l.rstrip().split()
+            dev_name = attr_val[-1]
+
+            if not dev_name[-1].isdigit():
+               continue
+
+            # skip disk if not present in /proc/mounts
+            if dev_name not in self._data["diskstats"]:
+               continue
+            self._data["diskstats"][dev_name]["size"].append(attr_val[2])
+
+      with open("/proc/diskstats", 'r') as f:
+         for disk in f.readlines():
+
+            attr_val = disk.rstrip().split()
+            dev_name = attr_val[2]
+            if not dev_name[-1].isdigit():
+               continue
+
+            # skip disk if not present in /proc/mounts
+            if dev_name not in self._data["diskstats"]:
+               continue
 
             for i,v in enumerate(attr_val):
                if i == 2:
                   continue
                self._data["diskstats"][dev_name][attr_names[i]].append(v)
+
+     
+      for monitored_dev in list(self._data["diskstats"].keys()):
+
+          # cleanup unmounted dev
+         if monitored_dev not in mounted_devs:
+            del self._data["diskstats"][monitored_dev]
+            continue
+         
+         path,_ = self._data["diskstats"][monitored_dev]["fs_file"].top()
+
+         try:
+            st = os.statvfs(path)
+         except:
+            continue
+
+         # Total space (only available to root)
+         total = (st.f_blocks * st.f_frsize) / 1024
+         # Remaining free space usable by root.
+         avail_to_root = (st.f_bfree * st.f_frsize)  / 1024
+         # Remaining free space usable by user.
+         avail_to_user = (st.f_bavail * st.f_frsize)  / 1024
+         # Total space being used in general.
+         used = (total - avail_to_root)  / 1024
+         # Total space which is available to user (same as 'total' but
+         # for the user).
+         total_user = used + avail_to_user  / 1024
+         # User usage percent compared to the total amount of space
+         # the user can use. This number would be higher if compared
+         # to root's because the user has less space (usually -5%).
+         try:
+            usage_percent_user = (float(used) / total_user) * 100
+         except:
+            usage_percent_user=0
+   
+         self._data["diskstats"][monitored_dev]["total"].append(total)
+         self._data["diskstats"][monitored_dev]["free_root"].append(avail_to_root)
+         self._data["diskstats"][monitored_dev]["free_user"].append(avail_to_user)
+         self._data["diskstats"][monitored_dev]["used"].append(used)
+         self._data["diskstats"][monitored_dev]["total_user"].append(total_user)
+         self._data["diskstats"][monitored_dev]["usage_user"].append(usage_percent_user)
+
+
 
    def _process_proc_net_netstat(self):
 
