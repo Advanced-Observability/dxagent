@@ -351,7 +351,7 @@ class DXAgent(IOManager):
       for i,name in enumerate(names):
 
          self.header.addstr(name, 
-            curses.A_BOLD | curses.color_pair(10) if self.screen == i else 0)
+            curses.A_BOLD | self.selected_color if self.screen == i else 0)
          if i != len(names)-1:
             self.header.addstr(" | ")
 
@@ -512,13 +512,13 @@ class DXAgent(IOManager):
             poffset,pflag=0,0
             for (offset,flag) in flags:
                self.pad.addstr(i,poffset,s[poffset:offset],
-                     pflag if i != current else pflag | curses.color_pair(10))
+                     pflag if i != current else pflag | self.selected_color)
                poffset,pflag=offset,flag
             self.pad.addstr(i,poffset,s[poffset:],
-                  pflag if i != current else pflag | curses.color_pair(10))
+                  pflag if i != current else pflag | self.selected_color)
 
          else:
-            self.pad.addstr(i,0,s,flags if i != current else flags | curses.color_pair(10))
+            self.pad.addstr(i,0,s,flags if i != current else flags | self.selected_color)
 
       # empty strings
       for i in range(len(visible_content), self.pad_height):
@@ -560,13 +560,15 @@ class DXAgent(IOManager):
       curses.curs_set(0)
       
       curses.start_color()
-      curses.init_color(10, 1000, 700, 0)
-      curses.init_pair(1, 10, curses.COLOR_BLACK)
+      curses.init_color(4, 1000, 700, 0)
+      curses.init_pair(1, 4, curses.COLOR_BLACK)
       curses.init_pair(2, curses.COLOR_RED, curses.COLOR_BLACK)
       
-      curses.init_pair(10, curses.COLOR_BLACK, curses.COLOR_WHITE)
-      curses.init_pair(11, 10, curses.COLOR_WHITE)  
-      curses.init_pair(12, curses.COLOR_RED, curses.COLOR_WHITE)   
+      curses.init_pair(8, curses.COLOR_BLACK, curses.COLOR_WHITE)
+      curses.init_pair(9, 4, curses.COLOR_WHITE)  
+      curses.init_pair(10, curses.COLOR_RED, curses.COLOR_WHITE)
+
+      self.selected_color = curses.color_pair(8)
 
       self.window.refresh()
       self._init_pads()
