@@ -29,7 +29,7 @@ def init_rb_dict(keys, type=int, types=None,
    
 
    """
-   return {attr:RingBuffer(type=types[i] if types else type, 
+   return {attr:RingBuffer(attr, type=types[i] if types else type, 
                            counter=counters[i] if counters else counter, 
                            unit=units[i] if units else unit) 
             for i,attr in enumerate(keys)}
@@ -45,7 +45,8 @@ class Severity(Enum):
 
 class RingBuffer(collections.deque):
 
-   def __init__(self, maxlen=_BUFFER_SIZE, type=int, counter=False, unit=""):
+   def __init__(self, attr_name, maxlen=_BUFFER_SIZE, 
+                      type=int, counter=False, unit=""):
       """
       RingBuffer
 
@@ -57,6 +58,7 @@ class RingBuffer(collections.deque):
       """
       super().__init__(maxlen=maxlen)
 
+      self.attr_name=attr_name
       self._unit=unit
       self.type=type
       self.counter=counter
@@ -133,6 +135,12 @@ class RingBuffer(collections.deque):
       except:
          return 0
 
+   def min(self):
+      return min(self)
+
+   def max(self):
+      return max(self)
+
    def delta(self, first=0):
       """
       @return delta value on entire buffer.
@@ -200,6 +208,9 @@ class RingBuffer(collections.deque):
 
    def unit(self):
       return self._unit
+
+   def name(self):
+      return self.attr_name
 
    def is_counter(self):
       return self.counter

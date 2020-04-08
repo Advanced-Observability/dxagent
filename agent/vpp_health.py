@@ -229,7 +229,7 @@ class VPPWatcher():
          # add field entry if needed XXX: fix this
          err_name = k.split('/')[3]
          if err_name not in self._data["vpp/stats/err"][node_name]:
-            self._data["vpp/stats/err"][node_name][err_name] = RingBuffer(counter=True)
+            self._data["vpp/stats/err"][node_name][err_name] = RingBuffer(err_name, counter=True)
 
          self._data["vpp/stats/err"][node_name][err_name].append(sum(d))
 

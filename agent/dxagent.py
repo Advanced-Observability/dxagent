@@ -22,6 +22,7 @@ from agent.vm_health import VMWatcher
 from agent.vpp_health import VPPWatcher
 
 ESCAPE = 27
+ENTER = 10
 
 # keyboard input processing delay
 KEYBOARD_INPUT_RATE=0.05
@@ -109,7 +110,8 @@ class DXAgent(IOManager):
       self._format_header()
       self._format_top_pad()
       self._format_colname_pad()
-         
+      self._format_footer()
+
    def _format_attrs(self, category, pad_index):
       """
       format a list of tuples into a curses pad
@@ -118,7 +120,8 @@ class DXAgent(IOManager):
       self._append_content(self._center_text(category),
                            pad_index, curses.A_BOLD)
       for e in self._data[category]:
-         self._append_content(e[0]+": "+" ".join(e[1:])+"\n", pad_index)
+         self._append_content(e[0]+": "+" ".join(e[1:])+"\n", 
+                              pad_index, buf=e)
       self._append_content("\n", pad_index)
 
    def _format_attrs_rb(self, category, pad_index):
@@ -158,7 +161,7 @@ class DXAgent(IOManager):
          if severity:
             flags.append((len(s),0))
 
-         self._append_content(s, pad_index, flags, fill=True)      
+         self._append_content(s, pad_index, flags, fill=True, buf=d)      
 
       self._append_content(self.hline_bottom(self.col_sizes), pad_index)
 
@@ -182,9 +185,10 @@ class DXAgent(IOManager):
                                              pad_index)
                   else:
                      self._append_content(" "+t[0]+": "+" ".join(t[1:])+"\n",
-                                         pad_index)
+                                          pad_index)
             else:
-               self._append_content(" "+e[0]+": "+" ".join(e[1:])+"\n", pad_index)
+               self._append_content(" "+e[0]+": "+" ".join(e[1:])+"\n",
+                                    pad_index)
 
          self._append_content(self.hline(self.col_sizes), pad_index)
 
@@ -233,7 +237,7 @@ class DXAgent(IOManager):
             if severity:
                flags.append((len(s),0))
 
-            self._append_content(s, pad_index, flags, fill=True)
+            self._append_content(s, pad_index, flags, fill=True, buf=dd)
 
          if i == len(self._data[category])-1:
             self._append_content(self.hline_bottom(self.col_sizes), pad_index)
@@ -264,6 +268,7 @@ class DXAgent(IOManager):
             s = (" {}"+" "*self.col_sizes_cpu[0]).format(k)[:self.col_sizes_cpu[0]]
             flags = [(0,0)]
             s += VLINE_CHAR
+            buffers = []
 
             for cpu_index in range(i,i+cpu_slice):
 
@@ -284,7 +289,9 @@ class DXAgent(IOManager):
                if cpu_index < i+cpu_slice-1:
                   s += VLINE_CHAR
 
-            self._append_content(s, pad_index, flags, fill=True)
+               buffers.append(d)
+
+            self._append_content(s, pad_index, flags, fill=True, buf=buffers)
 
          if cpu_count-i <= cpu_slice:
             self._append_content(self.hline_bottom(self.col_sizes_cpu), pad_index)
@@ -301,7 +308,7 @@ class DXAgent(IOManager):
 
       padding = int((width-len(s))/2)
       rest = (width-len(s)) % 2
-      return padding*" "+s+padding*" "+ rest*" "
+      return (padding*" "+s+padding*" "+ rest*" ")[:self.pad_width]
 
    def _fill_line(self, s):
       """
@@ -351,7 +358,7 @@ class DXAgent(IOManager):
       for i,name in enumerate(names):
 
          self.header.addstr(name, 
-            curses.A_BOLD | self.selected_color if self.screen == i else 0)
+            curses.A_BOLD | self.selection_color if self.screen == i else 0)
          if i != len(names)-1:
             self.header.addstr(" | ")
 
@@ -392,13 +399,12 @@ class DXAgent(IOManager):
       
       elif self.screen == 4:
          if "virtualbox" in agent.vm_health.vm_libs:
-            s = "virtualbox: "
             v,_=self._data["virtualbox/system"]["version"].top()
-            s += v
-            s += " active-count: {}".format(self.vm_watcher.vbox_vm_count)
+            s = "virtualbox: {}".format(v)
+            self.top_pad.addstr(self._center_text(s))
+            s = "active-count: {}".format(self.vm_watcher.vbox_vm_count)
             self.top_pad.addstr(self._center_text(s))
             
-
       elif self.screen == 5:
          if self.vpp_watcher.use_api:
             v,_ = self._data["vpp/system"]["version"].top()
@@ -426,17 +432,19 @@ class DXAgent(IOManager):
       elif self.screen == 6:
          pass
 
-   def _append_content(self, s, screen_index, flags=0, fill=False):
+   def _append_content(self, s, screen_index, flags=0, fill=False, 
+                       buf=None):
       """
       content is a list of screen content
       each screen content is a list of (str, flags) tuples
 
       @param fill Fill line with blanks
-
+      @param buf The buffer related to this line
       """
       if fill:
          s = self._fill_line(s)
       self.content[screen_index].append((s,flags))
+      self.buffers[screen_index].append(buf)
 
    def _format(self):
       """
@@ -445,7 +453,6 @@ class DXAgent(IOManager):
       """
 
       self._init_pads()
-      self.resize_columns()
 
       # baremetal 
       self._format_attrs_list_rb_percpu("stat/cpu", 0)
@@ -474,7 +481,8 @@ class DXAgent(IOManager):
       self._format_attrs_list("net/route", 3)
 
       # VM
-      if "virtualbox" in agent.vm_health.vm_libs:
+      if ("virtualbox" in agent.vm_health.vm_libs
+         and self.vm_watcher.vbox_vm_count):
          self._format_attrs_list_rb("virtualbox/vms", 4)
 
       # VPP
@@ -494,12 +502,13 @@ class DXAgent(IOManager):
       self._append_content("Metrics", 6, curses.A_BOLD, fill=True)
       self._append_content("Symptoms", 6, curses.A_BOLD, fill=True)
 
+      self.resize_columns()
+
    def _fill_pad(self):
       """
       fill pad from visible content
 
       """
-
       top = self.top[self.screen]
       current = self.current[self.screen]-top
       visible_content = self.content[self.screen][top:top+self.pad_height]
@@ -512,13 +521,13 @@ class DXAgent(IOManager):
             poffset,pflag=0,0
             for (offset,flag) in flags:
                self.pad.addstr(i,poffset,s[poffset:offset],
-                     pflag if i != current else pflag | self.selected_color)
+                    pflag if i != current else pflag | self.selection_color)
                poffset,pflag=offset,flag
             self.pad.addstr(i,poffset,s[poffset:],
-                  pflag if i != current else pflag | self.selected_color)
+                 pflag if i != current else pflag | self.selection_color)
 
          else:
-            self.pad.addstr(i,0,s,flags if i != current else flags | self.selected_color)
+            self.pad.addstr(i,0,s,flags if i != current else flags | self.selection_color)
 
       # empty strings
       for i in range(len(visible_content), self.pad_height):
@@ -533,17 +542,22 @@ class DXAgent(IOManager):
       if (self.height, self.width) != self.window.getmaxyx():
          self._init_pads()
          self.resize_columns()
-      
+
       try:
          self._fill_pad()
 
          self.header.refresh(0, 0, 0, 0, 0, self.width-1)
-         self.top_pad.refresh(0, 0, 2, 1, self.top_pad_height+2, self.pad_width-2)
+         self.top_pad.refresh(0, 0, 2, 1,
+                              self.top_pad_height+2,
+                              self.pad_width-2)
          self.colname_pad.refresh(0, 0, 5, 1, 
                                   5, self.pad_width-1)
          self.pad.refresh(0, 0, 3+self.top_pad_height, 1, 
                           self.height-2,
                           self.pad_width)
+         self.footer.refresh(0, 0, 
+                             self.height-1, 1,
+                             self.height-1, self.width-2)
       except:
          pass
 
@@ -568,14 +582,11 @@ class DXAgent(IOManager):
       curses.init_pair(9, 4, curses.COLOR_WHITE)  
       curses.init_pair(10, curses.COLOR_RED, curses.COLOR_WHITE)
 
-      self.selected_color = curses.color_pair(8)
+      self.selection_color = curses.color_pair(8)
 
       self.window.refresh()
       self._init_pads()
       self.resize_columns()
-      self._format_header()
-      self._format_top_pad()
-      self._format_colname_pad()
 
    def _clear_pads(self):
       """
@@ -592,12 +603,17 @@ class DXAgent(IOManager):
       self.height, self.width = self.window.getmaxyx()
       self.pad_height, self.pad_width = self.height-6, self.width-2
       self.top_pad_height, self.top_pad_width = 3, self.pad_width
+      # this list contains formatted text
       self.content = [[] for _ in range(self.max_screens)]
+      # this list is aligned to content and contains buffers
+      # it is used to display extra details on demand
+      self.buffers = [[] for _ in range(self.max_screens)]
 
       self.header = curses.newpad(1, self.width)
       self.top_pad = curses.newpad(3, self.pad_width)
       self.colname_pad = curses.newpad(1, self.pad_width)
       self.pad = curses.newpad(self.pad_height+1, self.pad_width)
+      self.footer = curses.newpad(1, self.width)
 
    def exit(self):
       """
@@ -629,6 +645,8 @@ class DXAgent(IOManager):
          if self.current[self.screen] >= self.top[self.screen]+self.pad_height-1:
             self.top[self.screen] += direction
 
+      self._format_footer()
+
    def paging(self, direction):
       if direction == self.UP and self.current[self.screen] > 0:
 
@@ -643,11 +661,36 @@ class DXAgent(IOManager):
          self.top[self.screen] += min(self.pad_height-1,
           max(0,len(self.content[self.screen])-self.top[self.screen]-self.pad_height+1))
 
+      self._format_footer()
+
    def switch_screen(self, direction):
       self.screen = (self.screen+direction) % self.max_screens
       self._format_header()
       self._format_top_pad()
       self._format_colname_pad()
+      self._format_footer()
+
+   def _format_footer(self):
+      self.footer.clear()
+      if not self.buffers[self.screen]:
+         return      
+
+      buffer = self.buffers[self.screen][self.current[self.screen]]
+      if not buffer:
+         return
+
+      if type(buffer) is list:
+         name = buffer[0].name()
+         s = "{}".format(name)
+      elif buffer.type is str:
+         name = buffer.name()
+         s = "{}".format(name)        
+      else:
+         name = buffer.name()
+         s = "{} min:{} max:{} severity:{}".format(name,
+               buffer.min(), buffer.max(), buffer._top_severity())
+
+      self.footer.addstr(self._center_text(s))
 
    def run(self):
       """
