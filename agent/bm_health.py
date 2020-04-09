@@ -30,6 +30,8 @@ class BMWatcher():
       self._data["net/arp"] = {}
       self._data["stats"] = {}
       self._data["diskstats"] = {}
+      self._data["thermal"] = {}
+      self._data["coretemp"] = {}
 
       # uptime
       attr_list = ["up", "idle"]
@@ -209,9 +211,64 @@ class BMWatcher():
       self._process_proc_net_arp()
       self._process_proc_net_route()
       self._process_net_settings()
+      self._process_sensors()
 
       # non-standards
       self._process_interfaces()
+
+   def _process_sensors(self):
+      dev_cooling_path = "/sys/class/thermal/"
+      attr_names = ["type", "temperature"]
+      attr_types = [str, float]
+      attr_units = ["", "C°"]
+
+      for d in next(os.walk(dev_cooling_path))[1]:
+         if "thermal" not in d:
+            continue
+
+         path = dev_cooling_path+d+"/"
+         if d not in self._data["thermal"]:
+            self._data["thermal"][d] = init_rb_dict(
+                    attr_names, types=attr_types, units=attr_units)     
+
+         with open(path+"type", 'r') as f:
+            type = f.readlines()[0].rstrip()
+            self._data["thermal"][d]["type"].append(type)
+         with open(path+"temp", 'r') as f:
+            temp = f.readlines()[0].rstrip()
+            self._data["thermal"][d]["temperature"].append(int(temp)/1000)
+      
+      cpu_sensor_path="/sys/devices/platform/coretemp.0/hwmon/"
+      attr_names = ["label", "input", "max", "critical"]
+      attr_types = [str, float, float, float]
+      attr_units = ["", "C°", "C°", "C°"]
+
+      for d in next(os.walk(cpu_sensor_path))[1]:
+         if "hwmon" not in d:
+            continue
+         
+         path = cpu_sensor_path+d+"/"
+         for n in range(1,512):
+            name = "temp{}".format(n)
+            self.info(path+name+"_label")
+            if not os.path.exists(path+name+"_label"):
+               break
+
+            if name not in self._data["coretemp"]:
+               self._data["coretemp"][name] = init_rb_dict(
+                    attr_names, types=attr_types, units=attr_units)
+            with open(path+name+"_label") as f:
+               label = f.readlines()[0].rstrip()
+               self._data["coretemp"][name]["label"].append(label)
+            with open(path+name+"_input") as f:
+               input = f.readlines()[0].rstrip()
+               self._data["coretemp"][name]["input"].append(int(input)/1000.0)
+            with open(path+name+"_max") as f:
+               max = f.readlines()[0].rstrip()
+               self._data["coretemp"][name]["max"].append(int(max)/1000.0)
+            with open(path+name+"_crit") as f:
+               crit = f.readlines()[0].rstrip()
+               self._data["coretemp"][name]["critical"].append(int(temp)/1000.0)
 
    def _process_proc_meminfo(self):
       with open("/proc/meminfo", 'r') as f:
@@ -521,8 +578,6 @@ class BMWatcher():
          self._data["diskstats"][monitored_dev]["used"].append(used)
          self._data["diskstats"][monitored_dev]["total_user"].append(total_user)
          self._data["diskstats"][monitored_dev]["usage_user"].append(usage_percent_user)
-
-
 
    def _process_proc_net_netstat(self):
 
