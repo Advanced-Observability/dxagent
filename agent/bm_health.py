@@ -30,8 +30,9 @@ class BMWatcher():
       self._data["net/arp"] = {}
       self._data["stats"] = {}
       self._data["diskstats"] = {}
-      self._data["thermal"] = {}
-      self._data["coretemp"] = {}
+      self._data["sensors/thermal"] = {}
+      self._data["sensors/fans"] = {}
+      self._data["sensors/coretemp"] = {}
 
       # uptime
       attr_list = ["up", "idle"]
@@ -221,27 +222,29 @@ class BMWatcher():
       attr_names = ["type", "temperature"]
       attr_types = [str, float]
       attr_units = ["", "C°"]
+      category = "sensors/thermal"
 
       for d in next(os.walk(dev_cooling_path))[1]:
          if "thermal" not in d:
             continue
 
          path = dev_cooling_path+d+"/"
-         if d not in self._data["thermal"]:
-            self._data["thermal"][d] = init_rb_dict(
+         if d not in self._data[category]:
+            self._data[category][d] = init_rb_dict(
                     attr_names, types=attr_types, units=attr_units)     
 
          with open(path+"type", 'r') as f:
             type = f.readlines()[0].rstrip()
-            self._data["thermal"][d]["type"].append(type)
+            self._data[category][d]["type"].append(type)
          with open(path+"temp", 'r') as f:
             temp = f.readlines()[0].rstrip()
-            self._data["thermal"][d]["temperature"].append(int(temp)/1000)
+            self._data[category][d]["temperature"].append(int(temp)/1000)
       
       cpu_sensor_path="/sys/devices/platform/coretemp.0/hwmon/"
       attr_names = ["label", "input", "max", "critical"]
       attr_types = [str, float, float, float]
       attr_units = ["", "C°", "C°", "C°"]
+      category = "sensors/coretemp"
 
       for d in next(os.walk(cpu_sensor_path))[1]:
          if "hwmon" not in d:
@@ -250,25 +253,74 @@ class BMWatcher():
          path = cpu_sensor_path+d+"/"
          for n in range(1,512):
             name = "temp{}".format(n)
-            self.info(path+name+"_label")
             if not os.path.exists(path+name+"_label"):
                break
 
-            if name not in self._data["coretemp"]:
-               self._data["coretemp"][name] = init_rb_dict(
+            if name not in self._data[category]:
+               self._data[category][name] = init_rb_dict(
                     attr_names, types=attr_types, units=attr_units)
+
             with open(path+name+"_label") as f:
                label = f.readlines()[0].rstrip()
-               self._data["coretemp"][name]["label"].append(label)
+               self._data[category][name]["label"].append(label)
             with open(path+name+"_input") as f:
                input = f.readlines()[0].rstrip()
-               self._data["coretemp"][name]["input"].append(int(input)/1000.0)
+               self._data[category][name]["input"].append(int(input)/1000.0)
             with open(path+name+"_max") as f:
                max = f.readlines()[0].rstrip()
-               self._data["coretemp"][name]["max"].append(int(max)/1000.0)
+               self._data[category][name]["max"].append(int(max)/1000.0)
             with open(path+name+"_crit") as f:
                crit = f.readlines()[0].rstrip()
-               self._data["coretemp"][name]["critical"].append(int(temp)/1000.0)
+               self._data[category][name]["critical"].append(int(crit)/1000.0)
+
+      fan_sensor_path="/sys/devices/platform/"
+      attr_names = ["label", "input", "temperature"]
+      attr_types = [str, int, float]
+      attr_units = ["", "RPM", "C°"]
+      category = "sensors/fans"
+
+
+      # find directories that monitor fans
+      fan_directories=[]
+      for d in next(os.walk(fan_sensor_path))[1]:
+         path=fan_sensor_path+d+"/hwmon/"
+         if os.path.exists(path) and "coretemp" not in d:
+            fan_directories.append(path)
+
+      for p in fan_directories:
+         for d in next(os.walk(p))[1]:
+            if "hwmon" not in d:
+               continue
+            
+            path = p+d+"/"
+            with open(path+"name") as f:
+               name = f.readlines()[0].rstrip()
+
+            for n in range(1,512):
+               
+               prefix = "fan{}".format(n)
+               if not os.path.exists(path+prefix+"_label"):
+                  break
+
+               # create entry if needed
+               name += "-"+prefix
+               if name not in self._data[category]:
+                  self._data[category][name] = init_rb_dict(
+                          attr_names, types=attr_types, units=attr_units)
+
+               with open(path+prefix+"_label") as f:
+                  label = f.readlines()[0].rstrip()
+                  self._data[category][name]["label"].append(label)
+               with open(path+prefix+"_input") as f:
+                  input = f.readlines()[0].rstrip()
+                  self._data[category][name]["input"].append(int(input))
+
+               prefix = "temp{}".format(n)
+               if os.path.exists(path+prefix+"_input"):
+                  with open(path+prefix+"_input") as f:
+                     temp = f.readlines()[0].rstrip()
+                     self._data[category][name]["temperature"].append(int(temp)/1000.0)                 
+
 
    def _process_proc_meminfo(self):
       with open("/proc/meminfo", 'r') as f:

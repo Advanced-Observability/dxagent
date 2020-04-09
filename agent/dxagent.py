@@ -456,8 +456,9 @@ class DXAgent(IOManager):
 
       # baremetal 
       self._format_attrs_list_rb_percpu("stat/cpu", 0)
-      self._format_attrs_list_rb("thermal", 0)
-      self._format_attrs_list_rb("coretemp", 0)
+      self._format_attrs_list_rb("sensors/thermal", 0)
+      self._format_attrs_list_rb("sensors/fans", 0)
+      self._format_attrs_list_rb("sensors/coretemp", 0)
       self._format_attrs_list_rb_percpu("rt-cache", 0)
       self._format_attrs_list_rb_percpu("arp-cache", 0)
       self._format_attrs_list_rb_percpu("ndisc-cache", 0)
