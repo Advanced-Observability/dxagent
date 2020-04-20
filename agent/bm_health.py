@@ -799,7 +799,7 @@ class BMWatcher():
          "carrier_down_count", "carrier_up_count",
       ]
 
-      type_list = 31*[str] + 2*[int]
+      type_list = 26*[str] + 2*[int] + 3*[str] + 2*[int]
       counter_list = 31*[False] + 2*[True]
 
       gws = netifaces.gateways()

@@ -50,9 +50,20 @@ class VMWatcher():
       if "virtualbox" in vm_libs:
          self._vbox = virtualbox.VirtualBox()
 
+
+         self.attr_list_query = [ 'CPU/Load/User', 
+            'CPU/Load/Kernel', 'RAM/Usage/Used', 'Disk/Usage/Used',
+            'Net/Rate/Rx', 'Net/Rate/Tx', 
+            'Guest/CPU/Load/User','Guest/CPU/Load/Kernel', 'Guest/CPU/Load/Idle',
+            'Guest/RAM/Usage/Total', 'Guest/RAM/Usage/Free',  'Guest/RAM/Usage/Balloon',
+            'Guest/RAM/Usage/Shared',
+             'Guest/RAM/Usage/Cache',
+            'Guest/Pagefile/Usage/Total',
+         ]
          # setup performance metric collection for all vms
          self.vbox_perf = self._vbox.performance_collector # IPerformanceCollecto
-         self.vbox_perf.setup_metrics([], self._vbox.machines, _virtualbox_metrics_sampling_period, 
+         self.vbox_perf.setup_metrics([','.join(self.attr_list_query)], 
+                self._vbox.machines, _virtualbox_metrics_sampling_period, 
                                      _virtualbox_metrics_sampling_count)
 
          attr_list = ["version"]
@@ -91,8 +102,12 @@ class VMWatcher():
                and state <= MachineState.last_online)
 
    def input(self):
+
       if "virtualbox" in vm_libs:
-         self._input_virtualbox()
+         try: # unstable if a vm is started during monitoring
+            self._input_virtualbox()
+         except:
+            pass
 
    def _input_virtualbox(self):
       """
@@ -109,44 +124,18 @@ class VMWatcher():
       attr_list = ["cpu", "state", "accessible", "id", "os_type_id", "cpu_cap", 
          "mem_size", "vram_size", "firmware", "chipset", "session_state", 
          "session_name", "session_pid",  "last_state_change",  "snapshot_count",
-         "io_cache_enabled",  "io_cache_size", "/VirtualBox/GuestInfo/Net/Count",
-         'CPU/Load/User', 'CPU/Load/User:avg', 'CPU/Load/User:min', 'CPU/Load/User:max',
-         'CPU/Load/Kernel', 'CPU/Load/Kernel:avg', 'CPU/Load/Kernel:min',
-         'CPU/Load/Kernel:max', 'RAM/Usage/Used', 'RAM/Usage/Used:avg',
-         'RAM/Usage/Used:min', 'RAM/Usage/Used:max', 'Disk/Usage/Used',
-         'Disk/Usage/Used:avg', 'Disk/Usage/Used:min', 'Disk/Usage/Used:max',
-         'Net/Rate/Rx', 'Net/Rate/Rx:avg', 'Net/Rate/Rx:min', 'Net/Rate/Rx:max',
-         'Net/Rate/Tx', 'Net/Rate/Tx:avg', 'Net/Rate/Tx:min', 'Net/Rate/Tx:max',
-         'Guest/CPU/Load/User', 'Guest/CPU/Load/User:avg', 'Guest/CPU/Load/User:min',
-         'Guest/CPU/Load/User:max', 'Guest/CPU/Load/Kernel', 'Guest/CPU/Load/Kernel:avg',
-         'Guest/CPU/Load/Kernel:min', 'Guest/CPU/Load/Kernel:max', 'Guest/CPU/Load/Idle',
-         'Guest/CPU/Load/Idle:avg', 'Guest/CPU/Load/Idle:min', 'Guest/CPU/Load/Idle:max',
-         'Guest/RAM/Usage/Total', 'Guest/RAM/Usage/Total:avg', 'Guest/RAM/Usage/Total:min',
-         'Guest/RAM/Usage/Total:max', 'Guest/RAM/Usage/Free', 'Guest/RAM/Usage/Free:avg',
-         'Guest/RAM/Usage/Free:min', 'Guest/RAM/Usage/Free:max', 'Guest/RAM/Usage/Balloon',
-         'Guest/RAM/Usage/Balloon:avg', 'Guest/RAM/Usage/Balloon:min',
-         'Guest/RAM/Usage/Balloon:max', 'Guest/RAM/Usage/Shared',
-         'Guest/RAM/Usage/Shared:avg', 'Guest/RAM/Usage/Shared:min',
-         'Guest/RAM/Usage/Shared:max', 'Guest/RAM/Usage/Cache', 'Guest/RAM/Usage/Cache:avg',
-         'Guest/RAM/Usage/Cache:min', 'Guest/RAM/Usage/Cache:max',
-         'Guest/Pagefile/Usage/Total', 'Guest/Pagefile/Usage/Total:avg',
-         'Guest/Pagefile/Usage/Total:min', 'Guest/Pagefile/Usage/Total:max'
-      ]
+         "io_cache_enabled",  "io_cache_size", "/VirtualBox/GuestInfo/Net/Count"
+      ] + self.attr_list_query
+
       unit_list = [ '','','','','MB','MB','','','','','','','','','','','','',
-         '%', '%', '%', '%', '%', '%', '%', '%', 'kB', 'kB', 'kB', 'kB', 'mB',
-         'mB', 'mB', 'mB', 'B/s', 'B/s', 'B/s', 'B/s', 'B/s', 'B/s', 'B/s',
-         'B/s', '%', '%', '%', '%', '%', '%', '%', '%', '%', '%', '%', '%',
-         'kB', 'kB', 'kB', 'kB', 'kB', 'kB', 'kB', 'kB', 'kB', 'kB', 'kB',
-         'kB', 'kB', 'kB', 'kB', 'kB', 'kB', 'kB', 'kB', 'kB', 'kB', 'kB',
-         'kB','kB'
+         '%', '%', 'kB', 'mB', 'B/s',
+         'B/s', '%', '%', '%',
+         'kB', 'kB', 'kB', 'kB', 'kB', 'kB', 
       ]
       type_list = [ str, str, str, str, str, str, str, str, str, str, str,
-         str, str, str, str, str, str, int, float, float, float, float, float, float,
-         float, float, float, float, float, float, float, float, float, float, float,
-         float, float, float, float, float, float, float, float, float, float, float,
-         float, float, float, float, float, float, float, float, float, float, float,
-         float, float, float, float, float, float, float, float, float, float, float,
-         float, float, float, float, float, float, float, float, float, float, 
+         str, str, str, str, str, str, int, float, float, float,
+         float, float, float, float, float, float, float, float,
+         float, float, float, float,
       ]
 
       self._data["virtualbox/system"]["version"].append(self._vbox.version_normalized)
@@ -193,8 +182,10 @@ class VMWatcher():
          vm_attrs.append(("/VirtualBox/GuestInfo/Net/Count", net_count))
 
          # probe for guest metrics
-         val, metric_attrs, _, _, scales, _, _, _ = self.vbox_perf.query_metrics_data([], [m])
-         vm_attrs.extend([(attr, str(val[i]/scales[i])) for i,attr in enumerate(metric_attrs)])
+         val, metric_attrs, _, _, scales, _, _, _ = self.vbox_perf.query_metrics_data(
+               [','.join(self.attr_list_query)], [m])
+         vm_attrs.extend([(attr, str(val[i]/scales[i])) 
+                  for i,attr in enumerate(metric_attrs)])
          
          for k,d in vm_attrs:
             self._data["virtualbox/vms"][name][k].append(d)
@@ -203,11 +194,13 @@ class VMWatcher():
          attrs_suffix = ["Name", "MAC", "V4/IP", "V4/Broadcast",
                              "V4/Netmask", "Status"]
          for net in range(int(net_count)):
-            attrs_list = ["{}{}/{}".format(guestinfo_prefix, net, attr) for attr in attrs_suffix]
+            attrs_list = ["{}{}/{}".format(guestinfo_prefix, net, attr) 
+                           for attr in attrs_suffix]
 
             # add entry if needed
             if attrs_list[0] not in self._data["virtualbox/vms"]:
-               self._data["virtualbox/vms"][name].update(init_rb_dict(attrs_list, type=str))
+               self._data["virtualbox/vms"][name].update(init_rb_dict(
+                  attrs_list, type=str))
 
             for attr in attrs_list:
                d = str(m.get_guest_property(attr)[0])
