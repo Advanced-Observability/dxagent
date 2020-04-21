@@ -50,19 +50,9 @@ class VMWatcher():
       if "virtualbox" in vm_libs:
          self._vbox = virtualbox.VirtualBox()
 
-
-         self.attr_list_query = [ 'CPU/Load/User', 
-            'CPU/Load/Kernel', 'RAM/Usage/Used', 'Disk/Usage/Used',
-            'Net/Rate/Rx', 'Net/Rate/Tx', 
-            'Guest/CPU/Load/User','Guest/CPU/Load/Kernel', 'Guest/CPU/Load/Idle',
-            'Guest/RAM/Usage/Total', 'Guest/RAM/Usage/Free',  'Guest/RAM/Usage/Balloon',
-            'Guest/RAM/Usage/Shared',
-             'Guest/RAM/Usage/Cache',
-            'Guest/Pagefile/Usage/Total',
-         ]
          # setup performance metric collection for all vms
          self.vbox_perf = self._vbox.performance_collector # IPerformanceCollecto
-         self.vbox_perf.setup_metrics([','.join(self.attr_list_query)], 
+         self.vbox_perf.setup_metrics(['*:'], # all metrics without aggregates
                 self._vbox.machines, _virtualbox_metrics_sampling_period, 
                                      _virtualbox_metrics_sampling_count)
 
@@ -104,10 +94,11 @@ class VMWatcher():
    def input(self):
 
       if "virtualbox" in vm_libs:
-         try: # unstable if a vm is started during monitoring
-            self._input_virtualbox()
-         except:
-            pass
+         self._input_virtualbox()
+#         try: # unstable if a vm is started during monitoring
+#            self._input_virtualbox()
+#         except:
+#            pass
 
    def _input_virtualbox(self):
       """
@@ -125,7 +116,14 @@ class VMWatcher():
          "mem_size", "vram_size", "firmware", "chipset", "session_state", 
          "session_name", "session_pid",  "last_state_change",  "snapshot_count",
          "io_cache_enabled",  "io_cache_size", "/VirtualBox/GuestInfo/Net/Count"
-      ] + self.attr_list_query
+      ] + [ 
+         'CPU/Load/User', 'CPU/Load/Kernel', 'RAM/Usage/Used',
+         'Disk/Usage/Used', 'Net/Rate/Rx', 'Net/Rate/Tx',
+         'Guest/CPU/Load/User','Guest/CPU/Load/Kernel', 'Guest/CPU/Load/Idle',
+         'Guest/RAM/Usage/Total', 'Guest/RAM/Usage/Free',
+         'Guest/RAM/Usage/Balloon', 'Guest/RAM/Usage/Shared',
+         'Guest/RAM/Usage/Cache', 'Guest/Pagefile/Usage/Total',
+      ]
 
       unit_list = [ '','','','','MB','MB','','','','','','','','','','','','',
          '%', '%', 'kB', 'mB', 'B/s',
@@ -183,7 +181,10 @@ class VMWatcher():
 
          # probe for guest metrics
          val, metric_attrs, _, _, scales, _, _, _ = self.vbox_perf.query_metrics_data(
-               [','.join(self.attr_list_query)], [m])
+               ['*:'], [m])
+         self.info(metric_attrs)
+         self.info(val)
+         self.info(scales)
          vm_attrs.extend([(attr, str(val[i]/scales[i])) 
                   for i,attr in enumerate(metric_attrs)])
          
