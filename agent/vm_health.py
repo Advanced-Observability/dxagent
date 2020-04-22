@@ -124,7 +124,6 @@ class VMWatcher():
          'Guest/RAM/Usage/Balloon', 'Guest/RAM/Usage/Shared',
          'Guest/RAM/Usage/Cache', 'Guest/Pagefile/Usage/Total',
       ]
-
       unit_list = [ '','','','','MB','MB','','','','','','','','','','','','',
          '%', '%', 'kB', 'mB', 'B/s',
          'B/s', '%', '%', '%',
@@ -182,9 +181,6 @@ class VMWatcher():
          # probe for guest metrics
          val, metric_attrs, _, _, scales, _, _, _ = self.vbox_perf.query_metrics_data(
                ['*:'], [m])
-         self.info(metric_attrs)
-         self.info(val)
-         self.info(scales)
          vm_attrs.extend([(attr, str(val[i]/scales[i])) 
                   for i,attr in enumerate(metric_attrs)])
          
@@ -217,7 +213,8 @@ class VMWatcher():
          #a=eval(s)
 
       # renew registration for new vms XXX
-      self.vbox_perf.setup_metrics([], self._vbox.machines, _virtualbox_metrics_sampling_period, 
-                                  _virtualbox_metrics_sampling_count)
+      self.vbox_perf.setup_metrics(['*:'], self._vbox.machines, 
+            _virtualbox_metrics_sampling_period, 
+            _virtualbox_metrics_sampling_count)
       
 

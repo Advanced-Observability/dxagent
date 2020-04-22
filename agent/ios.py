@@ -7,7 +7,9 @@ ios.py
 """
 
 import sys
-import argparse, configparser, logging
+import argparse
+import configparser
+import logging
 
 
 class IOManager():
@@ -16,9 +18,10 @@ class IOManager():
    extend me
 
    """
-   def __init__(self, child):
-   
-      self.child    = child
+   def __init__(self, child=None):
+      super(IOManager, self).__init__()
+
+      self.child  = child
 
       self.args   = None
       self.config = None
@@ -26,14 +29,14 @@ class IOManager():
 
    def load_ios(self):
       """
-      load_ios
-      
       Load all ios
+
       """
       self.arguments()
-      self.configuration()
-      self.log()
-
+      if "start" in self.args.cmd:
+         self.configuration()
+         self.log()
+      
    ########################################################
    # ARGPARSE
    ########################################################
@@ -46,8 +49,9 @@ class IOManager():
       """
 
       parser = argparse.ArgumentParser(description='Diagnostic Agent')
-
-      parser.add_argument('-l' , '--log-file', type=str, default="dxagent.log",
+      parser.add_argument('cmd', type=str,
+                           choices=["start", "stop", "restart", "status"])
+      parser.add_argument('-l' , '--log-file', type=str, default="/var/log/dxagent.log",
                          help='log file location (default: dxagent.log)')
 
       parser.add_argument('-c' , '--config', type=str, default="./dxagent.ini",
@@ -99,7 +103,7 @@ class IOManager():
       self.logger.setLevel(logging.DEBUG)
 
       # log file handler
-      fh = logging.FileHandler(self.config["core"]["logging_dir"]+"/"+self.args.log_file)
+      fh = logging.FileHandler(self.args.log_file if self.args.log_file.startswith("/") else self.config["core"]["logging_dir"]+"/"+self.args.log_file)
       fh.setLevel(logging.DEBUG if self.args.debug else logging.INFO)
 
       # add formatter to handlers
