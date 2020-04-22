@@ -11,46 +11,74 @@ import argparse
 import configparser
 import logging
 
-
 class IOManager():
    """
 
    extend me
 
    """
-   def __init__(self, child=None):
-      super(IOManager, self).__init__()
+   def __init__(self, child=None, parse_args=True):
+      #super(IOManager, self).__init__()
 
       self.child  = child
+      self.parse_args = parse_args
 
       self.args   = None
       self.config = None
       self.logger = None
 
-   def load_ios(self):
+   def load_ios(self, module="dxagent"):
       """
       Load all ios
 
       """
-      self.arguments()
-      if "start" in self.args.cmd:
-         self.configuration()
+      if not self.parse_args:
+         return
+
+      if module == "dxtop":
+         self.arguments_dxtop()
          self.log()
+
+      if module == "dxagent":
+         self.arguments_dxagent()
+         if "start" in self.args.cmd:
+            self.configuration_dxagent()
+            self.log()
       
    ########################################################
    # ARGPARSE
    ########################################################
-
-   def arguments(self):
+   def arguments_dxtop(self):
       """
-      Parse arguments
+      Parse dxtop arguments
 
          Used mostly to provide the location of the config file.
       """
 
+      parser = argparse.ArgumentParser(description='Diagnostic Agent console app')
+
+      # XXX: remove
+      parser.add_argument('-l' , '--log-file', type=str, default="dxtop.log",
+                         help='log file location (default: dxtop.log)')
+      parser.add_argument('-d' , '--debug', action='store_true',
+                         help='increase output level') 
+      parser.add_argument('-v' , '--verbose', action='store_true',
+                         help='increase output level') 
+
+      self.args = parser.parse_args()
+
+      return self.args
+
+   def arguments_dxagent(self):
+      """
+      Parse dxagent arguments
+
+      """
+
       parser = argparse.ArgumentParser(description='Diagnostic Agent')
       parser.add_argument('cmd', type=str,
-                           choices=["start", "stop", "restart", "status"])
+                           choices=["start", "stop", "restart", "status"],
+                          )
       parser.add_argument('-l' , '--log-file', type=str, default="/var/log/dxagent.log",
                          help='log file location (default: dxagent.log)')
 
@@ -69,7 +97,7 @@ class IOManager():
    # CONFIGPARSER
    ########################################################
 
-   def configuration(self):
+   def configuration_dxagent(self):
       """
       Parse configuration file
       """
@@ -95,15 +123,13 @@ class IOManager():
       """
       if self.args == None:
          raise IOManagerException("Arguments not found")
-      if self.config == None:
-         raise IOManagerException("Configuration not found")
 
       # create logger
       self.logger = logging.getLogger(self.child.__class__.__name__)
       self.logger.setLevel(logging.DEBUG)
 
       # log file handler
-      fh = logging.FileHandler(self.args.log_file if self.args.log_file.startswith("/") else self.config["core"]["logging_dir"]+"/"+self.args.log_file)
+      fh = logging.FileHandler(self.args.log_file if self.args.log_file.startswith("/") else "./"+self.args.log_file)
       fh.setLevel(logging.DEBUG if self.args.debug else logging.INFO)
 
       # add formatter to handlers

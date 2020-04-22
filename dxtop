@@ -1,0 +1,23 @@
+#!/usr/bin/env python3
+"""
+dxtop
+
+   DxTop UNIX script
+
+@author: K.Edeline
+"""
+
+import sys
+from agent.dxagent import DXAgent
+from agent.dxtop import DXTop
+
+status=DXAgent(parse_args=False).status()
+if status == 1:
+   sys.stdout.write("dxagent is not running\n")
+   sys.exit(1)
+
+sys.stdout.write("dxagent is running\n")
+
+dxt = DXTop()
+dxt.run()
+

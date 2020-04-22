@@ -2,7 +2,7 @@
 """
 dxagent
 
-   dxagent UNIX script
+   DxAgent UNIX script
 
 @author: K.Edeline
 """
@@ -16,7 +16,7 @@ cmd_switch = {
    'start'   : dxa.start,
    'stop'    : dxa.stop,
    'restart' : dxa.restart,
-   'status'  : dxa.status,
+   'status'  : dxa.print_status,
 }
 
 if cmd in cmd_switch:

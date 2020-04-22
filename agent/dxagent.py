@@ -10,6 +10,7 @@ dxagent.py
 import sched
 import time
 import signal
+#from multiprocessing import shared_memory
 
 import agent
 from agent.ios import IOManager
@@ -30,18 +31,20 @@ class DXAgent(Daemon, IOManager):
    
    """
 
-   def __init__(self):
-      super(DXAgent, self).__init__(
-                      pidfile='/var/run/dxagent.pid',
+   def __init__(self, parse_args=True):
+      Daemon.__init__(self, pidfile='/var/run/dxagent.pid',
                       stdout='/var/log/dxagent.log', 
                       stderr='/var/log/dxagent.log',
                       name='dxagent')
+      IOManager.__init__(self, child=self, parse_args=parse_args)
 
       self.load_ios()
-      self.sysinfo = SysInfo()
+      if not parse_args:
+         return
       if "start" not in self.args.cmd:
          return
 
+      self.sysinfo = SysInfo()
       self.scheduler = sched.scheduler()
       self._data = {}
 
@@ -49,10 +52,12 @@ class DXAgent(Daemon, IOManager):
       self.bm_watcher = BMWatcher(self._data, self.info)
       self.vm_watcher = VMWatcher(self._data, self.info)
       self.vpp_watcher = VPPWatcher(self._data, self.info)
-      signal.signal(signal.SIGTERM, self.exit)
-      #signal.signal(signal.SIGKILL, self.exit)
 
+      # catch signal for cleanup
+      signal.signal(signal.SIGTERM, self.exit)
       self.running = True
+
+      self
 
    def _input(self):
       self.bm_watcher.input()

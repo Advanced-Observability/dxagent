@@ -10,7 +10,6 @@ import sys
 import os
 import pwd
 import time
-import atexit
 
 from signal import SIGTERM
 
@@ -23,8 +22,8 @@ class Daemon():
    def __init__(self, pidfile='/var/run/dxagent.pid', stdin='/dev/null', 
                      stdout='/var/log/dxagent.log', 
                      stderr='/var/log/dxagent.log',
-                     name='dxagent', **kwargs):
-      super(Daemon, self).__init__()
+                     name='dxagent'):
+      #super(Daemon, self).__init__()
       self.stdin    = stdin
       self.stdout   = stdout
       self.stderr   = stderr
@@ -70,7 +69,6 @@ class Daemon():
       with open(self.pidfile,'w+') as f:
          f.write("{}\n".format(pid))
 
-      # drop privileges with seteuid
       #self.drop_privileges()
       #self._dropped = True
 
@@ -117,7 +115,7 @@ class Daemon():
       """
       # Check pidfile to see if the daemon already runs.
       pid = self._open_pid()
-      if pid and not self.status(print_result=False): # catch nopid exception
+      if pid and not self.status(): # catch nopid exception
          message = "{} already running\n".format(self.name)
          sys.stderr.write(message)
          return 1
@@ -159,23 +157,36 @@ class Daemon():
 
       return pid
 
-   def status(self, print_result=True):
+   def print_status(self):
+      """
+      get status of daemon and print it to stderr
+
+      """
+      status = self.status()
+      if status == 0:
+         message = "{} is running\n".format(self.name)
+         sys.stderr.write(message)
+      elif status == 1:
+         message = "{} is not running\n".format(self.name)
+         sys.stderr.write(message)
+      return 0
+
+   def status(self):
       """
       Get status of daemon.
+
+      @return 0 if running
+              1 if not running
+
       """
       pid = self._open_pid(exit_on_error=True)
 
       try:
          with open("/proc/{}/status".format(pid), 'r') as procfile:
             pass
-         if print_result:
-            message = "{} is running\n".format(self.name)
-            sys.stderr.write(message)
          return 0
       except IOError:
-         if print_result:
-            message = "{} is not running\n".format(self.name)
-            sys.stderr.write(message)
+         pass
 
       return 1 
 

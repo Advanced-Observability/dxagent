@@ -1,4 +1,4 @@
-# dxagent
+# DxAGENT
 
 Diagnostic Agent
 
@@ -14,6 +14,10 @@ arrow up, page up: scroll up
 arrow down, page down: scroll down
 
 arrow left, arrow right: switch between screens
+
+## Python
+
+- [python] >= 3.8
 
 ## Libs
 
@@ -31,8 +35,6 @@ To enable stats add following section to you VPP config:
   	per-node-counters on
   }
   ```
-
-
 ## Optional Libs
 
 - [pyvbox](https://pypi.org/project/pyvbox/)
@@ -46,7 +48,7 @@ To enable stats add following section to you VPP config:
 
 ## Important files
 
-- `dxagent`
+- `dxagent`, `dxtop`
 
 - `fields.csv` lists all monitored fields
 
