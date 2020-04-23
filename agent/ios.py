@@ -60,8 +60,6 @@ class IOManager():
       # XXX: remove
       parser.add_argument('-l' , '--log-file', type=str, default="dxtop.log",
                          help='log file location (default: dxtop.log)')
-      parser.add_argument('-d' , '--debug', action='store_true',
-                         help='increase output level') 
       parser.add_argument('-v' , '--verbose', action='store_true',
                          help='increase output level') 
 
@@ -79,13 +77,14 @@ class IOManager():
       parser.add_argument('cmd', type=str,
                            choices=["start", "stop", "restart", "status"],
                           )
-      parser.add_argument('-l' , '--log-file', type=str, default="/var/log/dxagent.log",
+      parser.add_argument('-l' , '--log-file', type=str,
+                         default="/var/log/dxagent.log",
                          help='log file location (default: dxagent.log)')
-
       parser.add_argument('-c' , '--config', type=str, default="./dxagent.ini",
                          help='configuration file location')
-      parser.add_argument('-d' , '--debug', action='store_true',
-                         help='increase output level') 
+      parser.add_argument('-s' , '--disable-shm', action='store_true',
+                         help='disable shared memory segment '
+                              '(cannot use dxtop)')      
       parser.add_argument('-v' , '--verbose', action='store_true',
                          help='increase output level') 
 
@@ -130,7 +129,7 @@ class IOManager():
 
       # log file handler
       fh = logging.FileHandler(self.args.log_file if self.args.log_file.startswith("/") else "./"+self.args.log_file)
-      fh.setLevel(logging.DEBUG if self.args.debug else logging.INFO)
+      fh.setLevel(logging.DEBUG if self.args.verbose else logging.INFO)
 
       # add formatter to handlers
       formatter = logging.Formatter("%(asctime)s %(message)s",

@@ -19,6 +19,7 @@ from agent.sysinfo import SysInfo
 from agent.bm_health import BMWatcher
 from agent.vm_health import VMWatcher
 from agent.vpp_health import VPPWatcher
+from agent.shareablebuffer import ShareableBuffer
 
 # input processing delay
 INPUT_RATE=3.0
@@ -46,7 +47,12 @@ class DXAgent(Daemon, IOManager):
 
       self.sysinfo = SysInfo()
       self.scheduler = sched.scheduler()
+
+      # ringbuffers are stored here
       self._data = {}
+      # SharedMemory with dxtop
+      if not self.args.disable_shm:
+         self.sbuffer = ShareableBuffer(create=True)
 
       # watchers
       self.bm_watcher = BMWatcher(self._data, self.info)
@@ -56,8 +62,6 @@ class DXAgent(Daemon, IOManager):
       # catch signal for cleanup
       signal.signal(signal.SIGTERM, self.exit)
       self.running = True
-
-      self
 
    def _input(self):
       self.bm_watcher.input()
@@ -73,6 +77,9 @@ class DXAgent(Daemon, IOManager):
       """
       
       self._input()
+      if not self.args.disable_shm:
+         skip=["stats"] if not self.args.verbose else []
+         self.sbuffer.write(self._data, skip=skip, info=self.info)
       self.scheduler.enter(INPUT_RATE,0,self.process)
 
    def exit(self, signum=None, stackframe=None):
@@ -85,6 +92,9 @@ class DXAgent(Daemon, IOManager):
 
       self.vm_watcher.exit()
       self.vpp_watcher.exit()
+
+      self.sbuffer.unlink()
+      del self.sbuffer
 
    def run(self):
       """

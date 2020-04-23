@@ -123,6 +123,8 @@ class RingBuffer(collections.deque):
       @return mean value on entire buffer
 
       """
+      if len(self) == 0:
+         return 0
       
       try:
          if self.type == float:

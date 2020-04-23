@@ -56,8 +56,10 @@ class VMWatcher():
                 self._vbox.machines, _virtualbox_metrics_sampling_period, 
                                      _virtualbox_metrics_sampling_count)
 
-         attr_list = ["version"]
-         self._data["virtualbox/system"] = init_rb_dict(attr_list, type=str)
+         attr_list = ["version", "vm_count"]
+         attr_types = [str, int]
+         self._data["virtualbox/system"] = init_rb_dict(attr_list, 
+                                                types=attr_types)
          self._data["virtualbox/vms"] = {}
          self.vbox_vm_count = 0
 
@@ -202,6 +204,8 @@ class VMWatcher():
             for attr in attrs_list:
                d = str(m.get_guest_property(attr)[0])
                self._data["virtualbox/vms"][name][attr].append(d)
+
+      self._data["virtualbox/system"]["vm_count"].append(self.vbox_vm_count)
 
       # look for vpp-in-vm through guest sessions
       for gs in self._vbox_guest_sessions:

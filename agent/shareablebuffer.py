@@ -27,10 +27,13 @@ class ShareableBuffer(shared_memory.ShareableList):
 
    internal format:
 
-   index;category
-   index;
-   index;name;value;dynamicity
-   index;val0;val1;val2;val3;val4;val5;val6;val7;
+   _format_attrs_list_rb: 
+   category;subcategory;name;value;severity;dynamicity;severity
+   _format_attrs_rb:
+   category;value;name;severity;dynamicity;severity
+   _format_attrs_list_rb_percpu: (similar to _format_attrs_list_rb)
+   category;cpu_index;name;value;severity;dynamicity;severity
+   _format_attrs_list:
 
    """
 
@@ -39,7 +42,8 @@ class ShareableBuffer(shared_memory.ShareableList):
       self.shm=None
       super(ShareableBuffer, self).__init__(
          sequence=[" "*MAX_WIDTH for _ in range(MAX_HEIGHT)] if create else None,
-         name=hashlib.sha1(platform.node().encode('utf-8')).hexdigest())
+         name=hashlib.sha1((platform.node()+"-dxagent").encode('utf-8'))
+              .hexdigest())
 
       if not create:
          # avoid auto unlinking of SharedMemory segment
@@ -86,22 +90,88 @@ class ShareableBuffer(shared_memory.ShareableList):
       self[self.index] = ""
       self.index = 0
 
-   def read(self):
+   def dict(self,info=None):
       """
-      parse&copy data to a new list
+      parse data into a new list
+
+      _format_attrs_list_rb: 
+      category;subcategory;name;value;severity;dynamicity;severity
+
+      _format_attrs_rb:
+      category;name;value;severity;dynamicity;severity
+
+      _format_attrs_list_rb_percpu: (similar to _format_attrs_list_rb)
+      category;cpu_index;name;value;severity;dynamicity;severity
 
       """
-      data = [[] for _ in range(self._sublists)]
+      data = {}
       for line in self:
          if not line or line.startswith(' '):
             break
-         v = line.split(';')
-         index = int(v[0])
-         data[index].append(v[1:])
+
+         split = line.split(';')
+         category = split[0]
+         if category not in data:
+            data[category] = {}
+
+         v, s, dv, ds = split[-4:]
+         content = [v, int(s), dv, int(ds)]
+
+         # _format_attrs_list_rb
+         # or _format_attrs_list_rb_percpu
+         if len(split) == 7:
+            subcategory = split[1]
+            if subcategory not in data[category]:
+               data[category][subcategory] = {}
+            name = split[2]
+            data[category][subcategory][name] = content
+
+         # _format_attrs_rb
+         elif len(split) == 6:
+            name = split[1]
+            data[category][name] = content
+
       return data
 
-   def append(self, screen_index, s, *args):
-      self[self.index] = ";".join([str(screen_index), s]+list(args))
+   def _get_content(self, rb):
+      value, severity = rb.top()
+      value = str(value)
+      if rb.unit():
+         value += (" {}").format(rb.unit())
+      dvalue, dseverity = rb.dynamicity()
+      return (value, str(severity.value),
+             str(dvalue), str(dseverity.value))
+
+   def write(self, data, skip=[], info=None):
+      """
+      write dict to ShareableMemory
+
+      XXX: only write fields that changed
+
+      """
+      for k,d in data.items():
+         if type(d) is list:
+            continue
+         if k in skip:
+            continue
+
+         for kk, dd in d.items():
+            if type(dd) is dict:
+               for kkk, ddd in dd.items():
+                  if ddd.is_empty():
+                     continue
+                  v,s,dv,ds = self._get_content(ddd)
+                  self.append(k, kk, kkk, v,s,dv,ds)
+            else:
+               if dd.is_empty():
+                  continue
+               v,s,dv,ds = self._get_content(dd)
+               self.append(k, kk, v,s,dv,ds)
+
+      self.validate()
+
+   def append(self, *args):
+      self[self.index] = ";".join(list(args))
       self.index += 1
 
    def reset(self):
