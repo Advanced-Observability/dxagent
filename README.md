@@ -5,6 +5,8 @@ Diagnostic Agent
 Medical diagnosis (abbreviated Dx or DS) is the process of determining which disease
 or condition explains a person's symptoms and signs. It is most often referred to as diagnosis.
 
+![alt text](dxagent-sw.png "Architecture")
+
 ## Commands
 
 q or ESC: quit
