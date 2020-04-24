@@ -13,6 +13,7 @@ try:
    import virtualbox
    from virtualbox.library import MachineState
    import vboxapi
+   disable
    vm_libs.append("virtualbox")
 except:
    pass
@@ -40,6 +41,12 @@ _virtualbox_metrics_sampling_period = 1
    samples get discarded.
 """
 _virtualbox_metrics_sampling_count = 1
+
+def hypervisors_support():
+   """
+   @return vbox_supported
+   """
+   return "virtualbox" in vm_libs
 
 class VMWatcher():
 

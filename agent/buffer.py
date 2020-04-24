@@ -164,11 +164,18 @@ class RingBuffer(collections.deque):
       except:
          return 0
 
-   def has_changed(self):
+   def has_changed(self, recently=False):
       """
       indicates if the ringbuffer has observed a value change
+
+      @param recently If true consider last two value
+                      If false consider all value
+                     
       """
-      return not self.is_empty() and self.count(self.__getitem__(0)) != len(self)
+      if not recently:
+         return not self.is_empty() and self.count(self.__getitem__(0)) != len(self)
+      else:
+         return len(self) > 1 and self.__getitem__(-1) != self.__getitem__(-2)
 
    def _dynamicity(self):
       """

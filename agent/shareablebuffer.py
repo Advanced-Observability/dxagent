@@ -29,11 +29,14 @@ class ShareableBuffer(shared_memory.ShareableList):
 
    _format_attrs_list_rb: 
    category;subcategory;name;value;severity;dynamicity;severity
+
    _format_attrs_rb:
    category;value;name;severity;dynamicity;severity
+
    _format_attrs_list_rb_percpu: (similar to _format_attrs_list_rb)
    category;cpu_index;name;value;severity;dynamicity;severity
-   _format_attrs_list:
+
+   _format_attrs_list:not implemented
 
    """
 
@@ -52,6 +55,7 @@ class ShareableBuffer(shared_memory.ShareableList):
 
       self.index=0
       self._sublists=sublists
+      self._last_rb_count=0
 
    def __del__(self):
       """
@@ -142,11 +146,52 @@ class ShareableBuffer(shared_memory.ShareableList):
       return (value, str(severity.value),
              str(dvalue), str(dseverity.value))
 
+   def _rb_count(self, data, skip=[]):
+      """
+      count the amount of RBs
+
+      """
+      count=0
+
+      for k,d in data.items():
+         if type(d) is list:
+            continue
+         if k in skip:
+            continue
+
+         for kk, dd in d.items():
+            if type(dd) is not dict:
+               if not dd.is_empty():
+                  count += 1
+            else:
+               for kkk, ddd in dd.items():
+                  if not ddd.is_empty():
+                     count += 1
+      return count
+
    def write(self, data, skip=[], info=None):
       """
       write dict to ShareableMemory
 
       XXX: only write fields that changed
+           if total datafield changed, rewrite all
+            otherwise skip all if not has_changed()
+
+      """
+      rb_count = self._rb_count(data, skip=skip)
+      if rb_count != self._last_rb_count:
+         self._write(data, write_all=True, skip=skip, info=info)
+      else:
+         self._write(data, write_all=False, skip=skip, info=info)
+      self._last_rb_count = rb_count
+
+   def _write(self, data, write_all=True, skip=[], info=None):
+      """
+      write dict to ShareableMemory
+
+      XXX: only write fields that changed
+           if total datafield changed, rewrite all
+            otherwise skip all if not has_changed()
 
       """
       for k,d in data.items():
@@ -160,10 +205,16 @@ class ShareableBuffer(shared_memory.ShareableList):
                for kkk, ddd in dd.items():
                   if ddd.is_empty():
                      continue
+                  if not write_all and not ddd.has_changed(recently=True):
+                     self.index += 1
+                     continue
                   v,s,dv,ds = self._get_content(ddd)
                   self.append(k, kk, kkk, v,s,dv,ds)
             else:
                if dd.is_empty():
+                  continue
+               if not write_all and not dd.has_changed(recently=True):
+                  self.index += 1
                   continue
                v,s,dv,ds = self._get_content(dd)
                self.append(k, kk, v,s,dv,ds)

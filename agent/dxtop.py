@@ -20,6 +20,10 @@ from agent.ios import IOManager
 from agent.sysinfo import SysInfo
 from agent.shareablebuffer import ShareableBuffer
 from agent.shareablebuffer import ShareableBufferException
+import agent.vpp_health
+from agent.vpp_health import vpp_support
+import agent.vm_health
+from agent.vm_health import hypervisors_support
 
 # keyboard input processing delay
 KEYBOARD_INPUT_RATE=0.05
@@ -64,12 +68,16 @@ class DXTop(IOManager):
       self.top = [0 for _ in range(self.max_screens)]
       self.current = [0 for _ in range(self.max_screens)]
       self.max_lines = 2**14
+      self._data=None
 
       try:
          self.sbuffer = ShareableBuffer()
       except FileNotFoundError:
          raise ShareableBufferException("ShareableBuffer not found")
 
+      self.vbox_supported = hypervisors_support()
+      self.vpp_api_supported, self.vpp_stats_supported=vpp_support()
+      
    def resize_columns(self):
       """
       find column sizes from screen width
@@ -89,9 +97,10 @@ class DXTop(IOManager):
       self.col_sizes_cpu[-1] = 0
 
       self._format_header()
-      self._format_top_pad()
       self._format_colname_pad()
-      self._format_footer()
+      if self._data:
+         self._format_top_pad()
+         self._format_footer()
 
    def _center_text(self, s, width=None):
       """
@@ -192,26 +201,25 @@ class DXTop(IOManager):
 #      self._format_attrs_list("net/route", 3)
 
       # VM
-      if ("virtualbox" in agent.vm_health.vm_libs
-         and self.vm_watcher.vbox_vm_count):
+      if (self.vbox_supported
+         and int(self._data["virtualbox/system"]["vm_count"][0]) > 0):
          self._format_attrs_list_rb("virtualbox/vms", 4)
 
       # VPP
-      if "vpp" in agent.vpp_health.kbnets_libs:
-         if self.vpp_watcher.use_api:
-            self._format_attrs_rb("vpp/system")
-            self._format_attrs_list_rb("vpp/api/if", 5)
+      if self.vpp_api_supported:
+         self._format_attrs_rb("vpp/system")
+         self._format_attrs_list_rb("vpp/api/if", 5)
 
-         if self.vpp_watcher.use_stats:
-            self._format_attrs_rb("vpp/stats/sys") 
-            self._format_attrs_list_rb("vpp/stats/buffer-pool", 5)
-            self._format_attrs_list_rb("vpp/stats/workers", 5) 
-            self._format_attrs_list_rb("vpp/stats/if", 5)
-            self._format_attrs_list_rb("vpp/stats/err", 5)
+      if self.vpp_stats_supported:
+         self._format_attrs_rb("vpp/stats/sys") 
+         self._format_attrs_list_rb("vpp/stats/buffer-pool", 5)
+         self._format_attrs_list_rb("vpp/stats/workers", 5) 
+         self._format_attrs_list_rb("vpp/stats/if", 5)
+         self._format_attrs_list_rb("vpp/stats/err", 5)
 
       # Health metrics Pad
-      #self.sbuffer.append(6, "Metrics") #curses.A_BOLD, fill=True)
-      #self.sbuffer.append(6, "Symptoms") #curses.A_BOLD, fill=True)
+      self._append_content("Metrics", 6, curses.A_BOLD, fill=True)
+      self._append_content("Symptoms", 6, curses.A_BOLD, fill=True)
 
       self.resize_columns()
 
@@ -434,29 +442,30 @@ class DXTop(IOManager):
    def _format_top_pad(self):
       self.top_pad.clear()
 
-#      if self.screen in [0, 1, 2, 3]:
-#         self.top_pad.addstr(self._center_text(str(self.sysinfo)))
-#         sec,_ = self._data["uptime"]["up"].top()
-#         if sec:
-#            uptime=datetime.timedelta(seconds=int(float(sec)))
-#            self.top_pad.addstr(self._center_text("uptime: {}".format(str(uptime))))
-#      
-#      elif self.screen == 4:
-#         if "virtualbox" in agent.vm_health.vm_libs:
-#            v,_=self._data["virtualbox/system"]["version"].top()
-#            s = "virtualbox: {}".format(v)
-#            self.top_pad.addstr(self._center_text(s))
-#            s = "active-count: {}".format(self.vm_watcher.vbox_vm_count)
-#            self.top_pad.addstr(self._center_text(s))
-#            
-#      elif self.screen == 5:
-#         if self.vpp_watcher.use_api:
-#            v,_ = self._data["vpp/system"]["version"].top()
-#            v = "vpp: "+v
-#            self.top_pad.addstr(self._center_text(v))
+      if self.screen in [0, 1, 2, 3]:
+         self.top_pad.addstr(self._center_text(str(self.sysinfo)))
+         sec = self._data["uptime"]["up"][0]
+         if sec:
+            uptime=datetime.timedelta(seconds=int(float(sec)))
+            self.top_pad.addstr(self._center_text("uptime: {}".format(str(uptime))))
+      
+      elif self.screen == 4:
+         if self.vbox_supported:
+            v=self._data["virtualbox/system"]["version"][0]
+            s = "virtualbox: {}".format(v)
+            self.top_pad.addstr(self._center_text(s))
+            v=self._data["virtualbox/system"]["vm_count"][0]
+            s = "active-count: {}".format(v)
+            self.top_pad.addstr(self._center_text(s))
+            
+      elif self.screen == 5:
+         if self.vpp_api_supported:
+            v = self._data["vpp/system"]["version"][0]
+            v = "vpp: "+v
+            self.top_pad.addstr(self._center_text(v))
 
-#      elif self.screen == 6:
-#         pass
+      elif self.screen == 6:
+         pass
 
    def _format_footer(self):
       self.footer.clear()
@@ -651,9 +660,7 @@ class DXTop(IOManager):
       read data from shared memory
 
       """
-      # READ
       self._data = self.sbuffer.dict(info=self.info)
-      #self.info(self._data)
       self._init_pads()
       self._format()
       self.scheduler.enter(INPUT_RATE,0,self.process)
