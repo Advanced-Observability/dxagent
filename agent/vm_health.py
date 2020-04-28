@@ -6,6 +6,8 @@ vm_health.py
 @author: K.Edeline
 """
 
+import os
+
 # list of supported vm api libs
 vm_libs=[]
 
@@ -13,7 +15,6 @@ try:
    import virtualbox
    from virtualbox.library import MachineState
    import vboxapi
-   disable
    vm_libs.append("virtualbox")
 except:
    pass
@@ -56,7 +57,8 @@ class VMWatcher():
 
       if "virtualbox" in vm_libs:
          self._vbox = virtualbox.VirtualBox()
-
+         self.vbox_system_properties = self._vbox.system_properties
+         self.imports()
          # setup performance metric collection for all vms
          self.vbox_perf = self._vbox.performance_collector # IPerformanceCollecto
          self.vbox_perf.setup_metrics(['*:'], # all metrics without aggregates
@@ -71,16 +73,40 @@ class VMWatcher():
          self.vbox_vm_count = 0
 
          # create guest sessions for each active machine
-         self._vbox_sessions       = []
-         self._vbox_guest_sessions = []
-         for m in self._vbox.machines:
-            if not self.virtualbox_vm_is_active(m):
-               continue
+#         self._vbox_sessions       = []
+#         self._vbox_guest_sessions = []
+#         for m in self._vbox.machines:
+#            if not self.virtualbox_vm_is_active(m):
+#               continue
 
-            s=m.create_session()
-            self._vbox_sessions.append(s)
-            gs=s.console.guest.create_session("root","vagrant")
-            self._vbox_guest_sessions.append(gs)
+#            s=m.create_session()
+#            self._vbox_sessions.append(s)
+#            gs=s.console.guest.create_session("root","vagrant")
+#            self._vbox_guest_sessions.append(gs)
+
+   def imports(self):
+      """
+      Ensure that all machines in vbox machine_folder are
+      registered
+
+      if default_folder is not set: 
+            $sudo vboxmanage setproperty machinefolder
+      """
+      machine_folder = self.vbox_system_properties.default_machine_folder
+      machine_dirs = [d for d in os.listdir(machine_folder)
+                        if os.path.isdir(os.path.join(machine_folder,d))]
+      registered = [m.name for m in self._vbox.machines]
+      for d in machine_dirs:
+
+         path = os.path.join(machine_folder, d)
+         # find .vbox setting file
+         sfiles = [os.path.join(path,s) for s in os.listdir(path) 
+            if s.endswith("vbox") and os.path.isfile(os.path.join(path,s))]
+         for sfile in sfiles:
+            if d in registered:
+               continue
+            self._vbox.register_machine(self._vbox.open_machine(sfile))
+            self.info("vbox: registered {}".format(d))
 
    def exit(self):
       """
@@ -88,10 +114,10 @@ class VMWatcher():
 
       """
       if "virtualbox" in vm_libs:
-
+         pass
          # close sessions         
-         for gs in self._vbox_guest_sessions:
-            gs.close()
+#         for gs in self._vbox_guest_sessions:
+#            gs.close()
 #         for s in self._vbox_sessions:
 #            s.unlock_machine()
          
@@ -103,11 +129,11 @@ class VMWatcher():
    def input(self):
 
       if "virtualbox" in vm_libs:
-         self._input_virtualbox()
-#         try: # unstable if a vm is started during monitoring
-#            self._input_virtualbox()
-#         except:
-#            pass
+         #self._input_virtualbox()
+         try: # unstable if a vm is started during monitoring
+            self._input_virtualbox()
+         except:
+            pass
 
    def _input_virtualbox(self):
       """
@@ -215,8 +241,8 @@ class VMWatcher():
       self._data["virtualbox/system"]["vm_count"].append(self.vbox_vm_count)
 
       # look for vpp-in-vm through guest sessions
-      for gs in self._vbox_guest_sessions:
-         pass
+#      for gs in self._vbox_guest_sessions:
+#         pass
          #s=gs.execute("/vagrant/dxagent/dump-vpp")[1]
          #for k,d in eval(s):
          #   if k not in self._data:
