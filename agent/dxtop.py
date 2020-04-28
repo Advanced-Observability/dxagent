@@ -14,15 +14,13 @@ import string
 import datetime
 import sys
 import os
+import threading
 
-import agent
 from agent.ios import IOManager
 from agent.sysinfo import SysInfo
 from agent.shareablebuffer import ShareableBuffer
 from agent.shareablebuffer import ShareableBufferException
-import agent.vpp_health
 from agent.vpp_health import vpp_support
-import agent.vm_health
 from agent.vm_health import hypervisors_support
 
 # keyboard input processing delay
@@ -100,7 +98,7 @@ class DXTop(IOManager):
       self._format_colname_pad()
       if self._data:
          self._format_top_pad()
-         self._format_footer()
+         #self._format_footer()
 
    def _center_text(self, s, width=None):
       """
@@ -112,7 +110,7 @@ class DXTop(IOManager):
 
       padding = int((width-len(s))/2)
       rest = (width-len(s)) % 2
-      return (padding*" "+s+padding*" "+ rest*" ")[:self.pad_width]
+      return (padding*" "+s+padding*" "+ rest*" ")[:width]
 
    def _fill_line(self, s):
       """
@@ -163,7 +161,6 @@ class DXTop(IOManager):
       if fill:
          s = self._fill_line(s)
       self.content[screen_index].append((s,flags))
-      #self.buffers[screen_index].append(buf)
 
    def _format(self):
       """
@@ -236,11 +233,11 @@ class DXTop(IOManager):
 
          s = (" {}"+" "*self.col_sizes[0]).format(k)[:self.col_sizes[0]]
          s += VLINE_CHAR
-         flags = 0
+         flags = []
 
          value, severity = d[:2]
          if severity:
-            flags = [(len(s),curses.color_pair(severity))]
+            flags.append((len(s),curses.color_pair(severity)))
          s += ("{}"+" "*self.col_sizes[1]).format(value)[:self.col_sizes[1]]
 
          if severity:
@@ -306,7 +303,7 @@ class DXTop(IOManager):
 
             s = (" {}"+" "*self.col_sizes[0]).format(kk)[:self.col_sizes[0]]
             s += VLINE_CHAR
-            flags = 0
+            flags = []
       
             value, severity = dd[:2]
             if severity:
@@ -355,7 +352,6 @@ class DXTop(IOManager):
             s = (" {}"+" "*self.col_sizes_cpu[0]).format(k)[:self.col_sizes_cpu[0]]
             flags = [(0,0)]
             s += VLINE_CHAR
-            buffers = []
 
             for cpu_index in range(i,i+cpu_slice):
 
@@ -372,9 +368,7 @@ class DXTop(IOManager):
                if cpu_index < i+cpu_slice-1:
                   s += VLINE_CHAR
 
-               buffers.append(d)
-
-            self._append_content(s, pad_index, flags, fill=True, buf=buffers)
+            self._append_content(s, pad_index, flags, fill=True)
 
          if cpu_count-i <= cpu_slice:
             self._append_content(self.hline_bottom(self.col_sizes_cpu), pad_index)
@@ -387,10 +381,10 @@ class DXTop(IOManager):
       s=""
       s += (self._center_text("name",
                              width=self.col_sizes[0])
-        + " " +  self._center_text("value",
+        + self._center_text("value",
                              width=self.col_sizes[1]))
       s += self._center_text("dynamicity",
-                             width=self.pad_width-len(s)-1)
+                             width=self.pad_width-len(s)-2)
       
       if self.screen == 0:
          pass
@@ -467,30 +461,30 @@ class DXTop(IOManager):
       elif self.screen == 6:
          pass
 
-   def _format_footer(self):
-      self.footer.clear()
-      if not self.buffers[self.screen]:
-         return      
+#   def _format_footer(self):
+#      self.footer.clear()
+#      if not self.buffers[self.screen]:
+#         return      
 
-      buffer = self.buffers[self.screen][self.current[self.screen]]
-      if not buffer:
-         return
+#      buffer = self.buffers[self.screen][self.current[self.screen]]
+#      if not buffer:
+#         return
 
-      # per-cpu buffer
-      if type(buffer) is list:
-         name = buffer[0].name()
-         s = "{}".format(name)
-      # str buffer
-      elif buffer.type is str:
-         name = buffer.name()
-         s = "{}".format(name)    
-      # numerical buffer    
-      else:
-         name = buffer.name()
-         s = "{} min:{} max:{} severity:{}".format(name,
-               buffer.min(), buffer.max(), buffer._top_severity())
+#      # per-cpu buffer
+#      if type(buffer) is list:
+#         name = buffer[0].name()
+#         s = "{}".format(name)
+#      # str buffer
+#      elif buffer.type is str:
+#         name = buffer.name()
+#         s = "{}".format(name)    
+#      # numerical buffer    
+#      else:
+#         name = buffer.name()
+#         s = "{} min:{} max:{} severity:{}".format(name,
+#               buffer.min(), buffer.max(), buffer._top_severity())
 
-      self.footer.addstr(self._center_text(s))
+#      self.footer.addstr(self._center_text(s))
 
    def _fill_pad(self):
       """
@@ -571,7 +565,7 @@ class DXTop(IOManager):
       curses.init_pair(10, curses.COLOR_RED, curses.COLOR_WHITE)
 
       self.selection_color = curses.color_pair(8)
-
+      self.content = [[] for _ in range(self.max_screens)]
       self.window.refresh()
       self._init_pads()
       self.resize_columns()
@@ -597,11 +591,6 @@ class DXTop(IOManager):
       self.height, self.width = self.window.getmaxyx()
       self.pad_height, self.pad_width = self.height-6, self.width-2
       self.top_pad_height, self.top_pad_width = 3, self.pad_width
-      # this list contains formatted text
-      self.content = [[] for _ in range(self.max_screens)]
-      # this list is aligned to content and contains buffers
-      # it is used to display extra details on demand
-      self.buffers = [[] for _ in range(self.max_screens)]
 
       self.header = curses.newpad(1, self.width)
       self.top_pad = curses.newpad(3, self.pad_width)
@@ -623,7 +612,7 @@ class DXTop(IOManager):
          if self.current[self.screen] >= self.top[self.screen]+self.pad_height-1:
             self.top[self.screen] += direction
 
-      self._format_footer()
+      #self._format_footer()
 
    def paging(self, direction):
       if direction == self.UP and self.current[self.screen] > 0:
@@ -639,14 +628,14 @@ class DXTop(IOManager):
          self.top[self.screen] += min(self.pad_height-1,
           max(0,len(self.content[self.screen])-self.top[self.screen]-self.pad_height+1))
 
-      self._format_footer()
+      #self._format_footer()
 
    def switch_screen(self, direction):
       self.screen = (self.screen+direction) % self.max_screens
       self._format_header()
       self._format_top_pad()
       self._format_colname_pad()
-      self._format_footer()
+      #self._format_footer()
 
    def exit(self):
       """
@@ -660,9 +649,15 @@ class DXTop(IOManager):
       read data from shared memory
 
       """
+      # this list contains formatted text
+      self.content = [[] for _ in range(self.max_screens)]
+      # this list is aligned to content and contains buffers
+      # it is used to display extra details on demand
+      #self._buffers = [[] for _ in range(self.max_screens)]
       self._data = self.sbuffer.dict(info=self.info)
-      self._init_pads()
+      #self._init_pads()
       self._format()
+
       self.scheduler.enter(INPUT_RATE,0,self.process)
 
    def run(self):
@@ -670,6 +665,8 @@ class DXTop(IOManager):
       main function
 
       """
+      #t = threading.Thread(target=self.process)
+      #t.start()
       try:
          self.start_gui()
          self.process()

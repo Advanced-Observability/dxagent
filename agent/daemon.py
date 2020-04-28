@@ -10,6 +10,7 @@ import sys
 import os
 import pwd
 import time
+from contextlib import contextmanager
 
 from signal import SIGTERM
 
@@ -29,6 +30,7 @@ class Daemon():
       self.stderr   = stderr
       self.pidfile  = pidfile
       self.name     = name
+      self.puid     = 0
 
       self.cwd      = os.getcwd()
       self.username = os.getenv("SUDO_USER")
@@ -84,30 +86,46 @@ class Daemon():
       self.root()
       os.remove(self.pidfile)
 
-   def drop_privileges(self):
-       if os.getuid() != 0:
+   @contextmanager
+   def drop(self, user):
+      try: 
+         self.drop_privileges(user)
+         yield self
+      finally: 
+         self.root() 
+
+   def drop_privileges(self, user):
+       """
+       drop effective uid to user's
+
+       """
+       uid = os.getuid()
+       if uid != 0:
            # We're not root so, osef
            return
+       self.puid = uid
 
        # Get the uid/gid from the name
-       pwnam         = pwd.getpwnam(self.username)
+       pw = pwd.getpwnam(user)
 
        # Remove group privileges
-       os.setgroups([])
+       #os.setgroups([])
 
-       # Try setting the new uid/gid
-       os.setgid(pwnam.pw_gid)
-       os.seteuid(pwnam.pw_uid)
+       # Try setting the new uid
+       os.setresuid(pw.pw_uid, pw.pw_uid, uid)
 
        # Ensure a reasonable umask
-       old_umask = os.umask(0o022)
+       #old_umask = os.umask(0o022)
+
+       self._dropped=True
 
    def root(self):
       """
       Grant root rights, if possible.
       """
       if self._dropped:
-         os.seteuid(0)
+         os.setresuid(self.puid, self.puid, self.puid)
+         self._dropped=False
  
    def start(self):
       """
@@ -123,6 +141,7 @@ class Daemon():
       # Start daemon.
       self.daemonize()
       self.run()
+
       return 0
  
    def redirect_fds(self):

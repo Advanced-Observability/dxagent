@@ -14,10 +14,11 @@ from agent.buffer import init_rb_dict
 
 class BMWatcher():
 
-   def __init__(self, data, info):
+   def __init__(self, data, info, parent):
       self.msec_per_jiffy = os.sysconf(os.sysconf_names['SC_CLK_TCK'])
-      self._data = data
-      self.info = info
+      self._data=data
+      self.info=info
+      self.parent=parent
       self._init_dicts()
 
    def _init_dicts(self):

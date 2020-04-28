@@ -10,7 +10,6 @@ dxagent.py
 import sched
 import time
 import signal
-#from multiprocessing import shared_memory
 
 import agent
 from agent.ios import IOManager
@@ -54,14 +53,8 @@ class DXAgent(Daemon, IOManager):
       if not self.args.disable_shm:
          self.sbuffer = ShareableBuffer(create=True)
 
-      # watchers
-      self.bm_watcher = BMWatcher(self._data, self.info)
-      self.vm_watcher = VMWatcher(self._data, self.info)
-      self.vpp_watcher = VPPWatcher(self._data, self.info)
-
       # catch signal for cleanup
       signal.signal(signal.SIGTERM, self.exit)
-      self.running = True
 
    def _input(self):
       self.bm_watcher.input()
@@ -101,6 +94,13 @@ class DXAgent(Daemon, IOManager):
       main function
 
       """
+      # watchers.
+      self.bm_watcher = BMWatcher(self._data, self.info, self)
+      self.vm_watcher = VMWatcher(self._data, self.info, self)
+      self.vpp_watcher = VPPWatcher(self._data, self.info, self)
+
+      self.running = True
+
       self.info(self.sysinfo)
       self.process()
 

@@ -30,11 +30,13 @@ def vpp_support(api_sock='/run/vpp/api.sock',
 
 class VPPWatcher():
 
-   def __init__(self, data={}, info=None, use_api=True, use_stats=True,
+   def __init__(self, data={}, info=None, parent=None,
+                      use_api=True, use_stats=True,
                 api_sock='/run/vpp/api.sock',
                 stats_sock='/run/vpp/stats.sock'): 
-      self._data = data
-      self.info = info
+      self._data=data
+      self.info=info
+      self.parent=parent
       self.use_api=(use_api and os.path.exists(api_sock)
                     and "vpp" in kbnets_libs)
       self.use_stats=(use_stats and os.path.exists(stats_sock)

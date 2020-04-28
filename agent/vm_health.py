@@ -51,14 +51,19 @@ def hypervisors_support():
 
 class VMWatcher():
 
-   def __init__(self, data, info):
-      self._data = data
-      self.info = info
+   def __init__(self, data, info, parent):
+      self._data=data
+      self.info=info
+      self.parent=parent
 
       if "virtualbox" in vm_libs:
-         self._vbox = virtualbox.VirtualBox()
+         #
+         # drop privileges to acquire IVirtualbox instance
+         with self.parent.drop(self.parent.config["virtualbox"]
+                                                 ["vbox_user"]):
+            self._vbox = virtualbox.VirtualBox()
+
          self.vbox_system_properties = self._vbox.system_properties
-         self.imports()
          # setup performance metric collection for all vms
          self.vbox_perf = self._vbox.performance_collector # IPerformanceCollecto
          self.vbox_perf.setup_metrics(['*:'], # all metrics without aggregates
