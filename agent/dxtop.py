@@ -198,7 +198,6 @@ class DXTop(IOManager):
       if self.args.verbose:
          self._format_attrs_list_rb("stats", 2)
 
-      self._format_attrs_list_rb("bm_ifs", 3)
       self._format_attrs_list_rb("net/dev", 3)
       self._format_attrs_rb("proc/sys", 3)
       self._format_attrs_rb("netstat", 3)

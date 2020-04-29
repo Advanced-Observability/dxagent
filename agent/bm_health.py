@@ -26,7 +26,7 @@ class BMWatcher():
       # init categories whose input count are prone to change during execution
       # e.g., interfaces , processes
       self._data["net/dev"] = {}
-      self._data["bm_ifs"] = {}
+      #self._data["bm_ifs"] = {}
       self._data["swaps"] = {}
       self._data["net/arp"] = {}
       self._data["stats"] = {}
@@ -209,7 +209,7 @@ class BMWatcher():
       self._process_proc_net_stat_arp_cache()
       self._process_proc_net_stat_ndisc_cache()
       self._process_proc_net_stat_rt_cache()
-      self._process_proc_net_dev()
+      #self._process_proc_net_dev()
       self._process_proc_net_arp()
       self._process_proc_net_route()
       self._process_net_settings()
@@ -783,7 +783,12 @@ class BMWatcher():
       index is if_name
 
       """
-
+      attr_list_netdev = [ 
+         "rx_bytes", "rx_packets", "rx_errs", "rx_drop", "rx_fifo",
+         "rx_frame", "rx_compressed", "rx_multicast", 
+         "tx_bytes", "tx_packets", "tx_errs", "tx_drop", "tx_fifo",
+         "tx_cols", "tx_carrier", "tx_compressed" 
+      ]
       attr_list = [
          "link_addr", "link_broadcast", "link_peer",  
          "link_gw_addr", "link_gw_if", "link_gw_default",  
@@ -795,13 +800,12 @@ class BMWatcher():
          "numa_node", "local_cpulist", "local_cpu",
          "enable", "current_link_speed", "current_link_width",
          "mtu", "tx_queue_len", "duplex", "carrier",
-          "operstate",
+         "operstate",
 
          "carrier_down_count", "carrier_up_count",
-      ]
-
-      type_list = 26*[str] + 2*[int] + 3*[str] + 2*[int]
-      counter_list = 31*[False] + 2*[True]
+      ] + attr_list_netdev
+      type_list = 26*[str] + 2*[int] + 3*[str] + 18*[int]
+      counter_list = 31*[False] + 18*[True]
 
       gws = netifaces.gateways()
       active_ifs = []
@@ -809,10 +813,9 @@ class BMWatcher():
          
          # create dict if interface was never observed
          active_ifs.append(if_name)
-         if if_name not in self._data["bm_ifs"]:
-            self._data["bm_ifs"][if_name] = init_rb_dict(attr_list, types=type_list, 
+         if if_name not in self._data["net/dev"]:
+            self._data["net/dev"][if_name] = init_rb_dict(attr_list, types=type_list, 
                                                          counters=counter_list)
-
          # link
          addrs = netifaces.ifaddresses(if_name)
          if netifaces.AF_LINK in addrs:
@@ -820,21 +823,20 @@ class BMWatcher():
             # addresses
             for item in addrs[netifaces.AF_LINK]:
                if "addr" in item:
-                  self._data["bm_ifs"][if_name]["link_addr"].append(item["addr"])
+                  self._data["net/dev"][if_name]["link_addr"].append(item["addr"])
                if "broadcast" in item:
-                  self._data["bm_ifs"][if_name]["link_broadcast"].append(item["broadcast"])
+                  self._data["net/dev"][if_name]["link_broadcast"].append(item["broadcast"])
                if "peer" in item:
-                  self._data["bm_ifs"][if_name]["link_peer"].append(item["peer"])
+                  self._data["net/dev"][if_name]["link_peer"].append(item["peer"])
 
             # gateways
             if netifaces.AF_LINK in gws:
                for item in gws[netifaces.AF_LINK]:
-
                   if item[1] != if_name:
                      continue
-                  self._data["bm_ifs"][if_name]["link_gw_addr"].append(item[0])
-                  self._data["bm_ifs"][if_name]["link_gw_if"].append(item[1])
-                  self._data["bm_ifs"][if_name]["link_gw_default"].append(item[2])
+                  self._data["net/dev"][if_name]["link_gw_addr"].append(item[0])
+                  self._data["net/dev"][if_name]["link_gw_if"].append(item[1])
+                  self._data["net/dev"][if_name]["link_gw_default"].append(item[2])
 
          # ip4
          if netifaces.AF_INET in addrs:
@@ -842,24 +844,22 @@ class BMWatcher():
             # addr
             for item in addrs[netifaces.AF_INET]:
                if "addr" in item:
-                  self._data["bm_ifs"][if_name]["ip4_addr"].append(item["addr"])
+                  self._data["net/dev"][if_name]["ip4_addr"].append(item["addr"])
                if "broadcast" in item:
-                  self._data["bm_ifs"][if_name]["ip4_broadcast"].append(item["broadcast"])
+                  self._data["net/dev"][if_name]["ip4_broadcast"].append(item["broadcast"])
                if "netmask" in item:
-                  self._data["bm_ifs"][if_name]["ip4_netmask"].append(item["netmask"])
+                  self._data["net/dev"][if_name]["ip4_netmask"].append(item["netmask"])
                if "peer" in item:
-                  self._data["bm_ifs"][if_name]["ip4_peer"].append(item["peer"])
+                  self._data["net/dev"][if_name]["ip4_peer"].append(item["peer"])
 
             # gateways
             if netifaces.AF_INET in gws:
                for item in gws[netifaces.AF_INET]:
-
                   if item[1] != if_name:
                      continue
-
-                  self._data["bm_ifs"][if_name]["ip4_gw_addr"].append(item[0])
-                  self._data["bm_ifs"][if_name]["ip4_gw_if"].append(item[1])
-                  self._data["bm_ifs"][if_name]["ip4_gw_default"].append(item[2])
+                  self._data["net/dev"][if_name]["ip4_gw_addr"].append(item[0])
+                  self._data["net/dev"][if_name]["ip4_gw_if"].append(item[1])
+                  self._data["net/dev"][if_name]["ip4_gw_default"].append(item[2])
 
          # ip6 addr
          if netifaces.AF_INET6 in addrs:
@@ -867,60 +867,73 @@ class BMWatcher():
             # addr
             for item in addrs[netifaces.AF_INET6]:
                if "addr" in item:
-                  self._data["bm_ifs"][if_name]["ip6_addr"].append(item["addr"])
+                  self._data["net/dev"][if_name]["ip6_addr"].append(item["addr"])
                if "broadcast" in item:
-                  self._data["bm_ifs"][if_name]["ip6_broadcast"].append(item["broadcast"])
+                  self._data["net/dev"][if_name]["ip6_broadcast"].append(item["broadcast"])
                if "netmask" in item:
-                  self._data["bm_ifs"][if_name]["ip6_netmask"].append(item["netmask"])
+                  self._data["net/dev"][if_name]["ip6_netmask"].append(item["netmask"])
                if "peer" in item:
-                  self._data["bm_ifs"][if_name]["ip6_peer"].append(item["peer"])
+                  self._data["net/dev"][if_name]["ip6_peer"].append(item["peer"])
 
             # gateways
             if netifaces.AF_INET6 in gws:
                for item in gws[netifaces.AF_INET6]:
-
                   if item[1] != if_name:
                      continue
-
-                  self._data["bm_ifs"][if_name]["ip6_gw_addr"].append(item[0])
-                  self._data["bm_ifs"][if_name]["ip6_gw_if"].append(item[1])
-                  self._data["bm_ifs"][if_name]["ip6_gw_default"].append(tem[2])
+                  self._data["net/dev"][if_name]["ip6_gw_addr"].append(item[0])
+                  self._data["net/dev"][if_name]["ip6_gw_if"].append(item[1])
+                  self._data["net/dev"][if_name]["ip6_gw_default"].append(tem[2])
          #
          # non-standard if attributes
          # https://www.kernel.org/doc/Documentation/ABI/testing/sysfs-class-net
          #
          path_prefix="/sys/class/net/{}/".format(if_name)
          self._open_read_append(path_prefix+"carrier_down_count",
-             self._data["bm_ifs"][if_name]["carrier_down_count"])
+             self._data["net/dev"][if_name]["carrier_down_count"])
          self._open_read_append(path_prefix+"carrier_up_count",
-             self._data["bm_ifs"][if_name]["carrier_up_count"])
+             self._data["net/dev"][if_name]["carrier_up_count"])
          self._open_read_append(path_prefix+"device/numa_node",
-             self._data["bm_ifs"][if_name]["numa_node"])
+             self._data["net/dev"][if_name]["numa_node"])
          self._open_read_append(path_prefix+"device/local_cpulist",
-             self._data["bm_ifs"][if_name]["local_cpulist"])
+             self._data["net/dev"][if_name]["local_cpulist"])
          self._open_read_append(path_prefix+"device/local_cpu",
-             self._data["bm_ifs"][if_name]["local_cpu"])
+             self._data["net/dev"][if_name]["local_cpu"])
          self._open_read_append(path_prefix+"device/enable",
-             self._data["bm_ifs"][if_name]["enable"])
+             self._data["net/dev"][if_name]["enable"])
          self._open_read_append(path_prefix+"device/current_link_speed",
-             self._data["bm_ifs"][if_name]["current_link_speed"])
+             self._data["net/dev"][if_name]["current_link_speed"])
          self._open_read_append(path_prefix+"device/current_link_width",
-             self._data["bm_ifs"][if_name]["current_link_width"])
+             self._data["net/dev"][if_name]["current_link_width"])
          self._open_read_append(path_prefix+"mtu",
-             self._data["bm_ifs"][if_name]["mtu"])
+             self._data["net/dev"][if_name]["mtu"])
          self._open_read_append(path_prefix+"tx_queue_len",
-             self._data["bm_ifs"][if_name]["tx_queue_len"])
+             self._data["net/dev"][if_name]["tx_queue_len"])
          self._open_read_append(path_prefix+"duplex",
-             self._data["bm_ifs"][if_name]["duplex"])
+             self._data["net/dev"][if_name]["duplex"])
          self._open_read_append(path_prefix+"carrier",
-             self._data["bm_ifs"][if_name]["carrier"])
+             self._data["net/dev"][if_name]["carrier"])
          self._open_read_append(path_prefix+"operstate",
-             self._data["bm_ifs"][if_name]["operstate"])
+             self._data["net/dev"][if_name]["operstate"])
+
+      with open("/proc/net/dev", 'r') as f:
+
+         for l in f.readlines()[2:]:
+            attr_val = [e.rstrip(':') for e in l.rstrip().split()]
+            index = attr_val[0] 
+
+            if index not in self._data["net/dev"]:
+               self._data["net/dev"][index] = init_rb_dict(attr_list, types=type_list, 
+                                                         counters=counter_list)
+
+            for i,e in enumerate(attr_val[1:]):
+               self._data["net/dev"][index][attr_list_netdev[i]].append(e)
+
+            active_ifs.append(index)
 
       # cleanup expired ifs
-      for monitored_ifs in list(self._data["bm_ifs"].keys()):
+      for monitored_ifs in list(self._data["net/dev"].keys()):
          if monitored_ifs not in active_ifs:
-            del self._data["bm_ifs"][monitored_ifs]
+            del self._data["net/dev"][monitored_ifs]
 
    def _process_net_settings(self):
       """
