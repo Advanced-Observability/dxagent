@@ -5,9 +5,39 @@ Diagnostic Agent
 Medical diagnosis (abbreviated Dx or DS) is the process of determining which disease
 or condition explains a person's symptoms and signs. It is most often referred to as diagnosis.
 
-![alt text](dxagent-sw.png "Architecture")
+![DxAgent Software Architecture](res/dxagent-sw.png "Architecture")
 
-## Commands
+## DxAgent
+
+DxAgent is the diagnostic agent daemon. It collects diagnostic baremetal, VM and
+VPP data, and compute health metrics. It makes it available via an optional GNMI
+exporter, and via shared memory for displaying DxTop.
+
+### DxAgent Commands DxTop
+
+* `dxagent [-h] [-l LOG_FILE] [-c CONFIG] [-s] [-v] {start,stop,restart,status}`
+   * `LOG_FILE` defaults to `/var/log/dxagent.log`
+   * `CONFIG` defaults to `./dxagent.ini`
+   * `-s` disables shared memory. Shared memory allows for using DxTop and
+     is enabled by default.
+
+### DxAgent Important Files
+
+* `dxagent`
+  DxAgent script.
+
+* `dxagent.ini`
+  DxAgent configuration file. With a virtualbox hypervisor, `vbox_user`
+  *has to* be set.
+
+* `fields.csv`
+   An informative list of all monitored fields.
+
+## DxTop
+
+DxTop is a console app that displays data collected by DxAgent.
+
+### DxTop Commands
 
 q or ESC: quit
 
@@ -17,11 +47,18 @@ arrow down, page down: scroll down
 
 arrow left, arrow right: switch between screens
 
-## Python
+### DxTop Important Files
 
-- [python] >= 3.8
+* `dxtop`
+  DxTop script.
 
-## Libs
+## Requirements
+
+### Python
+
+- python >= 3.8
+
+### Libs
 
 - [python3-ethtool](https://pypi.org/project/ethtool/)
    - Ubuntu: `sudo apt install python3-ethtool`
@@ -29,15 +66,7 @@ arrow left, arrow right: switch between screens
 - [netifaces](https://pypi.org/project/netifaces/)
    - `python3 -m pip install netifaces`
 
-To enable stats add following section to you VPP config:
-
-  ```sh
-  statseg {
-  	default
-  	per-node-counters on
-  }
-  ```
-## Optional Libs
+### Optional Libs
 
 - [pyvbox](https://pypi.org/project/pyvbox/)
    - `python3 -m pip install virtualbox`
@@ -47,12 +76,6 @@ To enable stats add following section to you VPP config:
 
 - [VPP Python3 API](https://wiki.fd.io/view/VPP/Python_API)
    - `sudo apt install python3-vpp-api`
-
-## Important files
-
-- `dxagent`, `dxtop`
-
-- `fields.csv` lists all monitored fields
 
 ## Author
 
