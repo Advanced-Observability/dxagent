@@ -108,7 +108,13 @@ class IOManager():
       parsed      = self.config.read(self.args.config)
       if not parsed:
          print("Configuration file not found:", self.args.config)
-         sys.exit(1)        
+         sys.exit(1)
+
+      # set default configuration directory
+      if "config_directory" not in self.config["virtualbox"]:
+         default_config_dir = "/home/{}/.config".format(
+                     self.config["virtualbox"]["vbox_user"])
+         self.config["virtualbox"]["config_directory"] = default_config_dir
 
       return self.config
 

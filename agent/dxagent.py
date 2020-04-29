@@ -24,7 +24,6 @@ from agent.shareablebuffer import ShareableBuffer
 INPUT_RATE=3.0
 
 class DXAgent(Daemon, IOManager):
-
    """
    DXAgent
 

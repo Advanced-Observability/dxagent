@@ -91,8 +91,20 @@ class Daemon():
       try: 
          self.drop_privileges(user)
          yield self
-      finally: 
-         self.root() 
+      finally:
+         self.root()
+
+   @contextmanager
+   def switch_config_home(self, dir):
+      saved = None
+      try:
+         if "XDG_CONFIG_HOME" in os.environ:
+            saved = os.environ["XDG_CONFIG_HOME"]
+         os.environ["XDG_CONFIG_HOME"]=dir
+         yield self
+      finally:
+         if saved:
+            os.environ["XDG_CONFIG_HOME"]=saved
 
    def drop_privileges(self, user):
        """

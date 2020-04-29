@@ -58,9 +58,11 @@ class VMWatcher():
 
       if "virtualbox" in vm_libs:
          #
-         # drop privileges to acquire IVirtualbox instance
-         with self.parent.drop(self.parent.config["virtualbox"]
-                                                 ["vbox_user"]):
+         # drop privileges&change config dir to acquire IVirtualbox
+         # instance
+         with self.parent.drop(self.parent.config["virtualbox"]["vbox_user"]) as _, self.parent.switch_config_home(self.parent.config
+                            ["virtualbox"]["config_directory"]) as _:
+            self.info(os.environ["XDG_CONFIG_HOME"])
             self._vbox = virtualbox.VirtualBox()
 
          self.vbox_system_properties = self._vbox.system_properties
@@ -135,7 +137,7 @@ class VMWatcher():
 
       if "virtualbox" in vm_libs:
          #self._input_virtualbox()
-         try: # unstable if a vm is started during monitoring
+         try:  # unstable if a vm is started during monitoring
             self._input_virtualbox()
          except:
             pass
@@ -177,12 +179,13 @@ class VMWatcher():
 
       self._data["virtualbox/system"]["version"].append(self._vbox.version_normalized)
       self.vbox_vm_count = 0
-
+      
       for m in self._vbox.machines:
 
          # check if machine is online/offline
          if not self.virtualbox_vm_is_active(m):
             continue
+         self.info(m)
 
          state = _virtualbox_states[int(m.state)]
          name = m.name
@@ -224,7 +227,9 @@ class VMWatcher():
          vm_attrs.extend([(attr, str(val[i]/scales[i])) 
                   for i,attr in enumerate(metric_attrs)])
          
-         for k,d in vm_attrs:
+         for k,d in vm_attrs: 
+            if not d:
+               continue
             self._data["virtualbox/vms"][name][k].append(d)
 
          # add rest of probed input (the variable bit)
