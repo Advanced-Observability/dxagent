@@ -48,9 +48,12 @@ class DXAgent(Daemon, IOManager):
 
       # ringbuffers are stored here
       self._data = {}
-      # SharedMemory with dxtop
+
+      # SharedMemory with dxtop.
+      # Drop privileges to avoid dxtop root requirements
       if not self.args.disable_shm:
-         self.sbuffer = ShareableBuffer(create=True)
+         with self.drop():
+            self.sbuffer = ShareableBuffer(create=True)
 
       # catch signal for cleanup
       signal.signal(signal.SIGTERM, self.exit)

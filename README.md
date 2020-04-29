@@ -1,6 +1,4 @@
-# DxAGENT
-
-Diagnostic Agent
+# Diagnostic Agent
 
 Medical diagnosis (abbreviated Dx or DS) is the process of determining which disease
 or condition explains a person's symptoms and signs. It is most often referred to as diagnosis.
@@ -9,8 +7,8 @@ or condition explains a person's symptoms and signs. It is most often referred t
 
 ## DxAgent
 
-DxAgent is the diagnostic agent daemon. It collects diagnostic baremetal, VM and
-VPP data, and compute health metrics. It makes it available via an optional GNMI
+DxAgent is the diagnostic agent daemon. It collects baremetal, VM and VPP
+diagnostic data, and compute health metrics. It makes it available via an optional GNMI
 exporter, and via shared memory for displaying DxTop.
 
 ### DxAgent Commands DxTop

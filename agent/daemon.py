@@ -33,7 +33,7 @@ class Daemon():
       self.puid     = 0
 
       self.cwd      = os.getcwd()
-      self.username = os.getenv("SUDO_USER")
+      self.username = os.getlogin()
       self._dropped = False
 
    def _fork(self):
@@ -87,7 +87,13 @@ class Daemon():
       os.remove(self.pidfile)
 
    @contextmanager
-   def drop(self, user):
+   def drop(self, user=None):
+      """
+      context manager that drops privileges to user's
+
+      """
+      if not user:
+         user = self.username
       try: 
          self.drop_privileges(user)
          yield self

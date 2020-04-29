@@ -40,7 +40,6 @@ class ShareableBuffer(shared_memory.ShareableList):
 
    """
 
-
    def __init__(self, create=False, sublists=7):
       self.shm=None
       super(ShareableBuffer, self).__init__(
