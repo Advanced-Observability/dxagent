@@ -58,11 +58,17 @@ class VMWatcher():
 
       if "virtualbox" in vm_libs:
          #
-         # drop privileges&change config dir to acquire IVirtualbox
-         # instance
-         with self.parent.drop(self.parent.config["virtualbox"]["vbox_user"]) as _, self.parent.switch_config_home(self.parent.config
+         # Drop privileges & Change config dir to acquire a IVirtualbox.
+         #
+         # virtualbox vm management is user-based, and root is,
+         # by design, not supposed to access a user VMs.
+         # Still, it is achievable by setting the user ruid and euid
+         # when acquiring the IVirtualBox instance.
+         # Plus, config dir is used to access virtualbox settings file
+         # instance.
+         with self.parent.drop(self.parent.config["virtualbox"]["vbox_user"]) as _, \
+              self.parent.switch_config_home(self.parent.config
                             ["virtualbox"]["config_directory"]) as _:
-            self.info(os.environ["XDG_CONFIG_HOME"])
             self._vbox = virtualbox.VirtualBox()
 
          self.vbox_system_properties = self._vbox.system_properties
@@ -78,18 +84,6 @@ class VMWatcher():
                                                 types=attr_types)
          self._data["virtualbox/vms"] = {}
          self.vbox_vm_count = 0
-
-         # create guest sessions for each active machine
-#         self._vbox_sessions       = []
-#         self._vbox_guest_sessions = []
-#         for m in self._vbox.machines:
-#            if not self.virtualbox_vm_is_active(m):
-#               continue
-
-#            s=m.create_session()
-#            self._vbox_sessions.append(s)
-#            gs=s.console.guest.create_session("root","vagrant")
-#            self._vbox_guest_sessions.append(gs)
 
    def imports(self):
       """
@@ -121,12 +115,7 @@ class VMWatcher():
 
       """
       if "virtualbox" in vm_libs:
-         pass
-         # close sessions         
-#         for gs in self._vbox_guest_sessions:
-#            gs.close()
-#         for s in self._vbox_sessions:
-#            s.unlock_machine()
+         del self._vbox
          
    def virtualbox_vm_is_active(self, machine):
          state = machine.state
@@ -257,14 +246,5 @@ class VMWatcher():
                self._data["virtualbox/vms"][name][attr].append(d)
 
       self._data["virtualbox/system"]["vm_count"].append(self.vbox_vm_count)
-
-      # look for vpp-in-vm through guest sessions
-#      for gs in self._vbox_guest_sessions:
-#         pass
-         #s=gs.execute("/vagrant/dxagent/dump-vpp")[1]
-         #for k,d in eval(s):
-         #   if k not in self._data:
-         #      self._data
-         #a=eval(s)
       
 
