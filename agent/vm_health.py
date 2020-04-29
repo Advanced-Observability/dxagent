@@ -141,6 +141,17 @@ class VMWatcher():
             self._input_virtualbox()
          except:
             pass
+         finally:
+            self._post_input_virtualbox()
+
+   def _post_input_virtualbox(self):
+      """
+      renew registration to metric collection for all machines
+
+      """
+      self.vbox_perf.setup_metrics(['*:'], self._vbox.machines, 
+            _virtualbox_metrics_sampling_period, 
+            _virtualbox_metrics_sampling_count)
 
    def _input_virtualbox(self):
       """
@@ -185,7 +196,6 @@ class VMWatcher():
          # check if machine is online/offline
          if not self.virtualbox_vm_is_active(m):
             continue
-         self.info(m)
 
          state = _virtualbox_states[int(m.state)]
          name = m.name
@@ -228,8 +238,6 @@ class VMWatcher():
                   for i,attr in enumerate(metric_attrs)])
          
          for k,d in vm_attrs: 
-            if not d:
-               continue
             self._data["virtualbox/vms"][name][k].append(d)
 
          # add rest of probed input (the variable bit)
@@ -258,10 +266,5 @@ class VMWatcher():
          #   if k not in self._data:
          #      self._data
          #a=eval(s)
-
-      # renew registration for new vms XXX
-      self.vbox_perf.setup_metrics(['*:'], self._vbox.machines, 
-            _virtualbox_metrics_sampling_period, 
-            _virtualbox_metrics_sampling_count)
       
 
