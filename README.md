@@ -37,13 +37,13 @@ DxTop is a console app that displays data collected by DxAgent.
 
 ### DxTop Commands
 
-q or ESC: quit
+* q or ESC: **quit**
 
-arrow up, page up: scroll up
+* arrow up, page up: **scroll up**
 
-arrow down, page down: scroll down
+* arrow down, page down: **scroll down**
 
-arrow left, arrow right: switch between screens
+* arrow left, arrow right: **switch between screens**
 
 ### DxTop Important Files
 

@@ -32,8 +32,8 @@ SCREEN_REFRESH_RATE=0.05
 # input processing delay
 INPUT_RATE=3.0
 
-ESCAPE_CHAR = 27
-ENTER_CHAR = 10
+ESCAPE_CHAR=27
+ENTER_CHAR=10
 HLINE_CHAR=u'\u2500'
 VLINE_CHAR=u'\u2502'
 TTEE_CHAR=u'\u252c'
@@ -107,10 +107,19 @@ class DXTop(IOManager):
       """
       if not width:
          width = self.pad_width
+      lpad,rpad = self._center_padding(s, width=width)
+      return (lpad+s+rpad)[:width]
 
+   def _center_padding(self, s, width=None):
+      """
+      @return left and right padding for a self.pad_width-centered string
+
+      """
+      if not width:
+         width = self.pad_width
       padding = int((width-len(s))/2)
       rest = (width-len(s)) % 2
-      return (padding*" "+s+padding*" "+ rest*" ")[:width]
+      return padding*" ",(padding+rest)*" "
 
    def _fill_line(self, s):
       """
@@ -155,7 +164,7 @@ class DXTop(IOManager):
       content is a list of screen content
       each screen content is a list of (str, flags) tuples
 
-      @param fill Fill line with blanks
+      @param fill Fill rest of line with blanks
       @param buf The buffer related to this line
       """
       if fill:
@@ -297,7 +306,7 @@ class DXTop(IOManager):
          s = " "*self.col_sizes[0]+VLINE_CHAR
          s +=  (k+" "*self.col_sizes[1])[:self.col_sizes[1]]
          s += VLINE_CHAR
-         self._append_content(s, pad_index, fill=True)
+         self._append_content(s, pad_index, fill=True, flags=curses.A_DIM)
 
          for kk,dd in d.items():
 
@@ -345,7 +354,7 @@ class DXTop(IOManager):
 
          self._append_content(
             self._center_text("cpu{}-cpu{}".format(i,i+cpu_slice-1)),
-            pad_index)
+            pad_index, curses.A_DIM)
          self._append_content(self.hline_top(self.col_sizes_cpu), pad_index)
 
          for k in keys:
@@ -429,7 +438,7 @@ class DXTop(IOManager):
       for i,name in enumerate(names):
 
          self.header.addstr(name, 
-            curses.A_BOLD | self.selection_color if self.screen == i else 0)
+            curses.A_BOLD | curses.A_REVERSE if self.screen == i else 0)
          if i != len(names)-1:
             self.header.addstr(" | ")    
 
@@ -437,20 +446,40 @@ class DXTop(IOManager):
       self.top_pad.clear()
 
       if self.screen in [0, 1, 2, 3]:
-         self.top_pad.addstr(self._center_text(str(self.sysinfo)))
+         # Line 1
+         s=str(self.sysinfo)
+         lpad,rpad=self._center_padding(s)
+         self.top_pad.addstr(lpad+"node: ", curses.A_DIM)
+         self.top_pad.addstr(self.sysinfo.node)
+         self.top_pad.addstr(" system: ", curses.A_DIM)
+         self.top_pad.addstr(self.sysinfo.system)
+         self.top_pad.addstr(" release: ", curses.A_DIM)
+         self.top_pad.addstr(self.sysinfo.release)
+         self.top_pad.addstr(" arch: ", curses.A_DIM)
+         self.top_pad.addstr(self.sysinfo.processor+rpad)
+         # Line 2
          sec = self._data["uptime"]["up"][0]
-         if sec:
-            uptime=datetime.timedelta(seconds=int(float(sec)))
-            self.top_pad.addstr(self._center_text("uptime: {}".format(str(uptime))))
+         uptime=datetime.timedelta(seconds=int(float(sec)))
+         k,d="uptime",str(uptime)
+         s="{}: {}".format(k,d)
+         lpad,rpad=self._center_padding(s)
+         self.top_pad.addstr(lpad+"{}: ".format(k), curses.A_DIM)
+         self.top_pad.addstr(d+rpad)
       
       elif self.screen == 4:
          if self.vbox_supported:
+            # Line 1
             v=self._data["virtualbox/system"]["version"][0]
             s = "virtualbox: {}".format(v)
-            self.top_pad.addstr(self._center_text(s))
+            lpad,rpad=self._center_padding(s)
+            self.top_pad.addstr(lpad+"virtualbox: ", curses.A_DIM)
+            self.top_pad.addstr(v+rpad)
+            # Line 2
             v=self._data["virtualbox/system"]["vm_count"][0]
             s = "active-count: {}".format(v)
-            self.top_pad.addstr(self._center_text(s))
+            lpad,rpad=self._center_padding(s)
+            self.top_pad.addstr(lpad+"active-count: ", curses.A_DIM)
+            self.top_pad.addstr(v+rpad)
             
       elif self.screen == 5:
          if self.vpp_api_supported:
@@ -509,7 +538,8 @@ class DXTop(IOManager):
                  pflag if i != current else pflag | self.selection_color)
 
          else:
-            self.pad.addstr(i,0,s,flags if i != current else flags | self.selection_color)
+            self.pad.addstr(i,0,s,
+               flags if i != current else flags | self.selection_color)
 
       # empty strings
       for i in range(len(visible_content), self.pad_height):
@@ -556,12 +586,18 @@ class DXTop(IOManager):
       curses.curs_set(0)
       
       curses.start_color()
+      curses.use_default_colors()
+      # 4: orange
       curses.init_color(4, 1000, 700, 0)
-      curses.init_pair(1, 4, curses.COLOR_BLACK)
-      curses.init_pair(2, curses.COLOR_RED, curses.COLOR_BLACK)
-      
+      # 1: orange on black
+      curses.init_pair(1, 4, -1)
+      # 2: red on black
+      curses.init_pair(2, curses.COLOR_RED, -1)
+      # 8: black on white
       curses.init_pair(8, curses.COLOR_BLACK, curses.COLOR_WHITE)
-      curses.init_pair(9, 4, curses.COLOR_WHITE)  
+      # 9: orange on white
+      curses.init_pair(9, 4, curses.COLOR_WHITE)
+      # 10: red on white
       curses.init_pair(10, curses.COLOR_RED, curses.COLOR_WHITE)
 
       self.selection_color = curses.color_pair(8)
@@ -665,8 +701,6 @@ class DXTop(IOManager):
       main function
 
       """
-      #t = threading.Thread(target=self.process)
-      #t.start()
       try:
          self.start_gui()
          self.process()
