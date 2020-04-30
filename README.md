@@ -59,7 +59,7 @@ DxTop is a console app that displays data collected by DxAgent.
 ### Libs
 
 - [python3-ethtool](https://pypi.org/project/ethtool/)
-   - Ubuntu: `sudo apt install python3-ethtool`
+   - `sudo apt install python3-ethtool`
 
 - [netifaces](https://pypi.org/project/netifaces/)
    - `python3 -m pip install netifaces`
@@ -74,6 +74,9 @@ DxTop is a console app that displays data collected by DxAgent.
 
 - [VPP Python3 API](https://wiki.fd.io/view/VPP/Python_API)
    - `sudo apt install python3-vpp-api`
+
+- [cisco-gNMI python](https://pypi.org/project/cisco-gnmi/)
+   - `python3 -m pip install cisco-gnmi`
 
 ## Author
 

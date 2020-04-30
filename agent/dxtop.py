@@ -206,21 +206,20 @@ class DXTop(IOManager):
 #      self._format_attrs_list("net/route", 3)
 
       # VM
-      if (self.vbox_supported
-         and int(self._data["virtualbox/system"]["vm_count"][0]) > 0):
-         self._format_attrs_list_rb("virtualbox/vms", 4)
+      # virtualbox
+      self._format_attrs_list_rb("virtualbox/vms", 4)
 
       # VPP
-      if self.vpp_api_supported:
-         self._format_attrs_rb("vpp/system")
-         self._format_attrs_list_rb("vpp/api/if", 5)
+      #vpp_api
+      self._format_attrs_rb("vpp/system", 5)
+      self._format_attrs_list_rb("vpp/api/if", 5)
 
-      if self.vpp_stats_supported:
-         self._format_attrs_rb("vpp/stats/sys") 
-         self._format_attrs_list_rb("vpp/stats/buffer-pool", 5)
-         self._format_attrs_list_rb("vpp/stats/workers", 5) 
-         self._format_attrs_list_rb("vpp/stats/if", 5)
-         self._format_attrs_list_rb("vpp/stats/err", 5)
+      #vpp_stats
+      self._format_attrs_rb("vpp/stats/sys", 5) 
+      self._format_attrs_list_rb("vpp/stats/buffer-pool", 5)
+      self._format_attrs_list_rb("vpp/stats/workers", 5) 
+      self._format_attrs_list_rb("vpp/stats/if", 5)
+      self._format_attrs_list_rb("vpp/stats/err", 5)
 
       # Health metrics Pad
       self._append_content("Metrics", 6, curses.A_BOLD, fill=True)
@@ -233,6 +232,8 @@ class DXTop(IOManager):
       format a dict of ringbuffers into a curses pad
  
       """
+      if category not in self._data:
+         return
       self._append_content(self._center_text(category),
                            pad_index, curses.A_BOLD)
       self._append_content(self.hline_top(self.col_sizes), pad_index)
@@ -295,6 +296,8 @@ class DXTop(IOManager):
       format a dict of dict of ringbuffers into a curses pad
  
       """
+      if category not in self._data:
+         return
 
       self._append_content(self._center_text(category),
                            pad_index, curses.A_BOLD)
@@ -341,6 +344,9 @@ class DXTop(IOManager):
       format a dict of dict of ringbuffers into a curses pad
  
       """
+      if category not in self._data:
+         return
+
       cpu_slice = 8
       cpu_count = 8#self.bm_watcher.cpu_count
       keys = self._data[category]["cpu0"].keys()

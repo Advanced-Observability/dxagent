@@ -8,6 +8,10 @@ vpp_health.py
 
 import os
 import fnmatch
+import json
+import threading
+from cisco_gnmi import ClientBuilder
+from google.protobuf import json_format
  
 kbnets_libs=[]
 try:
@@ -20,13 +24,51 @@ except:
 from agent.buffer import init_rb_dict
 from agent.buffer import RingBuffer
 
+# The rate at which gNMI sends updates
+GNMI_SAMPLING_RATE=int(1e9)*10
+
 def vpp_support(api_sock='/run/vpp/api.sock',
                 stats_sock='/run/vpp/stats.sock'):
    """
+   indicates local support for VPP api&stats   
+
    @return (vpp_api_supported, vpp_stats_supported)
    """
    return ("vpp" in kbnets_libs and os.path.exists(api_sock),
            "vpp" in kbnets_libs and os.path.exists(stats_sock))
+
+
+class VPPGNMIClient(threading.Thread):
+
+   def __init__(self, node, info, user='a', password='a'):
+      self.node = node
+      self.info = info
+
+      builder = ClientBuilder(node)
+      builder.set_secure_from_target()
+      builder.set_call_authentication(user, password)
+      self.client = builder.construct()
+
+   def parse_json(self, response):
+      self.info(json.loads(response))
+
+   def run(self,xpath="/"):
+      """
+      
+      """
+      synced  = False
+
+      try:
+         for response in client.subscribe_xpaths(xpath,
+                         sample_interval=GNMI_SAMPLING_RATE):
+            if response.sync_response:
+               synced = True
+            if synced:
+               self.parse_json(json_format.MessageToJson(response))
+      except Exception as e:
+         self.info(e)
+      finally:
+         pass
 
 class VPPWatcher():
 
@@ -37,84 +79,113 @@ class VPPWatcher():
       self._data=data
       self.info=info
       self.parent=parent
+      self.gnmi_nodes = self.parent.gnmi_nodes
       self.use_api=(use_api and os.path.exists(api_sock)
                     and "vpp" in kbnets_libs)
       self.use_stats=(use_stats and os.path.exists(stats_sock)
                       and "vpp" in kbnets_libs)
+      self.use_gnmi=(not not self.gnmi_nodes)
 
       # connect to VPP process (baremetal)
       if self.use_api:
-         vpp_json_dir = "/usr/share/vpp/api/core/"
-
-         # connect to API socket
-         jsonfiles = []
-         for root, dirnames, filenames in os.walk(vpp_json_dir):
-             for filename in fnmatch.filter(filenames, '*.api.json'):
-                 jsonfiles.append(os.path.join(vpp_json_dir, filename))
-
-         self.vpp = VPP(jsonfiles)
-         self.vpp.connect("dxagent")
-
-         # init api fields
-         self._data["vpp/api/if"] = {}
-         attr_list = ["version"]
-         self._data["vpp/system"] = init_rb_dict(attr_list, type=str)
-
+         self._init_stats()
       if self.use_stats:
+         self._init_stats()
+      if self.use_gnmi:
+         self._init_gnmi_client()
 
-         # connect to stats socket
-         self.stats = VPPStats('/run/vpp/stats.sock')
-         self.stats.connect()  
+   def _init_gnmi_client(self):
+      """
 
-         # init system stats
-         attr_names = [
-            '/sys/vector_rate', '/sys/num_worker_threads', '/sys/input_rate',
-            '/mem/statseg/total', '/mem/statseg/used', 
-            
-         ]
-         attr_types = [float, int, float, float, float]
-         self._data["vpp/stats/sys"] = init_rb_dict(attr_names, types=attr_types)
-         attr_names[0] += '$' # XXX
-         self._dir_sys = self.stats.ls(attr_names)
-
-         # numa stats (per numa node ?)
-         self._dir_buffer_pool = self.stats.ls(['/buffer-pool'])
-         self._data["vpp/stats/buffer-pool"] = {}
-
-         # workers stats (per worker)
-         attr_names = [
-            '/sys/vector_rate_per_worker', '/sys/node/clocks', '/sys/node/vectors',
-            '/sys/node/calls', '/sys/node/suspends', '/sys/node/names'
-            
-         ]
-         self._dir_workers = self.stats.ls(attr_names)
-         self._data["vpp/stats/workers"] = {}
-
-         # if stats (per if)
-         self._dir_if_names = self.stats.ls(['/if/names'])
-         attr_names = [
-            '/if/drops', '/if/punt', '/if/ip4', '/if/ip6',
-            '/if/rx-no-buf', '/if/rx-miss', '/if/rx-error', '/if/tx-error',
-            '/if/mpls', 'if/rx', '/if/rx-unicast', '/if/rx-multicast',
-            '/if/rx-broadcast', '/if/tx', '/if/tx-unicast', '/if/tx-multicast',
-            '/if/tx-broadcast'
-         ]
-         self._dir_if = self.stats.ls(attr_names)
-         self._data["vpp/stats/if"] = {}
-
-         # node stats (per node)
-         attr_names = [
-            '/err/'
-         ]
-         self._dir_err = self.stats.ls(attr_names)
-         self._data["vpp/stats/err"] = {}  
+      """
+      for gnmi_node in self.gnmi_nodes:
+         self.info("connecting to gNMI node {}".format(gnmi_node))
       
+   def _init_api(self,vpp_json_dir = "/usr/share/vpp/api/core/"):
+      """
+      init VPP api classes and rbuffers
+
+      """
+      # connect to API socket
+      jsonfiles = []
+      for root, dirnames, filenames in os.walk(vpp_json_dir):
+          for filename in fnmatch.filter(filenames, '*.api.json'):
+              jsonfiles.append(os.path.join(vpp_json_dir, filename))
+
+      self.vpp = VPP(jsonfiles)
+      self.vpp.connect("dxagent")
+
+      # init api fields
+      self._data["vpp/api/if"] = {}
+      attr_list = ["version"]
+      self._data["vpp/system"] = init_rb_dict(attr_list, type=str)
+    
+   def _init_stats(self):
+      """
+      init VPP stats classes and rbuffers
+
+      """
+      # connect to stats socket
+      self.stats = VPPStats('/run/vpp/stats.sock')
+      self.stats.connect()  
+
+      # init system stats
+      attr_names = [
+         '/sys/vector_rate', '/sys/num_worker_threads', '/sys/input_rate',
+         '/mem/statseg/total', '/mem/statseg/used', 
+         
+      ]
+      attr_types = [float, int, float, float, float]
+      self._data["vpp/stats/sys"] = init_rb_dict(attr_names, types=attr_types)
+      attr_names[0] += '$' # XXX
+      self._dir_sys = self.stats.ls(attr_names)
+
+      # numa stats (per numa node ?)
+      self._dir_buffer_pool = self.stats.ls(['/buffer-pool'])
+      self._data["vpp/stats/buffer-pool"] = {}
+
+      # workers stats (per worker)
+      attr_names = [
+         '/sys/vector_rate_per_worker', '/sys/node/clocks', '/sys/node/vectors',
+         '/sys/node/calls', '/sys/node/suspends', '/sys/node/names'
+         
+      ]
+      self._dir_workers = self.stats.ls(attr_names)
+      self._data["vpp/stats/workers"] = {}
+
+      # if stats (per if)
+      self._dir_if_names = self.stats.ls(['/if/names'])
+      attr_names = [
+         '/if/drops', '/if/punt', '/if/ip4', '/if/ip6',
+         '/if/rx-no-buf', '/if/rx-miss', '/if/rx-error', '/if/tx-error',
+         '/if/mpls', 'if/rx', '/if/rx-unicast', '/if/rx-multicast',
+         '/if/rx-broadcast', '/if/tx', '/if/tx-unicast', '/if/tx-multicast',
+         '/if/tx-broadcast'
+      ]
+      self._dir_if = self.stats.ls(attr_names)
+      self._data["vpp/stats/if"] = {}
+
+      # node stats (per node)
+      attr_names = [
+         '/err/'
+      ]
+      self._dir_err = self.stats.ls(attr_names)
+      self._data["vpp/stats/err"] = {}  
 
    def input(self):
       if self.use_api:
          self._input_api()
       if self.use_stats:
          self._input_stats()
+      if self.use_gnmi:
+         self._input_gnmi()
+
+   def _input_gnmi(self):
+      """
+      input from gNMI client
+
+      """
+      pass
 
    def _input_api(self):
       """

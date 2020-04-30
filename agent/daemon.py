@@ -71,12 +71,8 @@ class Daemon():
       with open(self.pidfile,'w+') as f:
          f.write("{}\n".format(pid))
 
-      #self.drop_privileges()
-      #self._dropped = True
-
       # Redirects stdio
       self.redirect_fds()   
-
 
    def delpid(self):
       """
@@ -133,8 +129,7 @@ class Daemon():
        os.setresuid(pw.pw_uid, pw.pw_uid, uid)
 
        # Ensure a reasonable umask
-       #old_umask = os.umask(0o022)
-
+       old_umask = os.umask(0o022)
        self._dropped=True
 
    def root(self):

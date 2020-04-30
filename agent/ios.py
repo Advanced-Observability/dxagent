@@ -116,6 +116,12 @@ class IOManager():
                      self.config["virtualbox"]["vbox_user"])
          self.config["virtualbox"]["config_directory"] = default_config_dir
 
+      # parse gNMI nodes
+      self.gnmi_nodes = []
+      gnmi_nodes = self.config["vpp"].get("gnmi_nodes")
+      if gnmi_nodes:
+         self.gnmi_nodes = [node.rstrip().lstrip() for node in gnmi_nodes.split(",")]
+      
       return self.config
 
    ########################################################
