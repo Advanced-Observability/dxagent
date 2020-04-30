@@ -23,18 +23,18 @@ class Daemon():
    def __init__(self, pidfile='/var/run/dxagent.pid', stdin='/dev/null', 
                      stdout='/var/log/dxagent.log', 
                      stderr='/var/log/dxagent.log',
-                     name='dxagent'):
-      #super(Daemon, self).__init__()
-      self.stdin    = stdin
-      self.stdout   = stdout
-      self.stderr   = stderr
-      self.pidfile  = pidfile
-      self.name     = name
-      self.puid     = 0
-
-      self.cwd      = os.getcwd()
-      self.username = os.getlogin()
-      self._dropped = False
+                     name='dxagent',
+                     input_rate=1):
+      self.stdin      = stdin
+      self.stdout     = stdout
+      self.stderr     = stderr
+      self.pidfile    = pidfile
+      self.input_rate = input_rate
+      self.name       = name
+      self.puid       = 0
+      self.cwd        = os.getcwd()
+      self.username   = os.getlogin()
+      self._dropped   = False
 
    def _fork(self):
       """
@@ -249,7 +249,8 @@ class Daemon():
       """
       if self.stop() > 0:
          return 1
-      time.sleep(1)
+      # gently wait for process to exit
+      time.sleep(self.input_rate)
       if self.start() > 0:
          return 1
  

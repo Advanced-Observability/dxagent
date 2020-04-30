@@ -49,7 +49,7 @@ class ShareableBuffer(shared_memory.ShareableList):
 
       if not create:
          # avoid auto unlinking of SharedMemory segment
-         # XXX: i'm guessing this is going to be fixed in later python versions
+         # XXX: i'm guessing (?) this is going to be fixed in later python versions
          unregister(self.shm._name, "shared_memory")
 
       self.index=0

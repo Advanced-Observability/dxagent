@@ -34,15 +34,15 @@ class DXAgent(Daemon, IOManager):
       Daemon.__init__(self, pidfile='/var/run/dxagent.pid',
                       stdout='/var/log/dxagent.log', 
                       stderr='/var/log/dxagent.log',
-                      name='dxagent')
+                      name='dxagent',
+                      input_rate=INPUT_RATE)
       IOManager.__init__(self, child=self, parse_args=parse_args)
 
       self.load_ios()
       if not parse_args:
          return
-      if "start" not in self.args.cmd:
-         return
 
+   def _init(self):
       self.sysinfo = SysInfo()
       self.scheduler = sched.scheduler()
 
@@ -51,9 +51,15 @@ class DXAgent(Daemon, IOManager):
 
       # SharedMemory with dxtop.
       # Drop privileges to avoid dxtop root requirements
+      # Create shared memory only if start, not on restart.
       if not self.args.disable_shm:
          with self.drop():
             self.sbuffer = ShareableBuffer(create=True)
+
+      # watchers.
+      self.bm_watcher = BMWatcher(self._data, self.info, self)
+      self.vm_watcher = VMWatcher(self._data, self.info, self)
+      self.vpp_watcher = VPPWatcher(self._data, self.info, self)
 
       # catch signal for cleanup
       signal.signal(signal.SIGTERM, self.exit)
@@ -96,11 +102,7 @@ class DXAgent(Daemon, IOManager):
       main function
 
       """
-      # watchers.
-      self.bm_watcher = BMWatcher(self._data, self.info, self)
-      self.vm_watcher = VMWatcher(self._data, self.info, self)
-      self.vpp_watcher = VPPWatcher(self._data, self.info, self)
-
+      self._init()
       self.running = True
 
       self.info(self.sysinfo)
