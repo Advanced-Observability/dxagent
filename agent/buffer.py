@@ -143,6 +143,9 @@ class RingBuffer(collections.deque):
    def max(self):
       return max(self)
 
+   def is_number(self):
+      return self.type == int or self.type == float
+
    def delta(self, first=0):
       """
       @return delta value on entire buffer.

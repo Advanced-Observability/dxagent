@@ -222,7 +222,7 @@ class DXTop(IOManager):
       self._format_attrs_list_rb("vpp/stats/err", 5)
 
       #vpp_gnmi
-      self._format_attrs_list_rb("vpp/gnmi", 5)
+      self._format_attrs_list_rb("vpp/gnmi", 5, skip_zero=True)
 
       # Health metrics Pad
       self._append_content("Metrics", 6, curses.A_BOLD, fill=True)
@@ -294,9 +294,10 @@ class DXTop(IOManager):
 
 #         self._append_content(self.hline(self.col_sizes), pad_index)
 
-   def _format_attrs_list_rb(self, category, pad_index):
+   def _format_attrs_list_rb(self, category, pad_index, skip_zero=False):
       """
       format a dict of dict of ringbuffers into a curses pad
+      @param skip_zero do not print if value is zero
  
       """
       if category not in self._data:
@@ -320,6 +321,8 @@ class DXTop(IOManager):
             flags = []
       
             value, severity = dd[:2]
+#            if skip_zero and int(value) == 0:
+#               continue
             if severity:
                flags = [(len(s),curses.color_pair(severity))]
             s += ("{}"+" "*self.col_sizes[1]).format(

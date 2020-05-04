@@ -44,12 +44,12 @@ def vpp_support(api_sock='/run/vpp/api.sock',
    return ("vpp" in kbnets_libs and os.path.exists(api_sock),
            "vpp" in kbnets_libs and os.path.exists(stats_sock))
 
-
 class VPPGNMIClient(threading.Thread):
-   def __init__(self, node, info, user='a', password='a'):
+   def __init__(self, node, info, data, user='a', password='a'):
       super().__init__()
       self.node = node
       self.info = info
+      self._data = data
       self.user = user
       self.password = password
       self.client = None
@@ -59,7 +59,30 @@ class VPPGNMIClient(threading.Thread):
       self._exit=False
 
    def parse_json(self, response):
-      self.info(json.loads(response))
+      """
+      parse response and fill data dict
+
+      """
+      msg = json.loads(response)
+      if "update" not in msg or "update" not in msg["update"]:
+         return
+      for e in msg["update"]["update"]:
+         path_json, val = e["path"]["elem"], e["val"]["intVal"]
+         root, node = path_json[0]["name"], path_json[1]["name"]
+         path = "/"+root+"/"+node
+         # building path
+         for name in path_json[2:]:
+            path += "/{}".format(name["name"])
+
+
+         if path not in self._data["vpp/gnmi"][self.node]:
+            self.info("{} {} {} {}".format(root, root=="err", val, val != 0))
+            # There are a lot of /err/ counters, so we drop data
+            # if it's zero.
+            if root == "err" and val == 0:
+               continue
+            self._data["vpp/gnmi"][self.node][path] = RingBuffer(path, counter=True)
+         self._data["vpp/gnmi"][self.node][path].append(val)
 
    def disconnect(self):
       self._exit=True
@@ -70,6 +93,7 @@ class VPPGNMIClient(threading.Thread):
       
       If more than MAX_RETRIES, do not connect. Wait at least 
       GNMI_RETRY_INTERVAL before re-connecting.
+
       """
       # too much retries
       if self.retry > MAX_RETRIES:
@@ -125,15 +149,13 @@ class VPPGNMIClient(threading.Thread):
             if response.sync_response:
                synced = True
             elif synced:
-               #self.parse_json(json_format.MessageToJson(response))
-               self.info("data")
+               self.parse_json(json_format.MessageToJson(response))
       except Exception as e:
          self.info(e)
       finally:
          pass
 
 class VPPWatcher():
-
    def __init__(self, data={}, info=None, parent=None,
                       use_api=True, use_stats=True,
                 api_sock='/run/vpp/api.sock',
@@ -164,11 +186,10 @@ class VPPWatcher():
 
       """
       self._data["vpp/gnmi"] = {}
-
       attr_names = ["status"]
       for node in self.gnmi_nodes:
-         self.gnmi_clients.append(VPPGNMIClient(node, self.info))
          self._data["vpp/gnmi"][node] = init_rb_dict(attr_names, type=str)
+         self.gnmi_clients.append(VPPGNMIClient(node, self.info, self._data))
       self._connect_gnmi_clients()
 
    def _connect_gnmi_clients(self):
@@ -265,9 +286,9 @@ class VPPWatcher():
 
       NOTE: actual input is done in VPPGNMIClient instances
       Here we only connect/reconnect if needed
+
       """
       self._connect_gnmi_clients()
-
       # update status
       for client in self.gnmi_clients:
          node = client.node
