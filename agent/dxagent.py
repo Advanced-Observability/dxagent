@@ -76,7 +76,6 @@ class DXAgent(Daemon, IOManager):
       displaying. re-schedule itself.
 
       """
-      
       self._input()
       if not self.args.disable_shm:
          skip=["stats"] if not self.args.verbose else []

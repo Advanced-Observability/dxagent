@@ -10,6 +10,7 @@ import os
 import fnmatch
 import json
 import threading
+import time
 from cisco_gnmi import ClientBuilder
 from google.protobuf import json_format
  
@@ -23,9 +24,15 @@ except:
 
 from agent.buffer import init_rb_dict
 from agent.buffer import RingBuffer
-
+#
 # The rate at which gNMI sends updates
 GNMI_SAMPLING_RATE=int(1e9)*10
+#
+# gNMI max consecutive connection fails
+MAX_RETRIES=3
+#
+# time for gNMI to wait before retry connecting
+GNMI_RETRY_INTERVAL=60
 
 def vpp_support(api_sock='/run/vpp/api.sock',
                 stats_sock='/run/vpp/stats.sock'):
@@ -39,18 +46,66 @@ def vpp_support(api_sock='/run/vpp/api.sock',
 
 
 class VPPGNMIClient(threading.Thread):
-
    def __init__(self, node, info, user='a', password='a'):
+      super().__init__()
       self.node = node
       self.info = info
-
-      builder = ClientBuilder(node)
-      builder.set_secure_from_target()
-      builder.set_call_authentication(user, password)
-      self.client = builder.construct()
+      self.user = user
+      self.password = password
+      self.client = None
+      self.connected = False
+      self.last_attempt = None
+      self.retry=0
 
    def parse_json(self, response):
       self.info(json.loads(response))
+
+   def connect(self):
+      """
+      connect
+      
+      If more than MAX_RETRIES, do not connect. Wait at least 
+      GNMI_RETRY_INTERVAL before re-connecting.
+      """
+      # too much retries
+      if self.retry > MAX_RETRIES:
+         return False
+      # Less than GNMI_RETRY_INTERVAL since last attempt
+      if (self.last_attempt != None and
+         time.time()-self.last_attempt < GNMI_RETRY_INTERVAL):
+         return False
+      self.last_attempt = time.time()
+
+      self.info("connecting to gNMI node {}".format(self.node))
+      try:
+         builder = ClientBuilder(self.node)
+         builder.set_secure_from_target()
+         builder.set_call_authentication(self.user, self.password)
+         self.client = builder.construct()
+         self.connected=True
+         self.retry = 0
+         return True
+      except Exception as e:
+         self.info(e)
+         self.retry += 1
+         return False
+
+   def is_connected(self):
+      return self.connected and self.is_alive()
+
+   def status(self):
+      """
+      @return running, connected, abandonned, connecting
+      
+      """
+      if self.connected and self.is_alive():
+         return "running"
+      if self.connected and not self.is_alive():
+         return "connected"
+      if not self.connected and self.retry > MAX_RETRIES:
+         return "abandonned"
+      if not self.connected and self.retry <= MAX_RETRIES:
+         return "connecting"
 
    def run(self,xpath="/"):
       """
@@ -59,12 +114,13 @@ class VPPGNMIClient(threading.Thread):
       synced  = False
 
       try:
-         for response in client.subscribe_xpaths(xpath,
+         for response in self.client.subscribe_xpaths(xpath,
                          sample_interval=GNMI_SAMPLING_RATE):
             if response.sync_response:
                synced = True
-            if synced:
-               self.parse_json(json_format.MessageToJson(response))
+            elif synced:
+               #self.parse_json(json_format.MessageToJson(response))
+               pass
       except Exception as e:
          self.info(e)
       finally:
@@ -80,6 +136,8 @@ class VPPWatcher():
       self.info=info
       self.parent=parent
       self.gnmi_nodes = self.parent.gnmi_nodes
+      self.gnmi_timer = time.time()
+      self.gnmi_clients = []
       self.use_api=(use_api and os.path.exists(api_sock)
                     and "vpp" in kbnets_libs)
       self.use_stats=(use_stats and os.path.exists(stats_sock)
@@ -96,10 +154,27 @@ class VPPWatcher():
 
    def _init_gnmi_client(self):
       """
+      instantiate gNMI clients and try connecting nodes
 
       """
-      for gnmi_node in self.gnmi_nodes:
-         self.info("connecting to gNMI node {}".format(gnmi_node))
+      self._data["vpp/gnmi"] = {}
+
+      attr_names = ["status"]
+      for node in self.gnmi_nodes:
+         self.gnmi_clients.append(VPPGNMIClient(node, self.info))
+         self._data["vpp/gnmi"][node] = init_rb_dict(attr_names, type=str)
+      self._connect_gnmi_clients()
+
+   def _connect_gnmi_clients(self):
+      """
+      connect gNMI clients
+      """
+      for gnmi_client in self.gnmi_clients:
+         if gnmi_client.is_alive():
+            continue
+         
+         if gnmi_client.connect():
+            gnmi_client.start()
       
    def _init_api(self,vpp_json_dir = "/usr/share/vpp/api/core/"):
       """
@@ -184,9 +259,17 @@ class VPPWatcher():
       """
       input from gNMI client
 
+      NOTE: actual input is done in VPPGNMIClient instances
+      Here we only connect/reconnect if needed
       """
-      pass
+      self._connect_gnmi_clients()
 
+      # update status
+      for client in self.gnmi_clients:
+         node = client.node
+         status = client.status()
+         self._data["vpp/gnmi"][node]["status"].append(status)
+            
    def _input_api(self):
       """
       input from api socket

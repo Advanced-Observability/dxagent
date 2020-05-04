@@ -221,6 +221,9 @@ class DXTop(IOManager):
       self._format_attrs_list_rb("vpp/stats/if", 5)
       self._format_attrs_list_rb("vpp/stats/err", 5)
 
+      #vpp_gnmi
+      self._format_attrs_list_rb("vpp/gnmi", 5)
+
       # Health metrics Pad
       self._append_content("Metrics", 6, curses.A_BOLD, fill=True)
       self._append_content("Symptoms", 6, curses.A_BOLD, fill=True)
@@ -652,7 +655,6 @@ class DXTop(IOManager):
          self.current[self.screen] += direction
          if self.current[self.screen] >= self.top[self.screen]+self.pad_height-1:
             self.top[self.screen] += direction
-
       #self._format_footer()
 
    def paging(self, direction):
@@ -668,7 +670,6 @@ class DXTop(IOManager):
               len(self.content[self.screen])-self.current[self.screen]-1)         
          self.top[self.screen] += min(self.pad_height-1,
           max(0,len(self.content[self.screen])-self.top[self.screen]-self.pad_height+1))
-
       #self._format_footer()
 
    def switch_screen(self, direction):
