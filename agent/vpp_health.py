@@ -28,7 +28,7 @@ from agent.buffer import RingBuffer
 # The rate at which gNMI sends updates
 GNMI_SAMPLING_RATE=int(1e9)*10
 #
-# gNMI max consecutive connection fails
+# gNMI client max consecutive retries
 MAX_RETRIES=3
 #
 # time for gNMI to wait before retry connecting
@@ -56,9 +56,13 @@ class VPPGNMIClient(threading.Thread):
       self.connected = False
       self.last_attempt = None
       self.retry=0
+      self._exit=False
 
    def parse_json(self, response):
       self.info(json.loads(response))
+
+   def disconnect(self):
+      self._exit=True
 
    def connect(self):
       """
@@ -116,11 +120,13 @@ class VPPGNMIClient(threading.Thread):
       try:
          for response in self.client.subscribe_xpaths(xpath,
                          sample_interval=GNMI_SAMPLING_RATE):
+            if self._exit:
+               break
             if response.sync_response:
                synced = True
             elif synced:
                #self.parse_json(json_format.MessageToJson(response))
-               pass
+               self.info("data")
       except Exception as e:
          self.info(e)
       finally:
@@ -169,12 +175,12 @@ class VPPWatcher():
       """
       connect gNMI clients
       """
-      for gnmi_client in self.gnmi_clients:
-         if gnmi_client.is_alive():
+      for client in self.gnmi_clients:
+         if client.is_alive():
             continue
          
-         if gnmi_client.connect():
-            gnmi_client.start()
+         if client.connect():
+            client.start()
       
    def _init_api(self,vpp_json_dir = "/usr/share/vpp/api/core/"):
       """
@@ -208,7 +214,6 @@ class VPPWatcher():
       attr_names = [
          '/sys/vector_rate', '/sys/num_worker_threads', '/sys/input_rate',
          '/mem/statseg/total', '/mem/statseg/used', 
-         
       ]
       attr_types = [float, int, float, float, float]
       self._data["vpp/stats/sys"] = init_rb_dict(attr_names, types=attr_types)
@@ -223,7 +228,6 @@ class VPPWatcher():
       attr_names = [
          '/sys/vector_rate_per_worker', '/sys/node/clocks', '/sys/node/vectors',
          '/sys/node/calls', '/sys/node/suspends', '/sys/node/names'
-         
       ]
       self._dir_workers = self.stats.ls(attr_names)
       self._data["vpp/stats/workers"] = {}
@@ -405,5 +409,8 @@ class VPPWatcher():
          self.vpp.disconnect()
       if self.use_stats:
          self.stats.disconnect()
+      if self.use_gnmi:
+         for c in self.gnmi_clients:
+            c.disconnect()
   
 

@@ -116,7 +116,7 @@ class VMWatcher():
       """
       if "virtualbox" in vm_libs:
          del self._vbox
-         
+
    def virtualbox_vm_is_active(self, machine):
          state = machine.state
          return (state >= MachineState.first_online
@@ -131,7 +131,8 @@ class VMWatcher():
          except:
             pass
          finally:
-            self._post_input_virtualbox()
+            if self._vbox:
+               self._post_input_virtualbox()
 
    def _post_input_virtualbox(self):
       """

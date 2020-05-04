@@ -51,7 +51,6 @@ class DXAgent(Daemon, IOManager):
 
       # SharedMemory with dxtop.
       # Drop privileges to avoid dxtop root requirements
-      # Create shared memory only if start, not on restart.
       if not self.args.disable_shm:
          with self.drop():
             self.sbuffer = ShareableBuffer(create=True)
