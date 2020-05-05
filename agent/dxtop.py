@@ -302,7 +302,6 @@ class DXTop(IOManager):
       """
       if category not in self._data:
          return
-
       self._append_content(self._center_text(category),
                            pad_index, curses.A_BOLD)
       self._append_content(self.hline_top(self.col_sizes), pad_index)

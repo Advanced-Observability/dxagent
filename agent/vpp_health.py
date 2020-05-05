@@ -77,7 +77,7 @@ class VPPGNMIClient(threading.Thread):
          if path not in self._data["vpp/gnmi"][self.node]:
             # There are a lot of /err/ counters, so we drop data
             # if it's zero.
-            if root == "err" and val == "0":
+            if (root == "err" and val == "0") or (root == "nat44"):
                continue
             # Lock the dict to make sure that main thread is not
             # iterating.
@@ -318,9 +318,8 @@ class VPPWatcher():
 
          # add entry if needed
          sw_if_name = intf.interface_name
-         if sw_if_name not in self._data["vpp/api/if"]:
-            self._data["vpp/api/if"][sw_if_name] = init_rb_dict(attr_names, types=attr_types)
-
+         self._data["vpp/api/if"].setdefault(sw_if_name,
+               init_rb_dict(attr_names, types=attr_types))
          self._data["vpp/api/if"][sw_if_name]["link_addr"].append(intf.l2_address)
          self._data["vpp/api/if"][sw_if_name]["sw_if_index"].append(intf.sw_if_index)
          self._data["vpp/api/if"][sw_if_name]["type"].append(intf.type)
@@ -350,12 +349,9 @@ class VPPWatcher():
       for k,d in self.stats.dump(self._dir_buffer_pool).items():
 
          # create entry if needed
-         numa_node = k.split('/')[2]
-         if numa_node not in self._data["vpp/stats/buffer-pool"]:
-            self._data["vpp/stats/buffer-pool"][numa_node] = init_rb_dict(attr_names, counter=True)
-         
-         field_name = k.split('/')[3]
-         self._data["vpp/stats/buffer-pool"][numa_node][field_name].append(d)
+         numa_node, field_name = k.split('/')[2:4]
+         self._data["vpp/stats/buffer-pool"].setdefault(numa_node, 
+           init_rb_dict(attr_names, counter=True))[field_name].append(d)
          
       # workers stats (per worker)
       attr_names = [
@@ -368,8 +364,8 @@ class VPPWatcher():
       for i in range(worker_count):
 
          # create entry if needed
-         if i not in self._data["vpp/stats/workers"]:
-            self._data["vpp/stats/workers"][i] = init_rb_dict(attr_names, types=attr_types)
+         self._data["vpp/stats/workers"].setdefault(i, 
+                  init_rb_dict(attr_names, types=attr_types))
 
          for k,d in self.stats.dump(self._dir_workers).items():
             self._data["vpp/stats/workers"][i][k].append(d)
@@ -390,20 +386,16 @@ class VPPWatcher():
 
       dump = self.stats.dump(self._dir_if)
       for i, if_name in enumerate(self.stats.dump(self._dir_if_names)['/if/names']):
-         
          # add interface when needed
-         if if_name not in self._data["vpp/stats/if"]:
-            self._data["vpp/stats/if"][if_name] = init_rb_dict(attr_names, counter=True)
+         self._data["vpp/stats/if"].setdefault(if_name,
+                  init_rb_dict(attr_names, counter=True))
  
          for k,d in dump.items():
-            
             if type(d[i][0]) is dict:
                bytes = sum([e['bytes'] for e in d[i]])
                packets = sum([e['packets'] for e in d[i]])
-
                self._data["vpp/stats/if"][if_name][k+'-bytes'].append(bytes)
                self._data["vpp/stats/if"][if_name][k+'-packets'].append(packets)
-
             else:
                self._data["vpp/stats/if"][if_name][k].append(sum(d[i]))
 
@@ -414,16 +406,12 @@ class VPPWatcher():
          # skip ip6 nodes because nobody uses ip6
          if "6" in node_name:
             continue
-
          # add node entry if needed
-         if node_name not in self._data["vpp/stats/err"]:
-            self._data["vpp/stats/err"][node_name] = {}
+         self._data["vpp/stats/err"].setdefault(node_name, {})
          # add field entry if needed XXX: fix this
          err_name = k.split('/')[3]
-         if err_name not in self._data["vpp/stats/err"][node_name]:
-            self._data["vpp/stats/err"][node_name][err_name] = RingBuffer(err_name, counter=True)
-
-         self._data["vpp/stats/err"][node_name][err_name].append(sum(d))
+         self._data["vpp/stats/err"][node_name].setdefault(err_name,  
+               RingBuffer(err_name, counter=True)).append(sum(d))
 
    def dump(self):
       print(self._data)

@@ -116,8 +116,7 @@ class ShareableBuffer(shared_memory.ShareableList):
 
          split = line.split(';')
          category = split[0]
-         if category not in data:
-            data[category] = {}
+         data.setdefault(category, {})
 
          v, s, dv, ds = split[-4:]
          content = [v, int(s), dv, int(ds)]
@@ -125,12 +124,8 @@ class ShareableBuffer(shared_memory.ShareableList):
          # _format_attrs_list_rb
          # or _format_attrs_list_rb_percpu
          if len(split) == 7:
-            subcategory = split[1]
-            if subcategory not in data[category]:
-               data[category][subcategory] = {}
-            name = split[2]
-            data[category][subcategory][name] = content
-
+            subcategory, name = split[1], split[2]
+            data[category].setdefault(subcategory, {})[name] = content
          # _format_attrs_rb
          elif len(split) == 6:
             name = split[1]
@@ -203,6 +198,7 @@ class ShareableBuffer(shared_memory.ShareableList):
 
          for kk, dd in d.items():
             if isinstance(dd, dict):
+               # avoid race condition with threads writing in dicts
                if isinstance(dd, MDict):
                   dd.acquire()
                for kkk, ddd in dd.items():

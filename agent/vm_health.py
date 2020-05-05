@@ -192,12 +192,9 @@ class VMWatcher():
          self.vbox_vm_count += 1
 
          # add entry if needed
-         if name not in self._data["virtualbox/vms"]:
-            self._data["virtualbox/vms"][name] = init_rb_dict(attr_list, 
-                  types=type_list, units=unit_list)
-
+         self._data["virtualbox/vms"].setdefault(name, init_rb_dict(attr_list, 
+               types=type_list, units=unit_list))
          #sc=m.storage_controllers # IStorageController
-         
          vm_attrs = [
             ("cpu", str(m.cpu_count)),
             ("state", state), ("accessible", str(int(m.accessible))),
@@ -238,7 +235,7 @@ class VMWatcher():
                            for attr in attrs_suffix]
 
             # add entry if needed
-            if attrs_list[0] not in self._data["virtualbox/vms"]:
+            if attrs_list[0] not in self._data["virtualbox/vms"][name]:
                self._data["virtualbox/vms"][name].update(init_rb_dict(
                   attrs_list, type=str))
 

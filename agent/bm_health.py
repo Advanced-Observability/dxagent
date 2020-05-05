@@ -230,9 +230,8 @@ class BMWatcher():
             continue
 
          path = dev_cooling_path+d+"/"
-         if d not in self._data[category]:
-            self._data[category][d] = init_rb_dict(
-                    attr_names, types=attr_types, units=attr_units)     
+         self._data[category].setdefault(d, init_rb_dict(
+                    attr_names, types=attr_types, units=attr_units))  
 
          with open(path+"type", 'r') as f:
             type = f.readlines()[0].rstrip()
@@ -257,9 +256,8 @@ class BMWatcher():
             if not os.path.exists(path+name+"_label"):
                break
 
-            if name not in self._data[category]:
-               self._data[category][name] = init_rb_dict(
-                    attr_names, types=attr_types, units=attr_units)
+            self._data[category].setdefault(name, init_rb_dict(
+                 attr_names, types=attr_types, units=attr_units))
 
             with open(path+name+"_label") as f:
                label = f.readlines()[0].rstrip()
@@ -305,9 +303,8 @@ class BMWatcher():
 
                # create entry if needed
                name += "-"+prefix
-               if name not in self._data[category]:
-                  self._data[category][name] = init_rb_dict(
-                          attr_names, types=attr_types, units=attr_units)
+               self._data[category].setdefault(name, init_rb_dict(
+                       attr_names, types=attr_types, units=attr_units))
 
                with open(path+prefix+"_label") as f:
                   label = f.readlines()[0].rstrip()
@@ -362,9 +359,8 @@ class BMWatcher():
                comm = split[0]
 
                # create new rb if needed
-               if pid not in self._data["stats"]:
-                  self._data["stats"][pid] = init_rb_dict(attr_names, types=attr_types)
-
+               self._data["stats"].setdefault(pid, 
+                  init_rb_dict(attr_names, types=attr_types))
                # READ 
                for i,e in enumerate( ([comm]+split[-1].split())[:len(attr_names)] ):
                   self._data["stats"][pid][attr_names[i]].append(e)
@@ -490,8 +486,7 @@ class BMWatcher():
             # create swap if needed
             swap_label = split[0]
             active_swaps.append(swap_label)
-            if swap_label not in self._data["swaps"]:
-               self._data["swaps"][swap_label] = init_rb_dict(attr_names, type=str)
+            self._data["swaps"].setdefault(swap_label, init_rb_dict(attr_names, type=str))
 
             for i,e in enumerate(split[1:]):
                self._data["swaps"][swap_label][attr_names[i]].append(e)
@@ -550,10 +545,9 @@ class BMWatcher():
                continue
 
             # add disk if not tracked
-            if dev_name not in self._data["diskstats"]:
-               self._data["diskstats"][dev_name] = init_rb_dict(
-                    attr_names, counters=attr_counters, units=attr_units,
-                     types=attr_types)     
+            self._data["diskstats"].setdefault(dev_name, init_rb_dict(
+                 attr_names, counters=attr_counters, units=attr_units,
+                  types=attr_types))
             mounted_devs.append(dev_name)
 
             for i,attr in enumerate(attr_val):
@@ -585,13 +579,11 @@ class BMWatcher():
             # skip disk if not present in /proc/mounts
             if dev_name not in self._data["diskstats"]:
                continue
-
             for i,v in enumerate(attr_val):
                if i == 2:
                   continue
                self._data["diskstats"][dev_name][attr_names[i]].append(v)
 
-     
       for monitored_dev in list(self._data["diskstats"].keys()):
 
           # cleanup unmounted dev
@@ -702,8 +694,8 @@ class BMWatcher():
             attr_val = [e.rstrip(':') for e in l.rstrip().split()]
             index = attr_val[0] 
 
-            if index not in self._data["net/dev"]:
-               self._data["net/dev"][index] = init_rb_dict(attr_names,counter=True)
+            self._data["net/dev"].setdefault(index, 
+               init_rb_dict(attr_names,counter=True))
 
             for i,e in enumerate(attr_val[1:]):
                self._data["net/dev"][index][attr_names[i]].append(e)
@@ -737,8 +729,7 @@ class BMWatcher():
             # create entry if needed
             ip_addr = split[0]
             active_entry.append(ip_addr)
-            if ip_addr not in self._data["net/arp"]:
-               self._data["net/arp"][ip_addr] = init_rb_dict(attr_names,type=str)
+            self._data["net/arp"].setdefault(ip_addr, init_rb_dict(attr_names,type=str))
 
             for i,e in enumerate(split[1:]):
                self._data["net/arp"][ip_addr][attr_names[i]].append(e)
@@ -747,7 +738,6 @@ class BMWatcher():
       for monitored_entry in list(self._data["net/arp"].keys()):
          if monitored_entry not in active_entry:
             del self._data["net/arp"][monitored_entry]
-
 
    def _process_proc_net_route(self):
       attr_names = ["if_name", "dst", "gateway", "flags", "ref_cnt", "use",
@@ -763,7 +753,6 @@ class BMWatcher():
                   
                entry.append((attr_names[i],e))
             self._data["net/route"].append(entry)
-
 
    def _open_read_append(self, path, obj):
       """
@@ -813,9 +802,8 @@ class BMWatcher():
          
          # create dict if interface was never observed
          active_ifs.append(if_name)
-         if if_name not in self._data["net/dev"]:
-            self._data["net/dev"][if_name] = init_rb_dict(attr_list, types=type_list, 
-                                                         counters=counter_list)
+         self._data["net/dev"].setdefault(if_name, init_rb_dict(attr_list, 
+                                          types=type_list, counters=counter_list))
          # link
          addrs = netifaces.ifaddresses(if_name)
          if netifaces.AF_LINK in addrs:
@@ -921,9 +909,8 @@ class BMWatcher():
             attr_val = [e.rstrip(':') for e in l.rstrip().split()]
             index = attr_val[0] 
 
-            if index not in self._data["net/dev"]:
-               self._data["net/dev"][index] = init_rb_dict(attr_list, types=type_list, 
-                                                         counters=counter_list)
+            self._data["net/dev"].setdefault(index, init_rb_dict(attr_list, 
+                                    types=type_list, counters=counter_list))
 
             for i,e in enumerate(attr_val[1:]):
                self._data["net/dev"][index][attr_list_netdev[i]].append(e)
