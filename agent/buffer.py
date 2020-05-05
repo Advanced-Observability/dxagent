@@ -8,6 +8,9 @@ buffer.py
 
 import numpy as np
 import collections
+import threading
+from contextlib import contextmanager
+from itertools import chain
 from enum import Enum
 
 # max number of collected values
@@ -15,7 +18,8 @@ _BUFFER_SIZE=60
 
 def init_rb_dict(keys, type=int, types=None, 
                        counter=False, counters=None, 
-                       unit=None, units=None):
+                       unit=None, units=None,
+                       thread_safe=False):
    """
    initalize a dict of ringbuffers
 
@@ -27,12 +31,18 @@ def init_rb_dict(keys, type=int, types=None,
    @unit the unit of elements stored
    @units per-rb unit list
    
-
+   @thread_safe the dict is replaced by a thread-safe MDict
    """
-   return {attr:RingBuffer(attr, type=types[i] if types else type, 
-                           counter=counters[i] if counters else counter, 
-                           unit=units[i] if units else unit) 
-            for i,attr in enumerate(keys)}
+   if thread_safe:
+      return MDict({attr:RingBuffer(attr, type=types[i] if types else type, 
+                              counter=counters[i] if counters else counter, 
+                              unit=units[i] if units else unit) 
+               for i,attr in enumerate(keys)})
+   else:
+      return {attr:RingBuffer(attr, type=types[i] if types else type, 
+                              counter=counters[i] if counters else counter, 
+                              unit=units[i] if units else unit) 
+               for i,attr in enumerate(keys)}
 
 class Severity(Enum):
    """
@@ -42,6 +52,31 @@ class Severity(Enum):
    GREEN=0
    ORANGE=1
    RED=2
+
+class MDict(dict):
+   """Multithread Dict, a dict that with an integrated threading.Lock.
+   Use acquire(), release() or lock().
+   
+   """
+   def __init__(self, *args, **kwargs):
+      """Base (dict) accepts mappings or iterables as first argument."""
+      super(MDict, self).__init__(*args, **kwargs)
+      self._lock = threading.Lock()    
+
+   def acquire(self):
+      self._lock.acquire()
+      return self
+
+   def release(self):
+      self._lock.release()
+
+   @contextmanager
+   def lock(self):
+      l = self._lock.acquire()
+      try:
+         yield l
+      finally:
+         self._lock.release()
 
 class RingBuffer(collections.deque):
 

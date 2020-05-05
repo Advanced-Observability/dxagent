@@ -57,6 +57,7 @@ class VPPGNMIClient(threading.Thread):
       self.last_attempt = None
       self.retry=0
       self._exit=False
+      #self._lock = threading.Lock()
 
    def parse_json(self, response):
       """
@@ -66,6 +67,7 @@ class VPPGNMIClient(threading.Thread):
       msg = json.loads(response)
       if "update" not in msg or "update" not in msg["update"]:
          return
+      #self._lock.acquire()
       for e in msg["update"]["update"]:
          path_json, val = e["path"]["elem"], e["val"]["intVal"]
          root, node = path_json[0]["name"], path_json[1]["name"]
@@ -76,13 +78,14 @@ class VPPGNMIClient(threading.Thread):
 
 
          if path not in self._data["vpp/gnmi"][self.node]:
-            self.info("{} {} {} {}".format(root, root=="err", val, val != 0))
             # There are a lot of /err/ counters, so we drop data
             # if it's zero.
-            if root == "err" and val == 0:
+            if root == "err" and val == "0":
                continue
-            self._data["vpp/gnmi"][self.node][path] = RingBuffer(path, counter=True)
+            with self._data["vpp/gnmi"][self.node].lock():
+               self._data["vpp/gnmi"][self.node][path] = RingBuffer(path, counter=True)
          self._data["vpp/gnmi"][self.node][path].append(val)
+      #self._lock.release()
 
    def disconnect(self):
       self._exit=True
@@ -178,9 +181,9 @@ class VPPWatcher():
       if self.use_stats:
          self._init_stats()
       if self.use_gnmi:
-         self._init_gnmi_client()
+         self._init_gnmi_clients()
 
-   def _init_gnmi_client(self):
+   def _init_gnmi_clients(self):
       """
       instantiate gNMI clients and try connecting nodes
 
@@ -188,13 +191,15 @@ class VPPWatcher():
       self._data["vpp/gnmi"] = {}
       attr_names = ["status"]
       for node in self.gnmi_nodes:
-         self._data["vpp/gnmi"][node] = init_rb_dict(attr_names, type=str)
+         self._data["vpp/gnmi"][node] = init_rb_dict(attr_names, type=str,
+                                                     thread_safe=True)
          self.gnmi_clients.append(VPPGNMIClient(node, self.info, self._data))
       self._connect_gnmi_clients()
 
    def _connect_gnmi_clients(self):
       """
       connect gNMI clients
+
       """
       for client in self.gnmi_clients:
          if client.is_alive():

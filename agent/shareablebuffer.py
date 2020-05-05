@@ -13,6 +13,8 @@ import hashlib
 from multiprocessing import shared_memory
 from multiprocessing.resource_tracker import unregister
 
+from agent.buffer import MDict
+
 MAX_WIDTH=256
 MAX_HEIGHT=2**14
 
@@ -153,13 +155,13 @@ class ShareableBuffer(shared_memory.ShareableList):
       count=0
 
       for k,d in data.items():
-         if type(d) is list:
+         if isinstance(d, list):
             continue
          if k in skip:
             continue
 
          for kk, dd in d.items():
-            if type(dd) is not dict:
+            if not isinstance(dd, dict):
                if not dd.is_empty():
                   count += 1
             else:
@@ -200,7 +202,9 @@ class ShareableBuffer(shared_memory.ShareableList):
             continue
 
          for kk, dd in d.items():
-            if type(dd) is dict:
+            if isinstance(dd, dict):
+               if isinstance(dd, MDict):
+                  dd.acquire()
                for kkk, ddd in dd.items():
                   if ddd.is_empty():
                      continue
@@ -209,6 +213,8 @@ class ShareableBuffer(shared_memory.ShareableList):
                      continue
                   v,s,dv,ds = self._get_content(ddd)
                   self.append(k, kk, kkk, v,s,dv,ds)
+               if isinstance(dd, MDict):
+                  dd.release()
             else:
                if dd.is_empty():
                   continue
