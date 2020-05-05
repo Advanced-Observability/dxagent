@@ -67,7 +67,6 @@ class VPPGNMIClient(threading.Thread):
       msg = json.loads(response)
       if "update" not in msg or "update" not in msg["update"]:
          return
-      #self._lock.acquire()
       for e in msg["update"]["update"]:
          path_json, val = e["path"]["elem"], e["val"]["intVal"]
          root, node = path_json[0]["name"], path_json[1]["name"]
@@ -75,17 +74,16 @@ class VPPGNMIClient(threading.Thread):
          # building path
          for name in path_json[2:]:
             path += "/{}".format(name["name"])
-
-
          if path not in self._data["vpp/gnmi"][self.node]:
             # There are a lot of /err/ counters, so we drop data
             # if it's zero.
             if root == "err" and val == "0":
                continue
+            # Lock the dict to make sure that main thread is not
+            # iterating.
             with self._data["vpp/gnmi"][self.node].lock():
                self._data["vpp/gnmi"][self.node][path] = RingBuffer(path, counter=True)
          self._data["vpp/gnmi"][self.node][path].append(val)
-      #self._lock.release()
 
    def disconnect(self):
       self._exit=True
@@ -156,7 +154,7 @@ class VPPGNMIClient(threading.Thread):
       except Exception as e:
          self.info(e)
       finally:
-         pass
+         self.connected = False
 
 class VPPWatcher():
    def __init__(self, data={}, info=None, parent=None,
