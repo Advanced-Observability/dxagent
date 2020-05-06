@@ -11,7 +11,6 @@ import os
 import pwd
 import time
 from contextlib import contextmanager
-
 from signal import SIGTERM
 
 class Daemon():

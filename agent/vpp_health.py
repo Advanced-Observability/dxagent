@@ -11,19 +11,27 @@ import fnmatch
 import json
 import threading
 import time
-from cisco_gnmi import ClientBuilder
-from google.protobuf import json_format
  
-kbnets_libs=[]
+vpp_libs=[]
+# VPP BM libs
 try:
    from vpp_papi import VPP
    from vpp_papi.vpp_stats import VPPStats
-   kbnets_libs.append("vpp")
+   vpp_libs.append("vpp")
+except:
+   pass
+
+# gNMI libs
+try:
+   from cisco_gnmi import ClientBuilder
+   from google.protobuf import json_format
+   vpp_libs.append("gnmi")
 except:
    pass
 
 from agent.buffer import init_rb_dict
 from agent.buffer import RingBuffer
+
 #
 # The rate at which gNMI sends updates
 GNMI_SAMPLING_RATE=int(1e9)*10
@@ -41,8 +49,8 @@ def vpp_support(api_sock='/run/vpp/api.sock',
 
    @return (vpp_api_supported, vpp_stats_supported)
    """
-   return ("vpp" in kbnets_libs and os.path.exists(api_sock),
-           "vpp" in kbnets_libs and os.path.exists(stats_sock))
+   return ("vpp" in vpp_libs and os.path.exists(api_sock),
+           "vpp" in vpp_libs and os.path.exists(stats_sock))
 
 class VPPGNMIClient(threading.Thread):
    def __init__(self, node, info, data, user='a', password='a'):
@@ -168,10 +176,11 @@ class VPPWatcher():
       self.gnmi_timer = time.time()
       self.gnmi_clients = []
       self.use_api=(use_api and os.path.exists(api_sock)
-                    and "vpp" in kbnets_libs)
+                    and "vpp" in vpp_libs)
       self.use_stats=(use_stats and os.path.exists(stats_sock)
-                      and "vpp" in kbnets_libs)
-      self.use_gnmi=(not not self.gnmi_nodes)
+                      and "vpp" in vpp_libs)
+      self.use_gnmi=(not not self.gnmi_nodes
+                     and "gnmi" in vpp_libs)
 
       # connect to VPP process (baremetal)
       if self.use_api:

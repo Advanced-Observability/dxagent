@@ -6,9 +6,7 @@ sysinfo.py
 @author: K.Edeline
 """
 
-import os
 import platform
-
 
 class SysInfo():
    """

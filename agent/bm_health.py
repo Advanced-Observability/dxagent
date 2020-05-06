@@ -8,8 +8,8 @@ bm_health.py
 
 import os
 import netifaces
-import time
 import ipaddress
+
 from agent.buffer import init_rb_dict
 
 class BMWatcher():

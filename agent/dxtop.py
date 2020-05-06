@@ -10,11 +10,8 @@ dxtop.py
 import curses
 import sched
 import time
-import string
 import datetime
-import sys
 import os
-import threading
 
 from agent.ios import IOManager
 from agent.sysinfo import SysInfo

@@ -116,14 +116,14 @@ class VMWatcher():
       """
       if "virtualbox" in vm_libs:
          del self._vbox
+         self._vbox = None
 
    def virtualbox_vm_is_active(self, machine):
-         state = machine.state
-         return (state >= MachineState.first_online
-               and state <= MachineState.last_online)
+      state = machine.state
+      return (state >= MachineState.first_online
+            and state <= MachineState.last_online)
 
    def input(self):
-
       if "virtualbox" in vm_libs:
          #self._input_virtualbox()
          try:  # unstable if a vm is started during monitoring
