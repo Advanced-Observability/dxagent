@@ -306,9 +306,11 @@ class DXTop(IOManager):
       for i,(k,d) in enumerate(self._data[category].items()):
 
          s = " "*self.col_sizes[0]+VLINE_CHAR
+         flags = [(len(s), curses.A_DIM)]
          s +=  (k+" "*self.col_sizes[1])[:self.col_sizes[1]]
+         flags.append((len(s), 0))
          s += VLINE_CHAR
-         self._append_content(s, pad_index, fill=True, flags=curses.A_DIM)
+         self._append_content(s, pad_index, fill=True, flags=flags)
 
          for kk,dd in d.items():
 
@@ -317,8 +319,6 @@ class DXTop(IOManager):
             flags = []
       
             value, severity = dd[:2]
-#            if skip_zero and int(value) == 0:
-#               continue
             if severity:
                flags = [(len(s),curses.color_pair(severity))]
             s += ("{}"+" "*self.col_sizes[1]).format(
