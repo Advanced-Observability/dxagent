@@ -394,18 +394,18 @@ class DXTop(IOManager):
    def _format_colname_pad(self):
       self.colname_pad.clear()
 
-      s=""
-      s += (self._center_text("name",
-                             width=self.col_sizes[0])
-        + self._center_text("value",
-                             width=self.col_sizes[1]))
-      s += self._center_text("dynamicity",
-                             width=self.pad_width-len(s)-2)
-      
       if self.screen == 0:
          pass
       elif self.screen in [1, 2, 3, 4, 5]:
-         self.colname_pad.addstr(s)
+         s= ("name"+" "*self.col_sizes[0])[:self.col_sizes[0]-1]
+         self.colname_pad.addstr(" ")
+         self.colname_pad.addstr(s, self.selection_color)# | curses.A_REVERSE)
+         s= ("value"+" "*self.col_sizes[1])[:self.col_sizes[1]]
+         self.colname_pad.addstr(" ")
+         self.colname_pad.addstr(s, self.selection_color)# | curses.A_REVERSE)
+         s= ("dynamicity"+" "*(self.pad_width-sum(self.col_sizes)))[:self.pad_width-sum(self.col_sizes)-3]
+         self.colname_pad.addstr(" ")
+         self.colname_pad.addstr(s, self.selection_color)# | curses.A_REVERSE)
       elif self.screen == 6:
          pass
 
