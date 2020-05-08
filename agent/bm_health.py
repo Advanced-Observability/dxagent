@@ -102,6 +102,7 @@ class BMWatcher():
          "idle_all_perc", "guest_all_perc",
        ]
       attr_units = ["ms"] * 28 + ["%"] * 13
+      attr_types = [int] * 28 + [float] * 13
 
       self._data["stat/cpu"] = {}
       with open("/proc/stat", 'r') as f:
@@ -442,7 +443,7 @@ class BMWatcher():
 
                def ratio(v, total):
                   try:
-                     return v/total*100.0
+                     return round(v/total*100.0)
                   except:
                      return 0
 
@@ -605,10 +606,10 @@ class BMWatcher():
          # Remaining free space usable by user.
          avail_to_user = (st.f_bavail * st.f_frsize)  / 1024
          # Total space being used in general.
-         used = (total - avail_to_root)  / 1024
+         used = (total - avail_to_root)
          # Total space which is available to user (same as 'total' but
          # for the user).
-         total_user = used + avail_to_user  / 1024
+         total_user = used + avail_to_user
          # User usage percent compared to the total amount of space
          # the user can use. This number would be higher if compared
          # to root's because the user has less space (usually -5%).

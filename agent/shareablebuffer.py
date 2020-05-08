@@ -51,9 +51,7 @@ class ShareableBuffer(shared_memory.ShareableList):
 
       if not create:
          # avoid auto unlinking of SharedMemory segment
-         # XXX: i'm guessing (?) this is going to be fixed in later python versions
          unregister(self.shm._name, "shared_memory")
-
       self.index=0
       self._sublists=sublists
       self._last_rb_count=0
@@ -169,10 +167,6 @@ class ShareableBuffer(shared_memory.ShareableList):
       """
       write dict to ShareableMemory
 
-      XXX: only write fields that changed
-           if total datafield changed, rewrite all
-            otherwise skip all if not has_changed()
-
       """
       rb_count = self._rb_count(data, skip=skip)
       if rb_count != self._last_rb_count:
@@ -185,7 +179,7 @@ class ShareableBuffer(shared_memory.ShareableList):
       """
       write dict to ShareableMemory
 
-      XXX: only write fields that changed
+      only write fields that changed
            if total datafield changed, rewrite all
             otherwise skip all if not has_changed()
 
