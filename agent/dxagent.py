@@ -19,6 +19,7 @@ from agent.bm_health import BMWatcher
 from agent.vm_health import VMWatcher
 from agent.vpp_health import VPPWatcher
 from agent.shareablebuffer import ShareableBuffer
+from agent.health import HealthEngine
 
 # input processing delay
 INPUT_RATE=3.0
@@ -60,6 +61,9 @@ class DXAgent(Daemon, IOManager):
       self.vm_watcher = VMWatcher(self._data, self.info, self)
       self.vpp_watcher = VPPWatcher(self._data, self.info, self)
 
+      # health engine
+      #self.engine = HealthEngine(self._data, self.info, self)
+
       # catch signal for cleanup
       signal.signal(signal.SIGTERM, self.exit)
 
@@ -71,11 +75,16 @@ class DXAgent(Daemon, IOManager):
 
    def process(self):
       """
-      read input data, process and format it for
-      displaying. re-schedule itself.
+      read input data, process and write it to shmem.
+      re-schedule itself.
 
       """
+      # fetch input
       self._input()
+      # compute KPIs&symptoms from input
+      #self.engine.update_kpis()
+      #self.engine.update_symptoms()
+      # write to shmem
       if not self.args.disable_shm:
          skip=["stats"] if not self.args.verbose else []
          self.sbuffer.write(self._data, skip=skip, info=self.info)

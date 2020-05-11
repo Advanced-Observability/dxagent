@@ -28,8 +28,11 @@ exporter, and via shared memory for displaying DxTop.
   DxAgent configuration file. With a virtualbox hypervisor, `vbox_user`
   *has to* be set.
 
+* `kpi.csv`
+   An list of vendor-independant KPIs.
+
 * `fields.csv`
-   An informative list of all monitored fields.
+   An informative list of vendor-specific monitored fields.
 
 ## DxTop
 
