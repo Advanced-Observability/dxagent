@@ -125,8 +125,7 @@ class VMWatcher():
 
    def input(self):
       if "virtualbox" in vm_libs:
-         #self._input_virtualbox()
-         try:  # unstable if a vm is started during monitoring
+         try:
             self._input_virtualbox()
          except:
             pass
@@ -182,13 +181,15 @@ class VMWatcher():
       self.vbox_vm_count = 0
       
       for m in self._vbox.machines:
-
+         name = m.name
          # check if machine is online/offline
          if not self.virtualbox_vm_is_active(m):
+            # if it went inactive, delete all VM entries
+            if name in self._data["virtualbox/vms"]:
+               del self._data["virtualbox/vms"][name]
             continue
 
          state = _virtualbox_states[int(m.state)]
-         name = m.name
          self.vbox_vm_count += 1
 
          # add entry if needed
