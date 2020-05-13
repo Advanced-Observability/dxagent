@@ -10,6 +10,7 @@ import sys
 import argparse
 import configparser
 import logging
+import os
 
 class IOManager():
    """
@@ -82,6 +83,9 @@ class IOManager():
                          help='log file location (default: dxagent.log)')
       parser.add_argument('-c' , '--config', type=str, default="./dxagent.ini",
                          help='configuration file location')
+      parser.add_argument('-r' , '--ressources-dir', type=str,
+                         default="./res/",
+                         help='configuration file location')  
       parser.add_argument('-s' , '--disable-shm', action='store_true',
                          help='disable shared memory segment '
                               '(cannot use dxtop)')      
@@ -89,6 +93,10 @@ class IOManager():
                          help='increase output level') 
 
       self.args = parser.parse_args()
+
+      # retreive absolute paths
+      self.args.config = os.path.abspath(self.args.config)
+      self.args.ressources_dir = os.path.abspath(self.args.ressources_dir)
 
       return self.args
 
