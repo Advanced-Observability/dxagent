@@ -78,9 +78,10 @@ class DXTop(IOManager):
       find column sizes from screen width
 
       """
-
+      # column sizes proportions
       self.col_sizes=[80,64,32]
-      self.col_sizes_cpu=[20,12,12,12,12,12,12,12,12]
+      self.col_sizes_cpu=[30,12,12,12,12,12,12,12,12]
+      # shrink factor until columns fit screen
       shrink_factor = 0.85
 
       while self.width <= sum(self.col_sizes)+len(self.col_sizes):
@@ -223,6 +224,13 @@ class DXTop(IOManager):
 
       # Health metrics Pad
       self._append_content("Metrics", 6, curses.A_BOLD, fill=True)
+      self._format_attrs_rb("bm_mem", 6)
+      self._format_attrs_rb("bm_disk", 6)
+      self._format_attrs_list_rb_percpu("bm_cpu", 6)
+#      self._format_attrs_rb("bm_sensors", 6)
+      self._format_attrs_rb("bm_proc", 6)
+#      self._format_attrs_rb("bm_net", 6)
+      
       self._append_content("Symptoms", 6, curses.A_BOLD, fill=True)
 
       self.resize_columns()

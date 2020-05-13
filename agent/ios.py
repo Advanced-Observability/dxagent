@@ -35,11 +35,9 @@ class IOManager():
       """
       if not self.parse_args:
          return
-
       if module == "dxtop":
          self.arguments_dxtop()
          self.log()
-
       if module == "dxagent":
          self.arguments_dxagent()
          if "start" in self.args.cmd:

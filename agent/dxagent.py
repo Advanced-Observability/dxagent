@@ -62,7 +62,7 @@ class DXAgent(Daemon, IOManager):
       self.vpp_watcher = VPPWatcher(self._data, self.info, self)
 
       # health engine
-      #self.engine = HealthEngine(self._data, self.info, self)
+      self.engine = HealthEngine(self._data, self.info, self)
 
       # catch signal for cleanup
       signal.signal(signal.SIGTERM, self.exit)
@@ -82,7 +82,7 @@ class DXAgent(Daemon, IOManager):
       # fetch input
       self._input()
       # compute KPIs&symptoms from input
-      #self.engine.update_kpis()
+      self.engine.update_kpis()
       #self.engine.update_symptoms()
       # write to shmem
       if not self.args.disable_shm:
