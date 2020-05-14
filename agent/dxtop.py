@@ -224,11 +224,11 @@ class DXTop(IOManager):
 
       # Health metrics Pad
       self._append_content("Metrics", 6, curses.A_BOLD, fill=True)
-      self._format_attrs_rb("bm_mem", 6)
-      self._format_attrs_rb("bm_disk", 6)
       self._format_attrs_list_rb_percpu("bm_cpu", 6)
-#      self._format_attrs_rb("bm_sensors", 6)
+      self._format_attrs_list_rb("bm_sensors", 6)
+      self._format_attrs_rb("bm_mem", 6)
       self._format_attrs_rb("bm_proc", 6)
+      self._format_attrs_list_rb("bm_disk", 6)
 #      self._format_attrs_rb("bm_net", 6)
       
       self._append_content("Symptoms", 6, curses.A_BOLD, fill=True)

@@ -213,24 +213,93 @@ class Subservice():
       """Update KPIs for linux BM sensors subservice
 
       """
-      return
-      self._data["bm_sensors"]["bm_sensors_cpu_input"].append(10)
-      self._data["bm_sensors"]["bm_sensors_cpu_max"].append(10)
-      self._data["bm_sensors"]["bm_sensors_cpu_critical"].append(10)
-      self._data["bm_sensors"]["bm_sensors_cpu_fan_input"].append(10)
+      # init KPI rbs if needed
+      if "bm_sensors" not in self._data:
+         self._data["bm_sensors"] = {}
+         # thermal zones
+         for zone_label,d in self._data["sensors/thermal"].items():
+            zone_label += ":"+d["type"]._top()
+            self._data["bm_sensors"][zone_label] = self._init_kpis_rb("bm", "sensors")
+            self._data["bm_sensors"][zone_label]["bm_sensors_type"].append("zone")
+         # fan sensors
+         for fan_label,d in self._data["sensors/fans"].items():
+            fan_label += ":"+d["label"]._top()
+            self._data["bm_sensors"][fan_label] = self._init_kpis_rb("bm", "sensors")
+            self._data["bm_sensors"][fan_label]["bm_sensors_type"].append("fan")
+         # core sensors
+         for core_label,d in self._data["sensors/coretemp"].items():
+            core_label += ":"+d["label"]._top()
+            self._data["bm_sensors"][core_label] = self._init_kpis_rb("bm", "sensors")
+            self._data["bm_sensors"][core_label]["bm_sensors_type"].append("cpu")
+
+      # thermal zones
+      for zone_label,d in self._data["sensors/thermal"].items():
+         zone_label += ":"+d["type"]._top()
+         attr_mapping = {"temperature": "bm_sensors_input_temp",}
+         for attr,kpi in attr_mapping.items():
+            if attr in d:
+               self._data["bm_sensors"][zone_label][kpi].append(
+                 d[attr]._top())
+      # fan sensors
+      for fan_label,d in self._data["sensors/fans"].items():
+         fan_label += ":"+d["label"]._top()
+         attr_mapping = {"input": "bm_sensors_input_fanspeed",
+                         "temperature": "bm_sensors_input_temp",}
+         for attr,kpi in attr_mapping.items():
+            if attr in d:
+               self._data["bm_sensors"][fan_label][kpi].append(
+                 d[attr]._top())
+      # core sensors
+      for core_label,d in self._data["sensors/coretemp"].items():
+         core_label += ":"+d["label"]._top()
+         attr_mapping = {"input": "bm_sensors_input_temp",
+                         "max": "bm_sensors_max_temp",
+                         "critical": "bm_sensors_critical_temp",}
+         for attr,kpi in attr_mapping.items():
+            if attr in d:
+               self._data["bm_sensors"][core_label][kpi].append(
+                 d[attr]._top())
 
    def _update_kpis_linux_bm_disk(self):
       """Update KPIs for linux BM disk subservice
 
       """
-      return
-      self._data["bm_disk"]["bm_disk_total_user"].append(10)
-      self._data["bm_disk"]["bm_disk_free_user"].append(10)
-      self._data["bm_disk"]["bm_disk_swap_used"].append(10)
-      self._data["bm_disk"]["bm_disk_read_time"].append(10)
-      self._data["bm_disk"]["bm_disk_write_time"].append(10)
-      self._data["bm_disk"]["bm_disk_io_time"].append(10)
-      self._data["bm_disk"]["bm_disk_discard_time"].append(10)
+      # init KPI rbs if needed
+      if "bm_disk" not in self._data:
+         self._data["bm_disk"] = {}
+      previous=set(self._data["bm_disk"].keys())
+      current=set(list(self._data["diskstats"].keys())
+                  +list(self._data["swaps"].keys()))
+      # add new disks
+      for disk in current-previous:
+         self._data["bm_disk"][disk] = self._init_kpis_rb("bm", "disk")
+      # remove unmounted disks
+      for disk in previous-current:
+         del self._data["bm_disk"][disk]
+
+      for disk,rbs in self._data["diskstats"].items():
+         self._data["bm_disk"][disk]["bm_disk_type"].append(
+            rbs["fs_vfstype"]._top())
+         self._data["bm_disk"][disk]["bm_disk_total_user"].append(
+            rbs["total"]._top()/1000.0)
+         self._data["bm_disk"][disk]["bm_disk_free_user"].append(
+            rbs["free_user"]._top()/1000.0)
+         self._data["bm_disk"][disk]["bm_disk_read_time"].append(
+            rbs["perc_reading"]._top())
+         self._data["bm_disk"][disk]["bm_disk_write_time"].append(
+            rbs["perc_writting"]._top())
+         self._data["bm_disk"][disk]["bm_disk_io_time"].append(
+            rbs["perc_io"]._top())
+         self._data["bm_disk"][disk]["bm_disk_discard_time"].append(
+            rbs["perc_discarding"]._top())
+
+      for disk,rbs in self._data["swaps"].items():
+         self._data["bm_disk"][disk]["bm_disk_type"].append(
+            "swap")#rbs["type"]._top()
+         self._data["bm_disk"][disk]["bm_disk_total_user"].append(
+            rbs["size"]._top()/1000.0)
+         self._data["bm_disk"][disk]["bm_disk_swap_used"].append(
+            rbs["used"]._top())
 
    def _update_kpis_linux_bm_mem(self):
       """Update KPIs for linux BM mem subservice

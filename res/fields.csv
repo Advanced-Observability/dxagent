@@ -123,9 +123,9 @@ meminfo,Hugetlb,int,0,kB,
 meminfo,DirectMap4k,int,0,kB,
 meminfo,DirectMap2M,int,0,kB,
 swaps,type,str,0,,swap_name
-swaps,size,str,0,,swap_name
-swaps,used,str,0,,swap_name
-swaps,priority,str,0,,swap_name
+swaps,size,int,0,,swap_name
+swaps,used,int,0,,swap_name
+swaps,priority,int,0,,swap_name
 diskstats,device_major,int,0,,device_name
 diskstats,device_minor,int,0,,device_name
 diskstats,reads_completed,int,1,,device_name
@@ -143,6 +143,14 @@ diskstats,time_discarding,int,0,ms,device_name
 diskstats,current_io,int,0,,device_name
 diskstats,time_io,int,0,ms,device_name
 diskstats,time_io_weighted,int,0,ms,device_name
+diskstats,period_writting,int,0,ms,device_name
+diskstats,period_reading,int,0,ms,device_name
+diskstats,period_io,int,0,ms,device_name
+diskstats,period_discarding,int,0,ms,device_name
+diskstats,perc_writting,int,0,%,device_name
+diskstats,perc_reading,int,0,%,device_name
+diskstats,perc_io,int,0,%,device_name
+diskstats,perc_discarding,int,0,%,device_name
 diskstats,size,int,0,KB,device_name
 diskstats,fs_spec,str,0,,device_name
 diskstats,fs_file,str,0,,device_name

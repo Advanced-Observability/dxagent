@@ -9,8 +9,15 @@ bm_health.py
 import os
 import netifaces
 import ipaddress
+import time
 
 from agent.buffer import init_rb_dict
+
+def ratio(v, total):
+   try:
+      return round(v/total*100.0)
+   except:
+      return 0
 
 class BMWatcher():
 
@@ -20,6 +27,7 @@ class BMWatcher():
       self.info=info
       self.parent=parent
       self._init_dicts()
+      self.diskstats_timestamp=None
 
    def _init_dicts(self):
 
@@ -440,13 +448,6 @@ class BMWatcher():
                                                                    first=-2)
                self._data["stat/cpu"][cpu_label]["total_period"].append(
                                                                 totalperiod)
-
-               def ratio(v, total):
-                  try:
-                     return round(v/total*100.0)
-                  except:
-                     return 0
-
                # compute&append period attrs
                for tname,pname,percname in zip(time_names, 
                                                period_names, 
@@ -455,7 +456,6 @@ class BMWatcher():
                   self._data["stat/cpu"][cpu_label][pname].append(v)
                   self._data["stat/cpu"][cpu_label][percname].append(
                                                    ratio(v,totalperiod))
-
             else:
                k, d = l.rstrip().split()[:2]
                self._data["stat"][k].append(d)
@@ -479,6 +479,7 @@ class BMWatcher():
       """
 
       attr_names = ["type", "size", "used", "priority"]
+      attr_types = [str, int, int, int]
       active_swaps = []
       with open("/proc/swaps", 'r') as f:
          for l in f.readlines()[1:]:
@@ -487,7 +488,7 @@ class BMWatcher():
             # create swap if needed
             swap_label = split[0]
             active_swaps.append(swap_label)
-            self._data["swaps"].setdefault(swap_label, init_rb_dict(attr_names, type=str))
+            self._data["swaps"].setdefault(swap_label, init_rb_dict(attr_names, types=attr_types))
 
             for i,e in enumerate(split[1:]):
                self._data["swaps"][swap_label][attr_names[i]].append(e)
@@ -512,6 +513,14 @@ class BMWatcher():
       mount_units = [ "" ]*4
       mount_types = [str]*4
 
+      time_names = [ "period_writting", "period_reading", "period_io",
+                     "period_discarding",
+                    "perc_writting", "perc_reading", "perc_io", 
+                    "perc_discarding"]
+      time_counters = [False]*8
+      time_units = ["ms"]*4 + ["%"]*4
+      time_types = [int]*8
+
       attr_names = [
          "device_major", "device_minor", "device_name",
          "reads_completed", "reads_merged", "sectors_read",
@@ -521,19 +530,18 @@ class BMWatcher():
          "discards_merged", "sectors_discarded", "time_discarding",
          "size", "total", "free_root", "free_user", 
          "used", "total_user", "usage_user"
-      ] + mount_names
+      ] + mount_names + time_names
       attr_units = [  "", "", "", "", "", "", "ms", "",
          "", "", "ms", "", "ms", "ms", "", "", "", "ms", "KB",
          "KB","KB","KB","KB","KB","%",
          
-      ] + mount_units
+      ] + mount_units + time_units
       attr_counters = [ False, False, False, True, True, True,
          False, True, True, True, False, False, False, False, # ??
          True, True, True, False, False, False, False, False, 
          False,  False, False,
-      ] + mount_counters
-      attr_types = [ int ] * 25 + mount_types
-
+      ] + mount_counters + time_counters
+      attr_types = [ int ] * 25 + mount_types + time_types
 
       mounted_devs = []
       with open("/proc/mounts") as f:
@@ -570,6 +578,7 @@ class BMWatcher():
             self._data["diskstats"][dev_name]["size"].append(attr_val[2])
 
       with open("/proc/diskstats", 'r') as f:
+         tstamp = time.time()
          for disk in f.readlines():
 
             attr_val = disk.rstrip().split()
@@ -584,21 +593,37 @@ class BMWatcher():
                if i == 2:
                   continue
                self._data["diskstats"][dev_name][attr_names[i]].append(v)
+            # compute periods and percentages
+            if self.diskstats_timestamp != None:
+               totalperiod=(tstamp-self.diskstats_timestamp)*1000
+               # compute&append period attrs
+               time_names = ["time_writting", "time_reading", "time_io",
+                             "time_discarding"]
+               period_names = ["period_writting", "period_reading", "period_io",
+                              "period_discarding"]
+               perc_names = ["perc_writting", "perc_reading", "perc_io",
+                             "perc_discarding"]
+               for tname,pname,percname in zip(time_names, 
+                                               period_names, 
+                                               perc_names):
+                  v = self._data["diskstats"][dev_name][tname].delta(first=-2)
+                  # periods are sums of per-CPU counters, compute avg.
+                  self._data["diskstats"][dev_name][pname].append(v)
+                  self._data["diskstats"][dev_name][percname].append(
+                                                   ratio(v,totalperiod))
+         self.diskstats_timestamp=tstamp
 
       for monitored_dev in list(self._data["diskstats"].keys()):
-
           # cleanup unmounted dev
          if monitored_dev not in mounted_devs:
             del self._data["diskstats"][monitored_dev]
             continue
          
          path,_ = self._data["diskstats"][monitored_dev]["fs_file"].top()
-
          try:
             st = os.statvfs(path)
          except:
             continue
-
          # Total space (only available to root)
          total = (st.f_blocks * st.f_frsize) / 1024
          # Remaining free space usable by root.
