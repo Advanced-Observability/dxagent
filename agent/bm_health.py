@@ -87,7 +87,7 @@ class BMWatcher():
             if not attrs:
                break
             prefix = attrs[0].rstrip(':')
-            attr_list.extend([prefix+attr for attr in attrs])
+            attr_list.extend([prefix+attr for attr in attrs[1:]])
       self._data["snmp"] = init_rb_dict(attr_list, counter=True)
 
 

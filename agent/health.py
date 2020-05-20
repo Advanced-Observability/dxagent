@@ -27,7 +27,13 @@ class HealthEngine():
             name,type,unit= r["name"], r["type"],r["unit"]
             # we use (node,subservice) tuples as key
             # e.g., ("bm", "net")
-            key = tuple(name.split('_')[:2])
+            split = name.split('_')
+            parent = split[0]
+            # subservice name might need an extension when it includes
+            # both list and non-list dependencies (ie., bm_net_if and bm_net_snmp)
+            dependency = "_".join(split[1:3]) if len(split) >= 3 and split[2] in ["if"] else split[1]
+            
+            key = (parent, dependency)
             self.kpi_attrs.setdefault(key,[]).append(name)
             self.kpi_types.setdefault(key,[]).append(getattr(builtins, type))
             self.kpi_units.setdefault(key,[]).append(unit)
@@ -61,10 +67,10 @@ class HealthEngine():
       for kb in monitored_kbs - kbs:
          self.add_kbnet(kb)      
 
-   def add_vm(self, name):
-      self.node.add_vm(name)
-   def add_kbnet(self, name):
-      self.node.add_kbnet(name)
+   def add_vm(self, name, hypervisor="virtualbox"):
+      self.node.add_vm(name, hypervisor)
+   def add_kbnet(self, name, framework="vpp"):
+      self.node.add_kbnet(name, framework)
    def remove_vm(self, name):
       self.node.remove_vm(name)
    def remove_kbnet(self, name):
@@ -141,6 +147,7 @@ class Subservice():
                         are getting initialized
 
       XXX: class name != parent subservice name in kpi.csv
+      
       """
       category = parent+"_"+dependency
       attrs = self.engine.kpi_attrs[(parent, dependency)]
@@ -351,39 +358,84 @@ class Subservice():
       """Update KPIs for linux BM net subservice
 
       """
-      return
-      self._data["bm_net"]["bm_net_rx_packets"].append(10)
-      self._data["bm_net"]["bm_net_rx_bytes"].append(10)
-      self._data["bm_net"]["bm_net_rx_error"].append(10)
-      self._data["bm_net"]["bm_net_rx_drop"].append(10)
-      self._data["bm_net"]["bm_net_tx_packets"].append(10)
-      self._data["bm_net"]["bm_net_tx_bytes"].append(10)
-      self._data["bm_net"]["bm_net_tx_error"].append(10)
-      self._data["bm_net"]["bm_net_tx_drop"].append(10)
-      self._data["bm_net"]["bm_net_up_count"].append(10)
-      self._data["bm_net"]["bm_net_down_count"].append(10)
-      self._data["bm_net"]["bm_net_state"].append(10)
-      self._data["bm_net"]["bm_net_mtu"].append(10)
-      self._data["bm_net"]["bm_net_numa"].append(10)
-      self._data["bm_net"]["bm_net_cpulist"].append(10)
-      self._data["bm_net"]["bm_net_tx_queue"].append(10)
-      self._data["bm_net"]["bm_net_gw_in_arp"].append(10)
+      # init KPI rbs if needed
+      previous=set(self._data["bm_net_if"].keys())
+      current=set(self._data["net/dev"].keys())
+      # add new ifs
+      for net in current-previous:
+         self._data["bm_net_if"][net] = self._init_kpis_rb("bm", "net_if")
+      # remove down ifs
+      for net in previous-current:
+         del self._data["bm_net_if"][net]
+         
+      attr_mapping = {"rx_packets": "bm_net_if_rx_packets",
+                      "rx_bytes": "bm_net_if_rx_bytes",
+                      "rx_errs": "bm_net_if_rx_error",
+                      "rx_drop": "bm_net_if_rx_drop",
+                      "tx_packets": "bm_net_if_tx_packets",
+                      "tx_bytes": "bm_net_if_tx_bytes",
+                      "tx_errs": "bm_net_if_tx_error",
+                      "tx_drop": "bm_net_if_tx_drop",
+                      "carrier_up_count": "bm_net_if_up_count",
+                      "carrier_down_count": "bm_net_if_down_count",
+                      "operstate": "bm_net_if_state",
+                      "mtu": "bm_net_if_mtu",
+                      "numa_node": "bm_net_if_numa",
+                      "local_cpulist": "bm_net_if_cpulist",
+                      "tx_queue_len": "bm_net_if_tx_queue"}
+      for net,rbs in self._data["net/dev"].items():
+         # direct mapping
+         for attr,kpi in attr_mapping.items():
+            if attr in rbs:
+               self._data["bm_net_if"][net][kpi].append(
+                 rbs[attr]._top())
+         # other fields
+         if "ip4_gw_addr" in rbs:
+            self._data["bm_net_if"][net]["bm_net_if_gw_in_arp"].append(
+               rbs["ip4_gw_addr"]._top() in self._data["net/arp"])
+      # non interface-related fields
+      for field, rb in self._data["snmp"].items():
+         self._data["bm_net"]["bm_net_snmp_"+field].append(rb._top())
 
    def _update_kpis_linux_vm_cpu(self):
       """Update KPIs for linux VM cpu subservice
 
       """
-      pass
+      vm_name=self.parent.name
+      hypervisor=self.parent.hypervisor
+      self._data["vm"][vm_name]["vm_cpu_count"].append(
+         self._data[hypervisor+"/vms"][vm_name]["cpu"]._top())
+      self._data["vm"][vm_name]["vm_cpu_user_time"].append(
+         self._data[hypervisor+"/vms"][vm_name]["Guest/CPU/Load/User"]._top())
+      self._data["vm"][vm_name]["vm_cpu_system_time"].append(
+         self._data[hypervisor+"/vms"][vm_name]["Guest/CPU/Load/Kernel"]._top())
+      self._data["vm"][vm_name]["vm_cpu_idle_time"].append(
+         self._data[hypervisor+"/vms"][vm_name]["Guest/CPU/Load/Idle"]._top())
+   
    def _update_kpis_linux_vm_mem(self):
       """Update KPIs for linux VM mem subservice
 
       """
-      pass
+      vm_name=self.parent.name
+      hypervisor=self.parent.hypervisor
+      self._data["vm"][vm_name]["vm_mem_total"].append(
+         self._data[hypervisor+"/vms"][vm_name]["Guest/RAM/Usage/Total"]._top()/1000.0)
+      self._data["vm"][vm_name]["vm_mem_free"].append(
+         self._data[hypervisor+"/vms"][vm_name]["Guest/RAM/Usage/Free"]._top()/1000.0)
+      self._data["vm"][vm_name]["vm_mem_cache"].append(
+         self._data[hypervisor+"/vms"][vm_name]["Guest/RAM/Usage/Cache"]._top()/1000.0)
+      
    def _update_kpis_linux_vm_net(self):
       """Update KPIs for linux VM net subservice
 
       """
-      pass
+      vm_name=self.parent.name
+      hypervisor=self.parent.hypervisor
+#      self._data["vm_net"][vm_name]["vm_net_state"].append(10)
+#      self._data["vm_net"][vm_name]["vm_net_rx_bytes"].append(10)
+#      self._data["vm_net"][vm_name]["vm_net_tx_bytes"].append(10)
+#      self._data["vm_net"][vm_name]["vm_net_ssh"].append(10)
+
    def _update_kpis_linux_kb_proc(self):
       """Update KPIs for linux KB proc subservice
 
@@ -414,10 +466,10 @@ class Node(Subservice):
       self.name = self.sysinfo.node
       self.dependencies = [Baremetal(self.name, self.engine, parent=self)]
 
-   def add_vm(self, name):
-      self.dependencies.append(VM(name, self.engine, parent=self))
-   def add_kbnet(self, name):
-      self.dependencies.append(KBNet(name, self.engine, parent=self))
+   def add_vm(self, name, hypervisor):
+      self.dependencies.append(VM(name, self.engine, hypervisor, parent=self))
+   def add_kbnet(self, name, framework):
+      self.dependencies.append(KBNet(name, self.engine, framework, parent=self))
    def remove_vm(self, name):
       for i, subservice in enumerate(self.dependencies):
          if isinstance(subservice, VM) and subservice.name == name:
@@ -447,6 +499,8 @@ class Baremetal(Subservice):
       deps = ["cpu", "sensors", "disk", "mem", "proc", "net"]
       self.dependencies = [Subservice(dep, self.engine, parent=self) for dep in deps]
       # init KPIs for non-list RBs
+      self._data["bm_net_if"] = {}
+      self._data["bm_net"] = self._init_kpis_rb("bm", "net")
       self._data["bm_mem"] = self._init_kpis_rb("bm", "mem")
       self._data["bm_proc"] = self._init_kpis_rb("bm", "proc")
 
@@ -461,14 +515,16 @@ class VM(Subservice):
    """VM subservice assurance
    
    """
-   def __init__(self, name, engine, parent=None):
+   def __init__(self, name, engine, hypervisor, parent=None):
       super(VM, self).__init__(name, engine, parent=parent)
-
+      self.hypervisor=hypervisor
+      
       deps = ["cpu", "mem", "net"]
       self.dependencies = [Subservice(dep, self.engine, parent=self) for dep in deps]
       # init KPIs for non-list RBs
-      self._data["vm_mem"] = self._init_kpis_rb("vm", "mem")
-      self._data["vm_cpu"] = self._init_kpis_rb("vm", "cpu")
+      self._data["vm"][self.name] = {}
+      self._data["vm"][self.name].update(self._init_kpis_rb("vm", "mem"))
+      self._data["vm"][self.name].update(self._init_kpis_rb("vm", "cpu"))
 
    def _update_kpis(self):
       """
@@ -486,9 +542,10 @@ class KBNet(Subservice):
    """Kernel Bypassing Networks subservice assurance
    
    """
-   def __init__(self, name, engine, parent=None):
+   def __init__(self, name, engine, framework, parent=None):
       super(KBNet, self).__init__(name, engine, parent=parent)
-
+      self.framework=framework
+      
       deps = ["proc", "mem", "net"]
       self.dependencies = [Subservice(dep, self.engine, parent=self) for dep in deps]
       # init KPIs for non-list RBs

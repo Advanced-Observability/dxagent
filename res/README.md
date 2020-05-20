@@ -9,7 +9,7 @@
 * `rules.csv`
    A list of symptoms.
    
-## `fields.csv`
+### `fields.csv`
 
 This file contains a list of vendor-specific input fields. Each field is described
 by the following attributes: category, name, type (e.g., str, int or float), 
@@ -18,7 +18,7 @@ how this field is indexed).
 
 `fields.csv` is purely informative and not used in DxAgent at the moment.
 
-## `kpi.csv`
+### `kpi.csv`
 
 This file contains a list of KPIs, which are *standardized* vendor-independent
 performance indicators fields. Each KPI is defined by the following attributes:
@@ -33,9 +33,9 @@ parent subservice, and `subservice` can be:
 
 * kb: proc, mem, net
 
-`kpi.csv` is used by DxAgent.
+`kpi.csv` is used by DxAgent, do not modify it.
 
-## `rules.csv`
+### `rules.csv`
 
 This file is the list of symptoms, it is used to determine a subservice health.
 Each symptom is defined by a name, (e.g., "Swap volume in use"), a severity (e.g.,

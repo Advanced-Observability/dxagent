@@ -125,8 +125,10 @@ class VMWatcher():
 
    def input(self):
       if "virtualbox" in vm_libs:
+         self._input_virtualbox()
          try:
-            self._input_virtualbox()
+            #self._input_virtualbox()
+            pass
          except:
             pass
          finally:
@@ -166,7 +168,7 @@ class VMWatcher():
          'Guest/RAM/Usage/Balloon', 'Guest/RAM/Usage/Shared',
          'Guest/RAM/Usage/Cache', 'Guest/Pagefile/Usage/Total',
       ]
-      unit_list = [ '','','','','MB','MB','','','','','','','','','','','','',
+      unit_list = [ '','','','','','','MB','MB','','','','','','','','','','',
          '%', '%', 'kB', 'mB', 'B/s',
          'B/s', '%', '%', '%',
          'kB', 'kB', 'kB', 'kB', 'kB', 'kB', 
@@ -191,7 +193,6 @@ class VMWatcher():
 
          state = _virtualbox_states[int(m.state)]
          self.vbox_vm_count += 1
-
          # add entry if needed
          self._data["virtualbox/vms"].setdefault(name, init_rb_dict(attr_list, 
                types=type_list, units=unit_list))
@@ -202,7 +203,7 @@ class VMWatcher():
             ("id", m.id_p), ("os_type_id",m.os_type_id),
             ("cpu_cap", str(m.cpu_execution_cap)), 
             ("mem_size", str(m.memory_size)), 
-            ("vram_size", str(m.vram_size)),
+            ("vram_size", "0"),#str(m.vram_size)),
             ("firmware", str(m.firmware_type)), 
             ("chipset", str(m.chipset_type)),
             ("session_state", str(m.session_state)), 
@@ -234,7 +235,6 @@ class VMWatcher():
          for net in range(int(net_count)):
             attrs_list = ["{}{}/{}".format(guestinfo_prefix, net, attr) 
                            for attr in attrs_suffix]
-
             # add entry if needed
             if attrs_list[0] not in self._data["virtualbox/vms"][name]:
                self._data["virtualbox/vms"][name].update(init_rb_dict(
