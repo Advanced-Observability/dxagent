@@ -29,7 +29,7 @@ exporter, and via shared memory for displaying DxTop.
   *has to* be set.
 
 * `kpi.csv`
-   An list of vendor-independant KPIs.
+   A list of vendor-independant KPIs.
 
 * `fields.csv`
    An informative list of vendor-specific monitored fields.
