@@ -93,6 +93,7 @@ class ShareableBuffer(shared_memory.ShareableList):
       self[self.index] = ""
       self.index = 0
 
+
    def dict(self,info=None):
       """
       parse data into a new list
@@ -111,24 +112,16 @@ class ShareableBuffer(shared_memory.ShareableList):
       for line in self:
          if not line or line.startswith(' '):
             break
-
          split = line.split(';')
-         category = split[0]
-         data.setdefault(category, {})
-
-         v, s, dv, ds = split[-4:]
+         # set default dicts
+         d = data
+         for category_index in range(len(split)-5):
+            category = split[category_index]
+            d = d.setdefault(category, {})
+         # write content
+         name, v, s, dv, ds = split[-5:]
          content = [v, int(s), dv, int(ds)]
-
-         # _format_attrs_list_rb
-         # or _format_attrs_list_rb_percpu
-         if len(split) == 7:
-            subcategory, name = split[1], split[2]
-            data[category].setdefault(subcategory, {})[name] = content
-         # _format_attrs_rb
-         elif len(split) == 6:
-            name = split[1]
-            data[category][name] = content
-
+         d[name] = content
       return data
 
    def _get_content(self, rb):
@@ -174,6 +167,31 @@ class ShareableBuffer(shared_memory.ShareableList):
       else:
          self._write(data, write_all=False, skip=skip, info=info)
       self._last_rb_count = rb_count
+      
+   def _write_dict_rec(self, d, write_all, *args):
+      """
+      recursively write dictionnary to shareableMemory
+      
+      @param d the dictionary
+      @param args parent keys to be written aswell 
+      """
+      for kk, dd in d.items():
+         if isinstance(dd, dict):
+            # avoid race condition with threads writing in dicts
+            if isinstance(dd, MDict):
+               dd.acquire()
+            self._write_dict_rec(dd, write_all, *args, kk)
+            if isinstance(dd, MDict):
+               dd.release()              
+         else:
+            if dd.is_empty():
+               continue
+            if not write_all and not dd.has_changed(recently=True):
+               self.index += 1
+               continue       
+            # write a line to ShareableMemory
+            v,s,dv,ds = self._get_content(dd)
+            self.append(*args, kk, v,s,dv,ds)
 
    def _write(self, data, write_all=True, skip=[], info=None):
       """
@@ -185,37 +203,11 @@ class ShareableBuffer(shared_memory.ShareableList):
 
       """
       for k,d in data.items():
-         if type(d) is list:
-            continue
          if k in skip:
             continue
-
-         for kk, dd in d.items():
-            if isinstance(dd, dict):
-               # avoid race condition with threads writing in dicts
-               if isinstance(dd, MDict):
-                  dd.acquire()
-               for kkk, ddd in dd.items():
-                  if ddd.is_empty():
-                     continue
-                  if not write_all and not ddd.has_changed(recently=True):
-                     self.index += 1
-                     continue
-                  v,s,dv,ds = self._get_content(ddd)
-                  self.append(k, kk, kkk, v,s,dv,ds)
-               if isinstance(dd, MDict):
-                  dd.release()
-            else:
-               if dd.is_empty():
-                  continue
-               if not write_all and not dd.has_changed(recently=True):
-                  self.index += 1
-                  continue
-               v,s,dv,ds = self._get_content(dd)
-               self.append(k, kk, v,s,dv,ds)
-
+         self._write_dict_rec(d, write_all, k)
       self.validate()
-
+      
    def append(self, *args):
       self[self.index] = ";".join(list(args))
       self.index += 1

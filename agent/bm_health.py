@@ -218,9 +218,8 @@ class BMWatcher():
       self._process_proc_net_stat_arp_cache()
       self._process_proc_net_stat_ndisc_cache()
       self._process_proc_net_stat_rt_cache()
-      #self._process_proc_net_dev()
       self._process_proc_net_arp()
-      self._process_proc_net_route()
+      #self._process_proc_net_route()
       self._process_net_settings()
       self._process_sensors()
 
@@ -706,32 +705,6 @@ class BMWatcher():
             cpu_label="cpu{}".format(i)
             for i,e in enumerate(l.rstrip().split()):
                self._data["rt-cache"][cpu_label][attr_names[i]].append(int(e,16))
-
-   def _process_proc_net_dev(self):
-      attr_names = ["rx_bytes", "rx_packets", "rx_errs", "rx_drop", "rx_fifo",
-                    "rx_frame", "rx_compressed", "rx_multicast", 
-                    "tx_bytes", "tx_packets", "tx_errs", "tx_drop", "tx_fifo",
-                    "tx_cols", "tx_carrier", "tx_compressed"]
-
-      active_ifs = []
-      with open("/proc/net/dev", 'r') as f:
-
-         for l in f.readlines()[2:]:
-            attr_val = [e.rstrip(':') for e in l.rstrip().split()]
-            index = attr_val[0] 
-
-            self._data["net/dev"].setdefault(index, 
-               init_rb_dict(attr_names,counter=True))
-
-            for i,e in enumerate(attr_val[1:]):
-               self._data["net/dev"][index][attr_names[i]].append(e)
-
-            active_ifs.append(index)
-
-      # cleanup expired ifs
-      for monitored_ifs in list(self._data["net/dev"].keys()):
-         if monitored_ifs not in active_ifs:
-            del self._data["net/dev"][monitored_ifs]
 
    def _inet_ntoa(self, addr):
       """

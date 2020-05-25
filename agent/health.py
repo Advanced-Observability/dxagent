@@ -567,7 +567,6 @@ class KBNet(Subservice):
       """
       remove this VM KPIs ringbuffers
       """
-      #del self._data["kb"][self.name]
       pass
 
 
