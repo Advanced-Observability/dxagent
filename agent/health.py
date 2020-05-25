@@ -9,6 +9,7 @@ health.py
 import csv
 import os
 import builtins
+import sys
 
 from agent.buffer import init_rb_dict
 from agent.sysinfo import SysInfo
@@ -130,8 +131,6 @@ class Subservice():
       subservice cleanup, overload in child if needed.
       """
       pass
-   def __del__(self):
-      self._del_kpis()
    def get_symptoms(self):
       for subservice in self.dependencies:
          pass
@@ -473,11 +472,15 @@ class Node(Subservice):
    def remove_vm(self, name):
       for i, subservice in enumerate(self.dependencies):
          if isinstance(subservice, VM) and subservice.name == name:
+            subservice._del_kpis()
             del self.dependencies[i]
             break
+      self.engine.info("deleted: now left with {}".format(len(self.dependencies)))
+      
    def remove_kbnet(self, name):
       for i, subservice in enumerate(self.dependencies):
          if isinstance(subservice, KBNet) and subservice.name == name:
+            subservice._del_kpis()
             del self.dependencies[i]
             break
 
@@ -532,11 +535,12 @@ class VM(Subservice):
 
       """
       pass
+      
    def _del_kpis(self):
       """
       remove this VM KPIs ringbuffers
       """
-      pass
+      del self._data["vm"][self.name]
       
 class KBNet(Subservice):
    """Kernel Bypassing Networks subservice assurance
@@ -563,6 +567,7 @@ class KBNet(Subservice):
       """
       remove this VM KPIs ringbuffers
       """
+      #del self._data["kb"][self.name]
       pass
 
 

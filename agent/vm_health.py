@@ -125,10 +125,10 @@ class VMWatcher():
 
    def input(self):
       if "virtualbox" in vm_libs:
-         self._input_virtualbox()
+         #self._input_virtualbox()
          try:
-            #self._input_virtualbox()
-            pass
+            self._input_virtualbox()
+            #pass
          except:
             pass
          finally:
@@ -173,8 +173,8 @@ class VMWatcher():
          'B/s', '%', '%', '%',
          'kB', 'kB', 'kB', 'kB', 'kB', 'kB', 
       ]
-      type_list = [ str, str, str, str, str, str, str, str, str, str, str,
-         str, str, str, str, str, str, int, float, float, float,
+      type_list = [ int, str, str, str, str, int, int, int, str, str, str,
+         str, str, str, str, str, int, int, float, float, float,
          float, float, float, float, float, float, float, float,
          float, float, float, float,
       ]
@@ -227,6 +227,8 @@ class VMWatcher():
                   for i,attr in enumerate(metric_attrs)])
          
          for k,d in vm_attrs: 
+            if not d:
+               continue
             self._data["virtualbox/vms"][name][k].append(d)
 
          # add rest of probed input (the variable bit)
@@ -242,6 +244,8 @@ class VMWatcher():
 
             for attr in attrs_list:
                d = str(m.get_guest_property(attr)[0])
+               if not d:
+                  continue
                self._data["virtualbox/vms"][name][attr].append(d)
 
       self._data["virtualbox/system"]["vm_count"].append(self.vbox_vm_count)
