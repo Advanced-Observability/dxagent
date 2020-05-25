@@ -132,6 +132,18 @@ class ShareableBuffer(shared_memory.ShareableList):
       dvalue, dseverity = rb.dynamicity()
       return (value, str(severity.value),
              str(dvalue), str(dseverity.value))
+             
+   def _rb_count_rec(self, d):
+      if isinstance(d, dict):
+         count = 0
+         for kk, dd in d.items():
+            count += self._rb_count_rec(dd)
+         return count
+      else: # trivial case
+         if not d.is_empty():
+            return 1
+         else:
+            return 0        
 
    def _rb_count(self, data, skip=[]):
       """
@@ -141,19 +153,10 @@ class ShareableBuffer(shared_memory.ShareableList):
       count=0
 
       for k,d in data.items():
-         if isinstance(d, list):
-            continue
          if k in skip:
             continue
+         count += self._rb_count_rec(d)
 
-         for kk, dd in d.items():
-            if not isinstance(dd, dict):
-               if not dd.is_empty():
-                  count += 1
-            else:
-               for kkk, ddd in dd.items():
-                  if not ddd.is_empty():
-                     count += 1
       return count
 
    def write(self, data, skip=[], info=None):

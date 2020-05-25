@@ -19,6 +19,7 @@ from agent.shareablebuffer import ShareableBuffer
 from agent.shareablebuffer import ShareableBufferException
 from agent.vpp_health import vpp_support
 from agent.vm_health import hypervisors_support
+from agent.buffer import RingBuffer
 
 # keyboard input processing delay
 KEYBOARD_INPUT_RATE=0.05
@@ -233,22 +234,31 @@ class DXTop(IOManager):
       self._format_attrs_rb("bm_proc", 6)
       self._format_attrs_list_rb("bm_disk", 6)
       self._format_attrs_rb("bm_net", 6)
+      
       self._format_attrs_list_rb("vm", 6)
-
+      for vm_name in self._data["vm"]:
+         self._append_content(self._center_text(vm_name), 6)
+         self._format_attrs_list_rb("net", 6, subdict=self._data["vm"][vm_name])
+         
+         
       self.resize_columns()
 
-   def _format_attrs_rb(self, category, pad_index):
+   def _format_attrs_rb(self, category, pad_index, subdict=None):
       """
       format a dict of ringbuffers into a curses pad
  
       """
-      if category not in self._data:
+      if subdict:
+         data=subdict
+      else:
+         data=self._data
+      if category not in data:
          return
       self._append_content(self._center_text(category),
                            pad_index, curses.A_BOLD)
       self._append_content(self.hline_top(self.col_sizes), pad_index)
 
-      for k,d in self._data[category].items():
+      for k,d in data[category].items():
 
          s = (" {}"+" "*self.col_sizes[0]).format(k)[:self.col_sizes[0]]
          s += VLINE_CHAR
@@ -301,19 +311,23 @@ class DXTop(IOManager):
 
 #         self._append_content(self.hline(self.col_sizes), pad_index)
 
-   def _format_attrs_list_rb(self, category, pad_index, skip_zero=False):
+   def _format_attrs_list_rb(self, category, pad_index, skip_zero=False, subdict=None):
       """
       format a dict of dict of ringbuffers into a curses pad
       @param skip_zero do not print if value is zero
  
       """
-      if category not in self._data:
+      if subdict:
+         data=subdict
+      else:
+         data=self._data
+      if category not in data:
          return
       self._append_content(self._center_text(category),
                            pad_index, curses.A_BOLD)
       self._append_content(self.hline_top(self.col_sizes), pad_index)
 
-      for i,(k,d) in enumerate(self._data[category].items()):
+      for i,(k,d) in enumerate(data[category].items()):
 
          s = " "*self.col_sizes[0]+VLINE_CHAR
          flags = [(len(s), curses.A_DIM)]
@@ -323,7 +337,8 @@ class DXTop(IOManager):
          self._append_content(s, pad_index, fill=True, flags=flags)
 
          for kk,dd in d.items():
-
+            if not isinstance(dd, list):
+               continue
             s = (" {}"+" "*self.col_sizes[0]).format(kk)[:self.col_sizes[0]]
             s += VLINE_CHAR
             flags = []
@@ -346,7 +361,7 @@ class DXTop(IOManager):
 
             self._append_content(s, pad_index, flags, fill=True, buf=dd)
 
-         if i == len(self._data[category])-1:
+         if i == len(data[category])-1:
             self._append_content(self.hline_bottom(self.col_sizes), pad_index)
          else:
             self._append_content(self.hline_x(self.col_sizes), pad_index)

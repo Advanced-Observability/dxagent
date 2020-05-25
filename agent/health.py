@@ -430,6 +430,33 @@ class Subservice():
       """
       vm_name=self.parent.name
       hypervisor=self.parent.hypervisor
+
+      prefix="/VirtualBox/GuestInfo/Net/"
+      attrs_suffix = ["MAC", "V4/IP", "V4/Broadcast",
+                    "V4/Netmask", "Status"]
+      net_count=(self._data["virtualbox/vms"][vm_name]
+                          ["/VirtualBox/GuestInfo/Net/Count"])._top()
+      for net_index in range(net_count):
+         # add if if needed
+         attr="{}{}/Name".format(prefix, net_index)
+         if_name=self._data[hypervisor+"/vms"][vm_name][attr]._top()
+         if if_name not in self._data["vm"][vm_name]["net"]:
+            self._data["vm"][vm_name]["net"][if_name] = self._init_kpis_rb("vm", "net")
+         # translate data
+         for suffix in attrs_suffix:
+            # if status
+            attr="{}{}/Status".format(prefix, net_index)
+            self._data["vm"][vm_name]["net"][if_name]["vm_net_state"].append(
+               self._data[hypervisor+"/vms"][vm_name][attr]._top())
+            # if status
+            attr="Net/Rate/Rx"
+            self._data["vm"][vm_name]["net"][if_name]["vm_net_rx_bytes"].append(
+               self._data[hypervisor+"/vms"][vm_name][attr]._top())
+            # if status
+            attr="Net/Rate/Tx"
+            self._data["vm"][vm_name]["net"][if_name]["vm_net_tx_bytes"].append(
+               self._data[hypervisor+"/vms"][vm_name][attr]._top())
+            
 #      self._data["vm_net"][vm_name]["vm_net_state"].append(10)
 #      self._data["vm_net"][vm_name]["vm_net_rx_bytes"].append(10)
 #      self._data["vm_net"][vm_name]["vm_net_tx_bytes"].append(10)
@@ -475,8 +502,6 @@ class Node(Subservice):
             subservice._del_kpis()
             del self.dependencies[i]
             break
-      self.engine.info("deleted: now left with {}".format(len(self.dependencies)))
-      
    def remove_kbnet(self, name):
       for i, subservice in enumerate(self.dependencies):
          if isinstance(subservice, KBNet) and subservice.name == name:
@@ -525,7 +550,7 @@ class VM(Subservice):
       deps = ["cpu", "mem", "net"]
       self.dependencies = [Subservice(dep, self.engine, parent=self) for dep in deps]
       # init KPIs for non-list RBs
-      self._data["vm"][self.name] = {}
+      self._data["vm"][self.name] = {"net": {}}
       self._data["vm"][self.name].update(self._init_kpis_rb("vm", "mem"))
       self._data["vm"][self.name].update(self._init_kpis_rb("vm", "cpu"))
 
