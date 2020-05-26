@@ -234,13 +234,11 @@ class DXTop(IOManager):
       self._format_attrs_rb("bm_proc", 6)
       self._format_attrs_list_rb("bm_disk", 6)
       self._format_attrs_rb("bm_net", 6)
-      
-      self._format_attrs_list_rb("vm", 6)
+       
       for vm_name in self._data["vm"]:
-         self._append_content(self._center_text(vm_name), 6)
-         self._format_attrs_list_rb("net", 6, subdict=self._data["vm"][vm_name])
-         
-         
+         self._format_attrs_rb(vm_name, 6, subdict=self._data["vm"])
+         self._format_attrs_list_rb("net_if", 6, subdict=self._data["vm"][vm_name])
+             
       self.resize_columns()
 
    def _format_attrs_rb(self, category, pad_index, subdict=None):
@@ -259,7 +257,8 @@ class DXTop(IOManager):
       self._append_content(self.hline_top(self.col_sizes), pad_index)
 
       for k,d in data[category].items():
-
+         if not isinstance(d, list):
+            continue
          s = (" {}"+" "*self.col_sizes[0]).format(k)[:self.col_sizes[0]]
          s += VLINE_CHAR
          flags = []

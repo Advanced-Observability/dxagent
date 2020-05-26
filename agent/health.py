@@ -31,7 +31,8 @@ class HealthEngine():
             split = name.split('_')
             parent = split[0]
             # subservice name might need an extension when it includes
-            # both list and non-list dependencies (ie., bm_net_if and bm_net_snmp)
+            # both list and non-list dependencies (ie., bm_net_if and bm_net_snmp
+            # or vm_net_if and other vm_net_ attrs)
             dependency = "_".join(split[1:3]) if len(split) >= 3 and split[2] in ["if"] else split[1]
             
             key = (parent, dependency)
@@ -182,9 +183,10 @@ class Subservice():
          ("Linux","Baremetal","mem")     : self._update_kpis_linux_bm_mem,
          ("Linux","Baremetal","proc")    : self._update_kpis_linux_bm_proc,
          ("Linux","Baremetal","net")     : self._update_kpis_linux_bm_net,
-         ("Linux","VM","cpu") : self._update_kpis_linux_vm_cpu,
-         ("Linux","VM","mem") : self._update_kpis_linux_vm_mem,
-         ("Linux","VM","net") : self._update_kpis_linux_vm_net,
+         ("Linux","VM","cpu")  : self._update_kpis_linux_vm_cpu,
+         ("Linux","VM","mem")  : self._update_kpis_linux_vm_mem,
+         ("Linux","VM","net")  : self._update_kpis_linux_vm_net,
+         ("Linux","VM","proc") : self._update_kpis_linux_vm_proc,
          ("Linux","KBNet","proc") : self._update_kpis_linux_kb_proc,
          ("Linux","KBNet","mem")  : self._update_kpis_linux_kb_mem,
          ("Linux","KBNet","net")  : self._update_kpis_linux_kb_net,
@@ -431,6 +433,7 @@ class Subservice():
       vm_name=self.parent.name
       hypervisor=self.parent.hypervisor
 
+      # per-interface KPIs
       prefix="/VirtualBox/GuestInfo/Net/"
       attrs_suffix = ["MAC", "V4/IP", "V4/Broadcast",
                     "V4/Netmask", "Status"]
@@ -440,28 +443,35 @@ class Subservice():
          # add if if needed
          attr="{}{}/Name".format(prefix, net_index)
          if_name=self._data[hypervisor+"/vms"][vm_name][attr]._top()
-         if if_name not in self._data["vm"][vm_name]["net"]:
-            self._data["vm"][vm_name]["net"][if_name] = self._init_kpis_rb("vm", "net")
+         if if_name not in self._data["vm"][vm_name]["net_if"]:
+            self._data["vm"][vm_name]["net_if"][if_name] = self._init_kpis_rb("vm", "net_if")
          # translate data
          for suffix in attrs_suffix:
             # if status
             attr="{}{}/Status".format(prefix, net_index)
-            self._data["vm"][vm_name]["net"][if_name]["vm_net_state"].append(
+            self._data["vm"][vm_name]["net_if"][if_name]["vm_net_if_state"].append(
                self._data[hypervisor+"/vms"][vm_name][attr]._top())
-            # if status
+            # XXX: per-interface instead of total rate
             attr="Net/Rate/Rx"
-            self._data["vm"][vm_name]["net"][if_name]["vm_net_rx_bytes"].append(
-               self._data[hypervisor+"/vms"][vm_name][attr]._top())
-            # if status
+            self._data["vm"][vm_name]["net_if"][if_name]["vm_net_if_rx_bytes"].append(
+               self._data[hypervisor+"/vms"][vm_name][attr]._top()/1000.0)
             attr="Net/Rate/Tx"
-            self._data["vm"][vm_name]["net"][if_name]["vm_net_tx_bytes"].append(
-               self._data[hypervisor+"/vms"][vm_name][attr]._top())
+            self._data["vm"][vm_name]["net_if"][if_name]["vm_net_if_tx_bytes"].append(
+               self._data[hypervisor+"/vms"][vm_name][attr]._top()/1000.0)
             
-#      self._data["vm_net"][vm_name]["vm_net_state"].append(10)
-#      self._data["vm_net"][vm_name]["vm_net_rx_bytes"].append(10)
-#      self._data["vm_net"][vm_name]["vm_net_tx_bytes"].append(10)
-#      self._data["vm_net"][vm_name]["vm_net_ssh"].append(10)
+      # global KPIs
+      self._data["vm"][vm_name]["vm_net_ssh"].append(
+          self._data[hypervisor+"/vms"][vm_name]["accessible"]._top())
+          
+   def _update_kpis_linux_vm_proc(self):
+      """Update KPIs for linux VM proc subservice
 
+      """
+      vm_name=self.parent.name
+      hypervisor=self.parent.hypervisor
+      self._data["vm"][vm_name]["vm_proc_active"].append(
+         self._data[hypervisor+"/vms"][vm_name]["state"]._top() == "Running")
+         
    def _update_kpis_linux_kb_proc(self):
       """Update KPIs for linux KB proc subservice
 
@@ -547,10 +557,12 @@ class VM(Subservice):
       super(VM, self).__init__(name, engine, parent=parent)
       self.hypervisor=hypervisor
       
-      deps = ["cpu", "mem", "net"]
+      deps = ["cpu", "mem", "net", "proc"]
       self.dependencies = [Subservice(dep, self.engine, parent=self) for dep in deps]
       # init KPIs for non-list RBs
-      self._data["vm"][self.name] = {"net": {}}
+      self._data["vm"][self.name] = {"net_if": {}}
+      self._data["vm"][self.name].update(self._init_kpis_rb("vm", "proc"))
+      self._data["vm"][self.name].update(self._init_kpis_rb("vm", "net"))
       self._data["vm"][self.name].update(self._init_kpis_rb("vm", "mem"))
       self._data["vm"][self.name].update(self._init_kpis_rb("vm", "cpu"))
 
