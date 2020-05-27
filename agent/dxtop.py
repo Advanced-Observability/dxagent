@@ -221,7 +221,12 @@ class DXTop(IOManager):
       self._format_attrs_list_rb("vpp/stats/err", 5)
 
       #vpp_gnmi
-      self._format_attrs_list_rb("vpp/gnmi", 5, skip_zero=True)
+      self._append_content(self._center_text("vpp/gnmi"), 5, curses.A_BOLD)
+      for kb_name in self._data["vpp/gnmi"]:
+         self._append_content(self._center_text(kb_name), 5, curses.A_DIM)
+         self._format_attrs_rb(kb_name, 5, subdict=self._data["vpp/gnmi"], title=False)
+         self._format_attrs_list_rb("net_if", 5, subdict=self._data["vpp/gnmi"][kb_name],
+                                    title=False)
 
       # Health metrics Pad
       self._append_content(self._center_text("Symptoms"), 6, curses.A_REVERSE)
@@ -234,14 +239,27 @@ class DXTop(IOManager):
       self._format_attrs_rb("bm_proc", 6)
       self._format_attrs_list_rb("bm_disk", 6)
       self._format_attrs_rb("bm_net", 6)
-       
+      
+      if self._data["vm"]:
+         self._append_content(self._center_text("vm"), 6, curses.A_BOLD)
       for vm_name in self._data["vm"]:
-         self._format_attrs_rb(vm_name, 6, subdict=self._data["vm"])
-         self._format_attrs_list_rb("net_if", 6, subdict=self._data["vm"][vm_name])
+         self._append_content(self._center_text(vm_name), 6, curses.A_DIM)
+         self._format_attrs_rb(vm_name, 6, subdict=self._data["vm"], title=False)
+         self._format_attrs_list_rb("net_if", 6, subdict=self._data["vm"][vm_name],
+                                    title=False)
+                                    
+      if self._data["kb"]:
+         self._append_content(self._center_text("kb"), 6, curses.A_BOLD)         
+      for kb_name in self._data["kb"]:
+         self._append_content(self._center_text(kb_name), 6, curses.A_DIM)
+         self._format_attrs_rb(kb_name, 6, subdict=self._data["kb"], title=False)
+         self._format_attrs_list_rb("net_if", 6, subdict=self._data["kb"][kb_name],
+                                    title=False)
              
       self.resize_columns()
 
-   def _format_attrs_rb(self, category, pad_index, subdict=None):
+   def _format_attrs_rb(self, category, pad_index, skip_zero=False,
+                        subdict=None, title=True):
       """
       format a dict of ringbuffers into a curses pad
  
@@ -252,8 +270,9 @@ class DXTop(IOManager):
          data=self._data
       if category not in data:
          return
-      self._append_content(self._center_text(category),
-                           pad_index, curses.A_BOLD)
+      if title:
+         self._append_content(self._center_text(category),
+                              pad_index, curses.A_BOLD)
       self._append_content(self.hline_top(self.col_sizes), pad_index)
 
       for k,d in data[category].items():
@@ -310,7 +329,8 @@ class DXTop(IOManager):
 
 #         self._append_content(self.hline(self.col_sizes), pad_index)
 
-   def _format_attrs_list_rb(self, category, pad_index, skip_zero=False, subdict=None):
+   def _format_attrs_list_rb(self, category, pad_index, skip_zero=False,
+                             subdict=None, title=True):
       """
       format a dict of dict of ringbuffers into a curses pad
       @param skip_zero do not print if value is zero
@@ -322,8 +342,9 @@ class DXTop(IOManager):
          data=self._data
       if category not in data:
          return
-      self._append_content(self._center_text(category),
-                           pad_index, curses.A_BOLD)
+      if title:
+         self._append_content(self._center_text(category),
+                              pad_index, curses.A_BOLD)
       self._append_content(self.hline_top(self.col_sizes), pad_index)
 
       for i,(k,d) in enumerate(data[category].items()):

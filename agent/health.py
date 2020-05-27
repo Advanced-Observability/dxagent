@@ -37,6 +37,7 @@ class HealthEngine():
             
             key = (parent, dependency)
             self.kpi_attrs.setdefault(key,[]).append(name)
+            # string to type conversion
             self.kpi_types.setdefault(key,[]).append(getattr(builtins, type))
             self.kpi_units.setdefault(key,[]).append(unit)
 
@@ -121,13 +122,12 @@ class Subservice():
       # The type of subservice e.g., Subservice, VM, BareMetal, etc
       self.type = type(self).__name__
       self.fullname = self.type+"."+self.name
+      self.active = False
 
    def __contains__(self, item):
-      for subservice in self.dependencies:
-         if item == subservice.name:
-            return True
-      return False
-   def _del_kpis(self):
+      return any(subservice.name == item for subservice in self.dependencies)
+
+   def del_kpis(self):
       """
       subservice cleanup, overload in child if needed.
       """
@@ -161,8 +161,9 @@ class Subservice():
       update KPIs for this subservice and its dependencies
 
       """
-      if not self.dependencies:
-         self._update_kpis()
+      self._update_kpis()
+      if not self.active:
+         return
       for subservice in self.dependencies:
          subservice.update_kpis()
 
@@ -469,24 +470,59 @@ class Subservice():
       """
       vm_name=self.parent.name
       hypervisor=self.parent.hypervisor
-      self._data["vm"][vm_name]["vm_proc_active"].append(
-         self._data[hypervisor+"/vms"][vm_name]["state"]._top() == "Running")
          
    def _update_kpis_linux_kb_proc(self):
       """Update KPIs for linux KB proc subservice
 
       """
-      pass
+      kb_name=self.parent.name
+      framework=self.parent.framework
+      self._data["kb"][kb_name]["kb_proc_thread_count"].append(
+         self._data[framework+"/gnmi"][kb_name]["/sys/num_worker_threads"]._top())
+      
    def _update_kpis_linux_kb_mem(self):
       """Update KPIs for linux KB mem subservice
 
       """
-      pass
+      kb_name=self.parent.name
+      framework=self.parent.framework
+      # stats-segment
+      mem_total = self._data[framework+"/gnmi"][kb_name]["/mem/statseg/total"]._top()/1000000.0
+      mem_used = self._data[framework+"/gnmi"][kb_name]["/mem/statseg/used"]._top()/1000000.0
+      mem_free = mem_total-mem_used
+      self._data["kb"][kb_name]["kb_mem_total"].append(mem_total)
+      self._data["kb"][kb_name]["kb_mem_free"].append(mem_free)
+      # buffers
+      buffer_free = self._data[framework+"/gnmi"][kb_name]["/buffer-pools/default-numa-0/available"]._top()
+      buffer_used = self._data[framework+"/gnmi"][kb_name]["/buffer-pools/default-numa-0/used"]._top()
+      buffer_total = buffer_free + buffer_used
+      self._data["kb"][kb_name]["kb_mem_buffer_total"].append(buffer_total)
+      self._data["kb"][kb_name]["kb_mem_buffer_free"].append(buffer_free)
+      self._data["kb"][kb_name]["kb_mem_buffer_cache"].append(self._data[framework+"/gnmi"][kb_name]["/buffer-pools/default-numa-0/cached"]._top())
+      
    def _update_kpis_linux_kb_net(self):
       """Update KPIs for linux KB net subservice
 
       """
-      pass
+      kb_name=self.parent.name
+      framework=self.parent.framework
+      for if_name, d in self._data[framework+"/gnmi"][kb_name]["net_if"].items():
+         # create interface entry if needed
+         if if_name not in self._data["kb"][kb_name]["net_if"]:
+            self._data["kb"][kb_name]["net_if"][if_name] = self._init_kpis_rb("kb", "net_if")
+         kpi_dict = self._data["kb"][kb_name]["net_if"][if_name]
+         md_dict = self._data[framework+"/gnmi"][kb_name]["net_if"][if_name]
+         kpi_dict["kb_net_if_vector_rate"].append(
+            self._data[framework+"/gnmi"][kb_name]["/sys/vector_rate"]._top())
+         kpi_dict["kb_net_if_rx_packets"].append(md_dict["/if/rx/T0/packets"]._top())
+         kpi_dict["kb_net_if_rx_bytes"].append(md_dict["/if/rx/T0/bytes"]._top()/1000000.0)
+         kpi_dict["kb_net_if_rx_error"].append(md_dict["/if/rx-error/T0"]._top())
+         kpi_dict["kb_net_if_rx_drop"].append(md_dict["/if/rx-miss/T0"]._top())  
+         kpi_dict["kb_net_if_tx_packets"].append(md_dict["/if/tx/T0/packets"]._top())
+         kpi_dict["kb_net_if_tx_bytes"].append(md_dict["/if/tx/T0/bytes"]._top()/1000000.0)
+         kpi_dict["kb_net_if_tx_error"].append(md_dict["/if/tx-error/T0"]._top())
+         #kpi_dict["kb_net_tx_drop"].append(md_dict["/if/tx/T0/packets"]._top())
+      
    def _update_kpis_macos_bm_cpu(self):
       pass
    def _update_kpis_win_bm_cpu(self):
@@ -499,9 +535,10 @@ class Node(Subservice):
    """
    def __init__(self, name, engine, parent=None):
       super(Node, self).__init__(name, engine, parent=parent)
+      self.active = True
       self.name = self.sysinfo.node
       self.dependencies = [Baremetal(self.name, self.engine, parent=self)]
-
+      
    def add_vm(self, name, hypervisor):
       self.dependencies.append(VM(name, self.engine, hypervisor, parent=self))
    def add_kbnet(self, name, framework):
@@ -509,13 +546,13 @@ class Node(Subservice):
    def remove_vm(self, name):
       for i, subservice in enumerate(self.dependencies):
          if isinstance(subservice, VM) and subservice.name == name:
-            subservice._del_kpis()
+            subservice.del_kpis()
             del self.dependencies[i]
             break
    def remove_kbnet(self, name):
       for i, subservice in enumerate(self.dependencies):
          if isinstance(subservice, KBNet) and subservice.name == name:
-            subservice._del_kpis()
+            subservice.del_kpis()
             del self.dependencies[i]
             break
 
@@ -523,7 +560,6 @@ class Node(Subservice):
       """
       update KPIs for this subservice 
 
-      XXX: meta-kpis like active count ?
       """
       pass
 
@@ -533,6 +569,7 @@ class Baremetal(Subservice):
    """
    def __init__(self, name, engine, parent=None):
       super(Baremetal, self).__init__(name, engine, parent=parent)
+      self.active = True
       
       deps = ["cpu", "sensors", "disk", "mem", "proc", "net"]
       self.dependencies = [Subservice(dep, self.engine, parent=self) for dep in deps]
@@ -571,9 +608,12 @@ class VM(Subservice):
       update KPIs for this subservice 
 
       """
-      pass
-      
-   def _del_kpis(self):
+      vm_name=self.name
+      hypervisor=self.hypervisor
+      self.active = self._data[hypervisor+"/vms"][vm_name]["state"]._top() == "Running"
+      self._data["vm"][vm_name]["vm_proc_active"].append(self.active)
+
+   def del_kpis(self):
       """
       remove this VM KPIs ringbuffers
       """
@@ -590,20 +630,24 @@ class KBNet(Subservice):
       deps = ["proc", "mem", "net"]
       self.dependencies = [Subservice(dep, self.engine, parent=self) for dep in deps]
       # init KPIs for non-list RBs
-      self._data["kb_mem"] = self._init_kpis_rb("kb", "mem")
-      self._data["kb_proc"] = self._init_kpis_rb("kb", "proc")
+      self._data["kb"][self.name] = {"net_if": {}}
+      self._data["kb"][self.name].update(self._init_kpis_rb("kb", "mem"))
+      self._data["kb"][self.name].update(self._init_kpis_rb("kb", "proc"))
 
    def _update_kpis(self):
       """
       update KPIs for this subservice 
 
       """
-      pass
+      kb_name=self.name
+      framework=self.framework
+      self.active = self._data[framework+"/gnmi"][kb_name]["status"]._top() == "synced"
+      self._data["kb"][kb_name]["kb_proc_active"].append(self.active)
 
-   def _del_kpis(self):
+   def del_kpis(self):
       """
       remove this VM KPIs ringbuffers
       """
-      pass
+      del self._data["kb"][self.name]
 
 

@@ -65,7 +65,47 @@ class VPPGNMIClient(threading.Thread):
       self.last_attempt = None
       self.retry=0
       self._exit=False
+      self.synced = False
       #self._lock = threading.Lock()
+      
+   def append_value(self, path, root, val):
+      """
+      append value to data dict
+      
+      """
+      if root == "if": # per interface
+         split = path.split('/')
+         interface = split.pop(3)
+         path = "/".join(split)
+         if not self.synced:
+            if interface not in self._data["vpp/gnmi"][self.node]["net_if"]:
+               with self._data["vpp/gnmi"][self.node].lock():
+                  self._data["vpp/gnmi"][self.node]["net_if"][interface] = {}
+            if path not in self._data["vpp/gnmi"][self.node]["net_if"][interface]:
+               with self._data["vpp/gnmi"][self.node].lock():
+                  self._data["vpp/gnmi"][self.node]["net_if"][interface][path] = RingBuffer(path, counter=True)
+         self._data["vpp/gnmi"][self.node]["net_if"][interface][path].append(val)
+      elif root == "err":
+         
+         if path not in self._data["vpp/gnmi"][self.node]:
+            # There are lots of /err/ counters, so we drop data
+            # if it's zero.
+            if val == "0":
+               return
+            # Lock the dict to make sure that main thread is not
+            # iterating.
+            with self._data["vpp/gnmi"][self.node].lock():
+               self._data["vpp/gnmi"][self.node][path] = RingBuffer(path, counter=True)
+         self._data["vpp/gnmi"][self.node][path].append(val)          
+      else:
+         if (root == "nat44") or (root == "nat64"):
+            return
+         if not self.synced:
+            if path not in self._data["vpp/gnmi"][self.node]:
+               # drop wierdly named /err/ 
+               with self._data["vpp/gnmi"][self.node].lock():
+                  self._data["vpp/gnmi"][self.node][path] = RingBuffer(path, counter=True)
+         self._data["vpp/gnmi"][self.node][path].append(val)     
 
    def parse_json(self, response):
       """
@@ -82,17 +122,8 @@ class VPPGNMIClient(threading.Thread):
          # building path
          for name in path_json[2:]:
             path += "/{}".format(name["name"])
-         if path not in self._data["vpp/gnmi"][self.node]:
-            # There are a lot of /err/ counters, so we drop data
-            # if it's zero.
-            if (root == "err" and val == "0") or (root == "nat44"):
-               continue
-            # Lock the dict to make sure that main thread is not
-            # iterating.
-            with self._data["vpp/gnmi"][self.node].lock():
-               self._data["vpp/gnmi"][self.node][path] = RingBuffer(path, counter=True)
-         self._data["vpp/gnmi"][self.node][path].append(val)
-
+         self.append_value(path, root, val)
+         
    def disconnect(self):
       self._exit=True
 
@@ -132,11 +163,14 @@ class VPPGNMIClient(threading.Thread):
 
    def status(self):
       """
-      @return running, connected, abandonned, connecting
+      @return synced, fetching, connected, abandonned, connecting
       
       """
       if self.connected and self.is_alive():
-         return "running"
+         if self.synced:
+            return "synced"    
+         else: 
+            return "fetching"
       if self.connected and not self.is_alive():
          return "connected"
       if not self.connected and self.retry > MAX_RETRIES:
@@ -148,7 +182,7 @@ class VPPGNMIClient(threading.Thread):
       """
       
       """
-      synced  = False
+      _synced = False
 
       try:
          for response in self.client.subscribe_xpaths(xpath,
@@ -156,13 +190,15 @@ class VPPGNMIClient(threading.Thread):
             if self._exit:
                break
             if response.sync_response:
-               synced = True
-            elif synced:
+               _synced = True
+            elif _synced:
                self.parse_json(json_format.MessageToJson(response))
+               self.synced = True
       except Exception as e:
          self.info(e)
       finally:
          self.connected = False
+         self.synced = False
 
 class VPPWatcher():
    def __init__(self, data={}, info=None, parent=None,
@@ -184,7 +220,7 @@ class VPPWatcher():
 
       # connect to VPP process (baremetal)
       if self.use_api:
-         self._init_stats()
+         self._init_api()
       if self.use_stats:
          self._init_stats()
       if self.use_gnmi:
@@ -200,6 +236,7 @@ class VPPWatcher():
       for node in self.gnmi_nodes:
          self._data["vpp/gnmi"][node] = init_rb_dict(attr_names, type=str,
                                                      thread_safe=True)
+         self._data["vpp/gnmi"][node].update({"net_if":{}})
          self.gnmi_clients.append(VPPGNMIClient(node, self.info, self._data))
       self._connect_gnmi_clients()
 
@@ -211,7 +248,6 @@ class VPPWatcher():
       for client in self.gnmi_clients:
          if client.is_alive():
             continue
-         
          if client.connect():
             client.start()
       
@@ -324,7 +360,6 @@ class VPPWatcher():
       ]
 
       for intf in self.vpp.api.sw_interface_dump():
-
          # add entry if needed
          sw_if_name = intf.interface_name
          self._data["vpp/api/if"].setdefault(sw_if_name,
