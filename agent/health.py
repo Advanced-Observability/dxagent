@@ -10,9 +10,55 @@ import csv
 import os
 import builtins
 import sys
+import ast
 
-from agent.rbuffer import init_rb_dict
+from agent.rbuffer import init_rb_dict, Severity
 from agent.sysinfo import SysInfo
+
+class RuleException(Exception):
+   """
+   RuleException(Exception)
+   """
+   
+   def __init__(self, value):
+      self.value = value
+   def __str__(self):
+      return repr(self.value)
+      
+class RewriteName(ast.NodeTransformer):
+   def visit_Name(self, node):
+      return ast.Call(value=ast.Attribute,
+                     ctx=node.ctx)
+      
+class Symptom():
+   def __init__(self, name, severity, rule):
+      self.name = name
+      self.severity = severity
+      self.rule = rule
+      self._compile_rule()
+
+   def _compile_rule(self):
+      class RewriteName(ast.NodeTransformer):
+         def visit_Name(self, node):
+            return ast.Call(func=ast.Attribute(value=ast.Name(id=node.id,ctx=ast.Load()),
+                                attr='_top',
+                                ctx=node.ctx
+                                ),
+                              args=[],keywords=[])
+      
+      node = ast.parse(self.rule, mode='eval')
+      node = ast.fix_missing_locations(RewriteName().visit(node))
+      self._o=compile(node, '<string>', 'eval')
+         
+   def check(self, data):
+      """
+      Check if the node exhibit this symptom
+      
+      """
+      return eval(self._o, data)
+      
+   def __str__(self):
+      return "{} {} {}".format(self.name, self.severity, self.rule)
 
 class HealthEngine():
    def __init__(self, data, info, parent):      
@@ -23,11 +69,33 @@ class HealthEngine():
       self._data["vm"], self._data["kb"] = {}, {}
       
       self._read_kpi_file()
+      self._read_rule_file()
       self._build_dependency_graph()
+      
+   def _safe_rule(self, rule):
+      return True
+      
+   def _read_rule_file(self):
+      self.symptoms=[]
+      file_loc = os.path.join(self.parent.args.ressources_dir,"rules.csv")
+      with open(file_loc) as csv_file:
+         for r in csv.DictReader(csv_file):
+         
+            name = r["name"]
+            try:
+               severity = Severity[str.upper(r["severity"])]
+            except KeyError as e:
+               raise RuleException("Invalid rule Severity: {}".format(r["severity"]))
+            rule = r["rule"]
+            if not self._safe_rule(rule):
+               raise RuleException("Invalid rule: {}".format(r["rule"]))
+
+            self.symptoms.append(Symptom(name, severity, rule))
       
    def _read_kpi_file(self):
       self.kpi_attrs, self.kpi_types, self.kpi_units = {}, {}, {}
-      with open(os.path.join(self.parent.args.ressources_dir,"kpi.csv")) as csv_file:
+      file_loc = os.path.join(self.parent.args.ressources_dir,"kpi.csv")
+      with open(file_loc) as csv_file:
          for r in csv.DictReader(csv_file):
             name,type,unit= r["name"], r["type"],r["unit"]
             # we use (node,subservice) tuples as key
@@ -99,14 +167,13 @@ class HealthEngine():
       pass
 
    def update_symptoms(self):
-      pass
-
-class Symptoms():
-   def __init__(self, name, severity, rule):
-      self.name = name
-      self.severity = severity
-      self.rule = rule
-
+      positives=[]
+      for symptom in self.symptoms:
+         self.info(self._data)
+         if symptom.check(self._data):
+            self.info(symptom.name)
+            positives.append(symptom.name)
+            
 class Subservice():
    """
    

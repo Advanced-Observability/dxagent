@@ -1,0 +1,8 @@
+name,severity,rule,
+"Swap volume in use",Red,bm_disk_swap_used>0
+"No free memory available",Orange,bm_mem_free<50
+"No free memory available for 1 min",Red,1min(bm_mem_free<50)
+"Core reached maximum temperature",Orange,bm_sensors_cpu_input>=bm_sensors_cpu_max
+"Core reached critical temperature",Red,bm_sensors_cpu_input>=bm_sensors_cpu_critical
+"No ARP Entry For Default Gateway",Red,bm_net_if_state=="up" and bm_net_if_gw_in_arp==0
+
