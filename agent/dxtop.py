@@ -394,7 +394,7 @@ class DXTop(IOManager):
          return
 
       cpu_slice = 8
-      cpu_count = 8#self.bm_watcher.cpu_count
+      cpu_count = len(self._data[category])-1
       keys = self._data[category]["cpu0"].keys()
 
       self._append_content(self._center_text(category),
