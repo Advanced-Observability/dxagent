@@ -17,9 +17,9 @@ from agent.ios import IOManager
 from agent.sysinfo import SysInfo
 from agent.shareablebuffer import ShareableBuffer
 from agent.shareablebuffer import ShareableBufferException
-from agent.vpp_health import vpp_support
-from agent.vm_health import hypervisors_support
-from agent.buffer import RingBuffer
+from agent.vpp_input import vpp_support
+from agent.vm_input import hypervisors_support
+from agent.rbuffer import RingBuffer
 
 # keyboard input processing delay
 KEYBOARD_INPUT_RATE=0.05
@@ -49,7 +49,6 @@ class DXTop(IOManager):
 
    UP = -1
    DOWN = 1
-
 
    def __init__(self):
       super(DXTop, self).__init__(self)
@@ -443,13 +442,13 @@ class DXTop(IOManager):
       elif self.screen in [1, 2, 3, 4, 5]:
          s= ("name"+" "*self.col_sizes[0])[:self.col_sizes[0]-1]
          self.colname_pad.addstr(" ")
-         self.colname_pad.addstr(s, self.selection_color)# | curses.A_REVERSE)
+         self.colname_pad.addstr(s, self.selection_color)
          s= ("value"+" "*self.col_sizes[1])[:self.col_sizes[1]]
          self.colname_pad.addstr(" ")
-         self.colname_pad.addstr(s, self.selection_color)# | curses.A_REVERSE)
+         self.colname_pad.addstr(s, self.selection_color)
          s= ("dynamicity"+" "*(self.pad_width-sum(self.col_sizes)))[:self.pad_width-sum(self.col_sizes)-3]
          self.colname_pad.addstr(" ")
-         self.colname_pad.addstr(s, self.selection_color)# | curses.A_REVERSE)
+         self.colname_pad.addstr(s, self.selection_color)
       elif self.screen == 6:
          pass
 

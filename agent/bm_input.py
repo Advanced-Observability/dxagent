@@ -1,5 +1,5 @@
 """
-bm_health.py
+bm_input.py
 
    Input parsing for baremetal health monitoring
 
@@ -11,7 +11,7 @@ import netifaces
 import ipaddress
 import time
 
-from agent.buffer import init_rb_dict
+from agent.rbuffer import init_rb_dict
 
 def ratio(v, total):
    try:
@@ -123,7 +123,6 @@ class BMWatcher():
             else:
                attr_list.append(label)
 
-      # XXX not portable
       is_counter = [True, True, True, False, False, False, True]
       self._data["stat"] = init_rb_dict(attr_list, counters=is_counter)
 
@@ -927,77 +926,77 @@ class BMWatcher():
       normally read through sysctl calls
 
       """
-
+      category="proc/sys"
       with open("/proc/sys/net/core/rmem_default") as f:
-         self._data["proc/sys"]["net.core.rmem_default"].append(f.read().rstrip())
+         self._data[category]["net.core.rmem_default"].append(f.read().rstrip())
       with open("/proc/sys/net/core/rmem_max") as f:
-         self._data["proc/sys"]["net.core.rmem_max"].append(f.read().rstrip())
+         self._data[category]["net.core.rmem_max"].append(f.read().rstrip())
       with open("/proc/sys/net/core/wmem_default") as f:
-         self._data["proc/sys"]["net.core.wmem_default"].append(f.read().rstrip())
+         self._data[category]["net.core.wmem_default"].append(f.read().rstrip())
       with open("/proc/sys/net/core/wmem_max") as f:
-         self._data["proc/sys"]["net.core.wmem_max"].append(f.read().rstrip())
+         self._data[category]["net.core.wmem_max"].append(f.read().rstrip())
       with open("/proc/sys/net/core/default_qdisc") as f:
-         self._data["proc/sys"]["net.core.default_qdisc"].append(f.read().rstrip())
+         self._data[category]["net.core.default_qdisc"].append(f.read().rstrip())
       with open("/proc/sys/net/core/netdev_max_backlog") as f:
-         self._data["proc/sys"]["net.core.netdev_max_backlog"].append(f.read().rstrip())
+         self._data[category]["net.core.netdev_max_backlog"].append(f.read().rstrip())
 
       attr_suffixes=["_min","_pressure", "_max"]
       page_to_bytes=4096
       with open("/proc/sys/net/ipv4/tcp_mem") as f:
          for i,e in enumerate(f.read().rstrip().split()):
-            self._data["proc/sys"]["net.ipv4.tcp_mem"+attr_suffixes[i]].append(
+            self._data[category]["net.ipv4.tcp_mem"+attr_suffixes[i]].append(
                   int(e)*page_to_bytes)
 
       attr_suffixes=["_min","_default", "_max"]
       with open("/proc/sys/net/ipv4/tcp_rmem") as f:
          for i,e in enumerate(f.read().rstrip().split()):
-            self._data["proc/sys"]["net.ipv4.tcp_rmem"+attr_suffixes[i]].append(e)
+            self._data[category]["net.ipv4.tcp_rmem"+attr_suffixes[i]].append(e)
       with open("/proc/sys/net/ipv4/tcp_wmem") as f:
          for i,e in enumerate(f.read().rstrip().split()):
-            self._data["proc/sys"]["net.ipv4.tcp_wmem"+attr_suffixes[i]].append(e)
+            self._data[category]["net.ipv4.tcp_wmem"+attr_suffixes[i]].append(e)
 
       with open("/proc/sys/net/ipv4/tcp_congestion_control") as f:
-         self._data["proc/sys"]["net.ipv4.tcp_congestion_control"].append(f.read().rstrip())
+         self._data[category]["net.ipv4.tcp_congestion_control"].append(f.read().rstrip())
       with open("/proc/sys/net/ipv4/tcp_sack") as f:
-         self._data["proc/sys"]["net.ipv4.tcp_sack"].append(f.read().rstrip())
+         self._data[category]["net.ipv4.tcp_sack"].append(f.read().rstrip())
       with open("/proc/sys/net/ipv4/tcp_dsack") as f:
-         self._data["proc/sys"]["net.ipv4.tcp_dsack"].append(f.read().rstrip())
+         self._data[category]["net.ipv4.tcp_dsack"].append(f.read().rstrip())
       with open("/proc/sys/net/ipv4/tcp_fack") as f:
-         self._data["proc/sys"]["net.ipv4.tcp_fack"].append(f.read().rstrip())
+         self._data[category]["net.ipv4.tcp_fack"].append(f.read().rstrip())
       with open("/proc/sys/net/ipv4/tcp_syn_retries") as f:
-         self._data["proc/sys"]["net.ipv4.tcp_syn_retries"].append(f.read().rstrip())
+         self._data[category]["net.ipv4.tcp_syn_retries"].append(f.read().rstrip())
       with open("/proc/sys/net/ipv4/tcp_slow_start_after_idle") as f:
-         self._data["proc/sys"]["net.ipv4.tcp_slow_start_after_idle"].append(f.read().rstrip())
+         self._data[category]["net.ipv4.tcp_slow_start_after_idle"].append(f.read().rstrip())
       with open("/proc/sys/net/ipv4/tcp_retries1") as f:
-         self._data["proc/sys"]["net.ipv4.tcp_retries1"].append(f.read().rstrip())
+         self._data[category]["net.ipv4.tcp_retries1"].append(f.read().rstrip())
       with open("/proc/sys/net/ipv4/tcp_retries2") as f:
-         self._data["proc/sys"]["net.ipv4.tcp_retries2"].append(f.read().rstrip())
+         self._data[category]["net.ipv4.tcp_retries2"].append(f.read().rstrip())
       with open("/proc/sys/net/ipv4/tcp_mtu_probing") as f:
-         self._data["proc/sys"]["net.ipv4.tcp_mtu_probing"].append(f.read().rstrip())
+         self._data[category]["net.ipv4.tcp_mtu_probing"].append(f.read().rstrip())
       with open("/proc/sys/net/ipv4/tcp_max_syn_backlog") as f:
-         self._data["proc/sys"]["net.ipv4.tcp_max_syn_backlog"].append(f.read().rstrip())
+         self._data[category]["net.ipv4.tcp_max_syn_backlog"].append(f.read().rstrip())
       with open("/proc/sys/net/ipv4/tcp_base_mss") as f:
-         self._data["proc/sys"]["net.ipv4.tcp_base_mss"].append(f.read().rstrip())
+         self._data[category]["net.ipv4.tcp_base_mss"].append(f.read().rstrip())
       with open("/proc/sys/net/ipv4/tcp_min_snd_mss") as f:
-         self._data["proc/sys"]["net.ipv4.tcp_min_snd_mss"].append(f.read().rstrip())
+         self._data[category]["net.ipv4.tcp_min_snd_mss"].append(f.read().rstrip())
       with open("/proc/sys/net/ipv4/tcp_ecn_fallback") as f:
-         self._data["proc/sys"]["net.ipv4.tcp_ecn_fallback"].append(f.read().rstrip())
+         self._data[category]["net.ipv4.tcp_ecn_fallback"].append(f.read().rstrip())
       with open("/proc/sys/net/ipv4/tcp_ecn") as f:
-         self._data["proc/sys"]["net.ipv4.tcp_ecn"].append(f.read().rstrip())
+         self._data[category]["net.ipv4.tcp_ecn"].append(f.read().rstrip())
       with open("/proc/sys/net/ipv4/tcp_adv_win_scale") as f:
-         self._data["proc/sys"]["net.ipv4.tcp_adv_win_scale"].append(f.read().rstrip())
+         self._data[category]["net.ipv4.tcp_adv_win_scale"].append(f.read().rstrip())
       with open("/proc/sys/net/ipv4/tcp_window_scaling") as f:
-         self._data["proc/sys"]["net.ipv4.tcp_window_scaling"].append(f.read().rstrip())
+         self._data[category]["net.ipv4.tcp_window_scaling"].append(f.read().rstrip())
       with open("/proc/sys/net/ipv4/tcp_tw_reuse") as f:
-         self._data["proc/sys"]["net.ipv4.tcp_tw_reuse"].append(f.read().rstrip())
+         self._data[category]["net.ipv4.tcp_tw_reuse"].append(f.read().rstrip())
       with open("/proc/sys/net/ipv4/tcp_syncookies") as f:
-         self._data["proc/sys"]["net.ipv4.tcp_syncookies"].append(f.read().rstrip())
+         self._data[category]["net.ipv4.tcp_syncookies"].append(f.read().rstrip())
       with open("/proc/sys/net/ipv4/tcp_timestamps") as f:
-         self._data["proc/sys"]["net.ipv4.tcp_timestamps"].append(f.read().rstrip())
+         self._data[category]["net.ipv4.tcp_timestamps"].append(f.read().rstrip())
       with open("/proc/sys/net/ipv4/tcp_no_metrics_save") as f:
-         self._data["proc/sys"]["net.ipv4.tcp_no_metrics_save"].append(f.read().rstrip())
+         self._data[category]["net.ipv4.tcp_no_metrics_save"].append(f.read().rstrip())
 
       with open("/proc/sys/net/ipv4/ip_forward") as f:
-         self._data["proc/sys"]["net.ipv4.ip_forward"].append(f.read().rstrip())
+         self._data[category]["net.ipv4.ip_forward"].append(f.read().rstrip())
       with open("/proc/sys/net/ipv4/ip_no_pmtu_disc") as f:
-         self._data["proc/sys"]["net.ipv4.ip_no_pmtu_disc"].append(f.read().rstrip())
+         self._data[category]["net.ipv4.ip_no_pmtu_disc"].append(f.read().rstrip())

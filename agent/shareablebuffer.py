@@ -13,9 +13,13 @@ import hashlib
 from multiprocessing import shared_memory
 from multiprocessing.resource_tracker import unregister
 
-from agent.buffer import MDict
+from agent.rbuffer import MDict
 
+#
+# line width
 MAX_WIDTH=256
+#
+# line height
 MAX_HEIGHT=2**14
 
 class ShareableBuffer(shared_memory.ShareableList):
@@ -23,22 +27,7 @@ class ShareableBuffer(shared_memory.ShareableList):
    """
    ShareableBuffer
 
-   Stores a list of index sublists in shared memory.
-   Each sublist contains 
-
-
-   internal format:
-
-   _format_attrs_list_rb: 
-   category;subcategory;name;value;severity;dynamicity;severity
-
-   _format_attrs_rb:
-   category;value;name;severity;dynamicity;severity
-
-   _format_attrs_list_rb_percpu: (similar to _format_attrs_list_rb)
-   category;cpu_index;name;value;severity;dynamicity;severity
-
-   _format_attrs_list:not implemented
+   Stores a dictionnary of RingBuffers in shared memory.
 
    """
 
@@ -62,11 +51,11 @@ class ShareableBuffer(shared_memory.ShareableList):
 
       This does not unlink
       """
-      if self.shm:
-         self.shm.close()
+      self.close()
 
    def close(self):
-      self.shm.close()
+      if self.shm:
+         self.shm.close()
 
    def unlink(self):
       """

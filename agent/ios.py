@@ -19,8 +19,6 @@ class IOManager():
 
    """
    def __init__(self, child=None, parse_args=True):
-      #super(IOManager, self).__init__()
-
       self.child  = child
       self.parse_args = parse_args
 
@@ -56,14 +54,12 @@ class IOManager():
 
       parser = argparse.ArgumentParser(description='Diagnostic Agent console app')
 
-      # XXX: remove
       parser.add_argument('-l' , '--log-file', type=str, default="dxtop.log",
                          help='log file location (default: dxtop.log)')
       parser.add_argument('-v' , '--verbose', action='store_true',
                          help='increase output level') 
 
       self.args = parser.parse_args()
-
       return self.args
 
    def arguments_dxagent(self):

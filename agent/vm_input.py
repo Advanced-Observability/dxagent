@@ -1,5 +1,5 @@
 """
-vm_health.py
+vm_input.py
 
    Input parsing for virtual machines health monitoring
 
@@ -19,7 +19,7 @@ try:
 except:
    pass
 
-from agent.buffer import init_rb_dict
+from agent.rbuffer import init_rb_dict
 
 # vbox states without pseudo-states
 _virtualbox_states = [

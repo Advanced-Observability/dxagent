@@ -1,5 +1,5 @@
 """
-vpp_health.py
+vpp_input.py
 
    Input parsing for VPP health monitoring
 
@@ -29,8 +29,8 @@ try:
 except:
    pass
 
-from agent.buffer import init_rb_dict
-from agent.buffer import RingBuffer
+from agent.rbuffer import init_rb_dict
+from agent.rbuffer import RingBuffer
 
 #
 # The rate at which gNMI sends updates

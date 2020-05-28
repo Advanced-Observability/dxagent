@@ -11,7 +11,7 @@ import os
 import builtins
 import sys
 
-from agent.buffer import init_rb_dict
+from agent.rbuffer import init_rb_dict
 from agent.sysinfo import SysInfo
 
 class HealthEngine():
@@ -21,7 +21,11 @@ class HealthEngine():
       self.parent = parent
       self.sysinfo = SysInfo()
       self._data["vm"], self._data["kb"] = {}, {}
-      # read kpi file
+      
+      self._read_kpi_file()
+      self._build_dependency_graph()
+      
+   def _read_kpi_file(self):
       self.kpi_attrs, self.kpi_types, self.kpi_units = {}, {}, {}
       with open(os.path.join(self.parent.args.ressources_dir,"kpi.csv")) as csv_file:
          for r in csv.DictReader(csv_file):
@@ -39,9 +43,7 @@ class HealthEngine():
             self.kpi_attrs.setdefault(key,[]).append(name)
             # string to type conversion
             self.kpi_types.setdefault(key,[]).append(getattr(builtins, type))
-            self.kpi_units.setdefault(key,[]).append(unit)
-
-      self._build_dependency_graph()
+            self.kpi_units.setdefault(key,[]).append(unit)      
 
    def _build_dependency_graph(self):
       self.node = Node(self.sysinfo.node, self)

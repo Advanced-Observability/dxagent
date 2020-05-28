@@ -15,9 +15,9 @@ import agent
 from agent.ios import IOManager
 from agent.daemon import Daemon
 from agent.sysinfo import SysInfo
-from agent.bm_health import BMWatcher
-from agent.vm_health import VMWatcher
-from agent.vpp_health import VPPWatcher
+from agent.bm_input import BMWatcher
+from agent.vm_input import VMWatcher
+from agent.vpp_input import VPPWatcher
 from agent.shareablebuffer import ShareableBuffer
 from agent.health import HealthEngine
 
@@ -71,7 +71,6 @@ class DXAgent(Daemon, IOManager):
       self.bm_watcher.input()
       self.vm_watcher.input()
       self.vpp_watcher.input()
-      # XXX: ioam
 
    def process(self):
       """
@@ -83,7 +82,7 @@ class DXAgent(Daemon, IOManager):
       self._input()
       # compute KPIs&symptoms from input
       self.engine.update_kpis()
-      #self.engine.update_symptoms()
+      self.engine.update_symptoms()
       # write to shmem
       if not self.args.disable_shm:
          skip=["stats"] if not self.args.verbose else []
