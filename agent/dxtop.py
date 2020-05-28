@@ -97,7 +97,6 @@ class DXTop(IOManager):
       self._format_colname_pad()
       if self._data:
          self._format_top_pad()
-         #self._format_footer()
 
    def _center_text(self, s, width=None):
       """
@@ -542,31 +541,6 @@ class DXTop(IOManager):
       elif self.screen == 6:
          pass
 
-#   def _format_footer(self):
-#      self.footer.clear()
-#      if not self.buffers[self.screen]:
-#         return      
-
-#      buffer = self.buffers[self.screen][self.current[self.screen]]
-#      if not buffer:
-#         return
-
-#      # per-cpu buffer
-#      if type(buffer) is list:
-#         name = buffer[0].name()
-#         s = "{}".format(name)
-#      # str buffer
-#      elif buffer.type is str:
-#         name = buffer.name()
-#         s = "{}".format(name)    
-#      # numerical buffer    
-#      else:
-#         name = buffer.name()
-#         s = "{} min:{} max:{} severity:{}".format(name,
-#               buffer.min(), buffer.max(), buffer._top_severity())
-
-#      self.footer.addstr(self._center_text(s))
-
    def _fill_pad(self):
       """
       fill pad from visible content
@@ -619,9 +593,6 @@ class DXTop(IOManager):
          self.pad.refresh(0, 0, 3+self.top_pad_height, 1, 
                           self.height-2,
                           self.pad_width)
-         self.footer.refresh(0, 0, 
-                             self.height-1, 1,
-                             self.height-1, self.width-2)
       except:
          pass
 
@@ -684,7 +655,6 @@ class DXTop(IOManager):
       self.top_pad = curses.newpad(3, self.pad_width)
       self.colname_pad = curses.newpad(1, self.pad_width)
       self.pad = curses.newpad(self.pad_height+1, self.pad_width)
-      self.footer = curses.newpad(1, self.width)
 
    def scroll(self, direction):
       if direction == self.UP and self.current[self.screen] > 0:
@@ -699,7 +669,6 @@ class DXTop(IOManager):
          self.current[self.screen] += direction
          if self.current[self.screen] >= self.top[self.screen]+self.pad_height-1:
             self.top[self.screen] += direction
-      #self._format_footer()
 
    def paging(self, direction):
       if direction == self.UP and self.current[self.screen] > 0:
@@ -714,14 +683,12 @@ class DXTop(IOManager):
               len(self.content[self.screen])-self.current[self.screen]-1)         
          self.top[self.screen] += min(self.pad_height-1,
           max(0,len(self.content[self.screen])-self.top[self.screen]-self.pad_height+1))
-      #self._format_footer()
 
    def switch_screen(self, direction):
       self.screen = (self.screen+direction) % self.max_screens
       self._format_header()
       self._format_top_pad()
       self._format_colname_pad()
-      #self._format_footer()
 
    def exit(self):
       """
@@ -737,13 +704,8 @@ class DXTop(IOManager):
       """
       # this list contains formatted text
       self.content = [[] for _ in range(self.max_screens)]
-      # this list is aligned to content and contains buffers
-      # it is used to display extra details on demand
-      #self._buffers = [[] for _ in range(self.max_screens)]
       self._data = self.sbuffer.dict(info=self.info)
-      #self._init_pads()
       self._format()
-
       self.scheduler.enter(INPUT_RATE,0,self.process)
 
    def run(self):
