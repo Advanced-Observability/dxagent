@@ -5,4 +5,3 @@ name,severity,rule,
 "Core reached maximum temperature",Orange,bm_sensors_cpu_input>=bm_sensors_cpu_max
 "Core reached critical temperature",Red,bm_sensors_cpu_input>=bm_sensors_cpu_critical
 "No ARP Entry For Default Gateway",Red,bm_net_if_state=="up" and bm_net_if_gw_in_arp==0
-

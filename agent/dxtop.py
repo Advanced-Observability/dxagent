@@ -13,6 +13,7 @@ import time
 import datetime
 import os
 
+from agent import TOP_INPUT_RATE, KEYBOARD_INPUT_RATE, SCREEN_REFRESH_RATE
 from agent.ios import IOManager
 from agent.sysinfo import SysInfo
 from agent.shareablebuffer import ShareableBuffer
@@ -21,14 +22,6 @@ from agent.vpp_input import vpp_support
 from agent.vm_input import hypervisors_support
 from agent.rbuffer import RingBuffer
 
-# keyboard input processing delay
-KEYBOARD_INPUT_RATE=0.05
-
-# screen refresh delay
-SCREEN_REFRESH_RATE=0.05
-
-# input processing delay
-INPUT_RATE=3.0
 
 ESCAPE_CHAR=27
 ENTER_CHAR=10
@@ -238,21 +231,21 @@ class DXTop(IOManager):
       self._format_attrs_list_rb("bm_disk", 6)
       self._format_attrs_rb("bm_net", 6)
       
-      if self._data["vm"]:
+      if "vm" in self._data:
          self._append_content(self._center_text("vm"), 6, curses.A_BOLD)
-      for vm_name in self._data["vm"]:
-         self._append_content(self._center_text(vm_name), 6, curses.A_DIM)
-         self._format_attrs_rb(vm_name, 6, subdict=self._data["vm"], title=False)
-         self._format_attrs_list_rb("net_if", 6, subdict=self._data["vm"][vm_name],
-                                    title=False)
+         for vm_name in self._data["vm"]:
+            self._append_content(self._center_text(vm_name), 6, curses.A_DIM)
+            self._format_attrs_rb(vm_name, 6, subdict=self._data["vm"], title=False)
+            self._format_attrs_list_rb("net_if", 6, subdict=self._data["vm"][vm_name],
+                                       title=False)
                                     
-      if self._data["kb"]:
+      if "kb" in self._data:
          self._append_content(self._center_text("kb"), 6, curses.A_BOLD)         
-      for kb_name in self._data["kb"]:
-         self._append_content(self._center_text(kb_name), 6, curses.A_DIM)
-         self._format_attrs_rb(kb_name, 6, subdict=self._data["kb"], title=False)
-         self._format_attrs_list_rb("net_if", 6, subdict=self._data["kb"][kb_name],
-                                    title=False)
+         for kb_name in self._data["kb"]:
+            self._append_content(self._center_text(kb_name), 6, curses.A_DIM)
+            self._format_attrs_rb(kb_name, 6, subdict=self._data["kb"], title=False)
+            self._format_attrs_list_rb("net_if", 6, subdict=self._data["kb"][kb_name],
+                                       title=False)
              
       self.resize_columns()
 
@@ -538,7 +531,12 @@ class DXTop(IOManager):
             self.top_pad.addstr(self._center_text(v))
 
       elif self.screen == 6:
-         pass
+         vm_count=len(self._data["vm"]) if "vm" in self._data else 0
+         kb_count=len(self._data["kb"]) if "kb" in self._data else 0
+         s = "vm-count: {} kb-count:{}".format(vm_count, kb_count)
+         self.top_pad.addstr(self._center_text(s))         
+         s = "symptoms-count: {}".format(len([]))
+         self.top_pad.addstr(self._center_text(s))
 
    def _fill_pad(self):
       """
@@ -705,7 +703,7 @@ class DXTop(IOManager):
       self.content = [[] for _ in range(self.max_screens)]
       self._data = self.sbuffer.dict(info=self.info)
       self._format()
-      self.scheduler.enter(INPUT_RATE,0,self.process)
+      self.scheduler.enter(TOP_INPUT_RATE,0,self.process)
 
    def run(self):
       """

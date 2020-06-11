@@ -126,6 +126,16 @@ class RingBuffer(collections.deque):
             return ""
          else:
             return 0
+            
+   def _tops(self, c):
+      """
+      @return last c value
+
+      """
+      try:
+         return self[-c-1:-1]
+      except:
+         return []
 
    def top(self):
       """

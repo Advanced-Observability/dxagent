@@ -14,6 +14,7 @@ import ast
 
 from agent.rbuffer import init_rb_dict, Severity
 from agent.sysinfo import SysInfo
+from agent import AGENT_INPUT_RATE
 
 class RuleException(Exception):
    """
@@ -25,26 +26,29 @@ class RuleException(Exception):
    def __str__(self):
       return repr(self.value)
       
-class RewriteName(ast.NodeTransformer):
-   def visit_Name(self, node):
-      return ast.Call(value=ast.Attribute,
-                     ctx=node.ctx)
-      
 class Symptom():
-   def __init__(self, name, severity, rule):
+   def __init__(self, name, severity, rule, engine):
       self.name = name
       self.severity = severity
       self.rule = rule
+      self.engine = engine
       self._compile_rule()
 
    def _compile_rule(self):
+      engine = self.engine
+      kpis = self.engine.kpis
       class RewriteName(ast.NodeTransformer):
          def visit_Name(self, node):
-            return ast.Call(func=ast.Attribute(value=ast.Name(id=node.id,ctx=ast.Load()),
-                                attr='_top',
-                                ctx=node.ctx
-                                ),
-                              args=[],keywords=[])
+            kpi = kpis[node.id]
+            if kpi.islist:
+               return node
+            else: # if no list, call it like it is
+               return ast.Call(func=ast.Attribute(
+                                   value=ast.Name(id=node.id,ctx=ast.Load()),
+                                                  attr='_top',
+                                                  ctx=node.ctx
+                                                  ),
+                                args=[],keywords=[])
       
       node = ast.parse(self.rule, mode='eval')
       node = ast.fix_missing_locations(RewriteName().visit(node))
@@ -55,10 +59,21 @@ class Symptom():
       Check if the node exhibit this symptom
       
       """
-      return eval(self._o, data)
+      try:
+         return eval(self._o, globals(), data)
+      except Exception as e:
+         self.engine.info("Evaluating rule {} raised error ".format(self.rule, e))
+         return False
       
    def __str__(self):
       return "{} {} {}".format(self.name, self.severity, self.rule)
+
+class KPI():
+   def __init__(self, name, _type, unit, islist):
+      self.name=name
+      self._type=_type
+      self.unit=unit
+      self.islist=int(islist)
 
 class HealthEngine():
    def __init__(self, data, info, parent):      
@@ -67,6 +82,7 @@ class HealthEngine():
       self.parent = parent
       self.sysinfo = SysInfo()
       self._data["vm"], self._data["kb"] = {}, {}
+      self.sample_per_min = 60/AGENT_INPUT_RATE
       
       self._read_kpi_file()
       self._read_rule_file()
@@ -80,24 +96,29 @@ class HealthEngine():
       file_loc = os.path.join(self.parent.args.ressources_dir,"rules.csv")
       with open(file_loc) as csv_file:
          for r in csv.DictReader(csv_file):
-         
             name = r["name"]
             try:
                severity = Severity[str.upper(r["severity"])]
             except KeyError as e:
-               raise RuleException("Invalid rule Severity: {}".format(r["severity"]))
+               self.info("Invalid rule Severity: {}".format(r["severity"]))
+               continue
             rule = r["rule"]
             if not self._safe_rule(rule):
-               raise RuleException("Invalid rule: {}".format(r["rule"]))
-
-            self.symptoms.append(Symptom(name, severity, rule))
+               self.info("Invalid rule: {}".format(rule))
+               continue
+            try:
+               self.symptoms.append(Symptom(name, severity, rule, self))
+            except Exception as e:
+               self.info("Invalid rule syntax: {}".format(rule))
+               continue
       
    def _read_kpi_file(self):
       self.kpi_attrs, self.kpi_types, self.kpi_units = {}, {}, {}
+      self.kpis = {}
       file_loc = os.path.join(self.parent.args.ressources_dir,"kpi.csv")
       with open(file_loc) as csv_file:
          for r in csv.DictReader(csv_file):
-            name,type,unit= r["name"], r["type"],r["unit"]
+            name,_type,unit,islist= r["name"], r["type"],r["unit"],r["is_list"]
             # we use (node,subservice) tuples as key
             # e.g., ("bm", "net")
             split = name.split('_')
@@ -110,8 +131,10 @@ class HealthEngine():
             key = (parent, dependency)
             self.kpi_attrs.setdefault(key,[]).append(name)
             # string to type conversion
-            self.kpi_types.setdefault(key,[]).append(getattr(builtins, type))
-            self.kpi_units.setdefault(key,[]).append(unit)      
+            self.kpi_types.setdefault(key,[]).append(getattr(builtins, _type))
+            self.kpi_units.setdefault(key,[]).append(unit)
+            kpi = KPI(name, getattr(builtins, _type), unit, islist)
+            self.kpis[name] = kpi
 
    def _build_dependency_graph(self):
       self.node = Node(self.sysinfo.node, self)
@@ -169,7 +192,6 @@ class HealthEngine():
    def update_symptoms(self):
       positives=[]
       for symptom in self.symptoms:
-         self.info(self._data)
          if symptom.check(self._data):
             self.info(symptom.name)
             positives.append(symptom.name)
@@ -189,8 +211,8 @@ class Subservice():
       self.is_leaf = is_leaf
       self.dependencies = []
       # The type of subservice e.g., Subservice, VM, BareMetal, etc
-      self.type = type(self).__name__
-      self.fullname = self.type+"."+self.name
+      self._type = type(self).__name__
+      self.fullname = self._type+"."+self.name
       self.active = False
 
    def __contains__(self, item):
@@ -244,7 +266,7 @@ class Subservice():
       
       """
       key = (self.sysinfo.system,
-             self.parent.type if self.parent else None, 
+             self.parent._type if self.parent else None, 
              self.name)
       funcs = {
          ("Linux","Baremetal","cpu")     : self._update_kpis_linux_bm_cpu,

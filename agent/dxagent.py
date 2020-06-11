@@ -12,6 +12,7 @@ import time
 import signal
 
 import agent
+from agent import AGENT_INPUT_RATE
 from agent.ios import IOManager
 from agent.daemon import Daemon
 from agent.sysinfo import SysInfo
@@ -20,9 +21,6 @@ from agent.vm_input import VMWatcher
 from agent.vpp_input import VPPWatcher
 from agent.shareablebuffer import ShareableBuffer
 from agent.health import HealthEngine
-
-# input processing delay
-INPUT_RATE=3.0
 
 class DXAgent(Daemon, IOManager):
    """
@@ -36,7 +34,7 @@ class DXAgent(Daemon, IOManager):
                       stdout='/var/log/dxagent.log', 
                       stderr='/var/log/dxagent.log',
                       name='dxagent',
-                      input_rate=INPUT_RATE)
+                      input_rate=AGENT_INPUT_RATE)
       IOManager.__init__(self, child=self, parse_args=parse_args)
 
       self.load_ios()
@@ -87,7 +85,7 @@ class DXAgent(Daemon, IOManager):
       if not self.args.disable_shm:
          skip=["stats"] if not self.args.verbose else []
          self.sbuffer.write(self._data, skip=skip, info=self.info)
-      self.scheduler.enter(INPUT_RATE,0,self.process)
+      self.scheduler.enter(AGENT_INPUT_RATE,0,self.process)
 
    def exit(self, signum=None, stackframe=None):
       """
@@ -95,7 +93,7 @@ class DXAgent(Daemon, IOManager):
 
       """
       self.running = False
-      time.sleep(INPUT_RATE)
+      time.sleep(AGENT_INPUT_RATE)
 
       self.vm_watcher.exit()
       self.vpp_watcher.exit()
@@ -116,5 +114,5 @@ class DXAgent(Daemon, IOManager):
 
       while self.running:
          self.scheduler.run(blocking=False)
-         time.sleep(INPUT_RATE)
+         time.sleep(AGENT_INPUT_RATE)
 
