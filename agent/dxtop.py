@@ -20,7 +20,7 @@ from agent.shareablebuffer import ShareableBuffer
 from agent.shareablebuffer import ShareableBufferException
 from agent.vpp_input import vpp_support
 from agent.vm_input import hypervisors_support
-from agent.rbuffer import RingBuffer
+from agent.rbuffer import RingBuffer, Severity
 
 
 ESCAPE_CHAR=27
@@ -221,7 +221,13 @@ class DXTop(IOManager):
 
       # Health metrics Pad
       self._append_content(self._center_text("Symptoms"), 6, curses.A_REVERSE)
-      
+      self._append_content(self._center_text(" "), 6)
+      for name, severity, args in self._data["symptoms"]:
+         s=name+" "+", ".join(args)
+         lpad,rpad=self._center_padding(s)
+         flags = [(len(lpad),curses.color_pair(int(severity))),(len(s)+len(lpad),0)]
+         self._append_content(self._center_text(s), 6, flags=flags)
+      self._append_content(self._center_text(" "), 6)
       self._append_content(self._center_text("Metrics"), 6, curses.A_REVERSE)
       self._format_attrs_list_rb_percpu("bm_cpu", 6)
       self._format_attrs_list_rb("bm_net_if", 6)

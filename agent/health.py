@@ -35,20 +35,19 @@ class Symptom():
       self._compile_rule()
 
    def _compile_rule(self):
-      engine = self.engine
-      kpis = self.engine.kpis
+#   return ast.Call(func=ast.Attribute(
+#                       value=ast.Name(id=node.id,ctx=ast.Load()),
+#                                      attr='_top',
+#                                      ctx=node.ctx
+#                                      ),
+#                    args=[],keywords=[])
       class RewriteName(ast.NodeTransformer):
          def visit_Name(self, node):
-            kpi = kpis[node.id]
-            if kpi.islist:
-               return node
-            else: # if no list, call it like it is
-               return ast.Call(func=ast.Attribute(
-                                   value=ast.Name(id=node.id,ctx=ast.Load()),
-                                                  attr='_top',
-                                                  ctx=node.ctx
-                                                  ),
-                                args=[],keywords=[])
+            # only if parent is not a func
+            # if node.id == "1min"
+            return ast.Call(func=ast.Name(id="access", ctx=node.ctx),
+                            args=[ast.Constant(value=node.id)],
+                            keywords=[])
       
       node = ast.parse(self.rule, mode='eval')
       node = ast.fix_missing_locations(RewriteName().visit(node))
@@ -59,8 +58,33 @@ class Symptom():
       Check if the node exhibit this symptom
       
       """
+      engine = self.engine
+      kpis = self.engine.kpis
+      
+      def access(var):
+         kpi = kpis[var]
+         prefix="_".join(var.split("_")[:2])
+         if not kpi.islist:
+            return data[prefix][var]._top()
+
+         return [(dev, b[var]._top()) for dev,b in prefix.items()]
+         
+      def _1min(var):
+         prefix="_".join(var.split("_")[:2])
+         return prefix[var]._tops(sample_per_min)   
+
+      def _5min(var):
+         prefix="_".join(var.split("_")[:2])
+         return prefix[var]._tops(sample_per_min*5)
+         
       try:
-         return eval(self._o, globals(), data)
+         ret=eval(self._o, globals(), locals())
+         self.args = []
+         if ret:
+            if isinstance(ret, list):
+               self.args = ret
+            return True
+         return False
       except Exception as e:
          self.engine.info("Evaluating rule {} raised error ".format(self.rule, e))
          return False
@@ -82,6 +106,7 @@ class HealthEngine():
       self.parent = parent
       self.sysinfo = SysInfo()
       self._data["vm"], self._data["kb"] = {}, {}
+      self._data["symptoms"] = []
       self.sample_per_min = 60/AGENT_INPUT_RATE
       
       self._read_kpi_file()
@@ -106,11 +131,12 @@ class HealthEngine():
             if not self._safe_rule(rule):
                self.info("Invalid rule: {}".format(rule))
                continue
-            try:
-               self.symptoms.append(Symptom(name, severity, rule, self))
-            except Exception as e:
-               self.info("Invalid rule syntax: {}".format(rule))
-               continue
+            self.symptoms.append(Symptom(name, severity, rule, self))
+#            try:
+#               self.symptoms.append(Symptom(name, severity, rule, self))
+#            except Exception as e:
+#               self.info("Invalid rule syntax: {}".format(rule))
+#               continue
       
    def _read_kpi_file(self):
       self.kpi_attrs, self.kpi_types, self.kpi_units = {}, {}, {}
@@ -190,11 +216,13 @@ class HealthEngine():
       pass
 
    def update_symptoms(self):
-      positives=[]
+      self._data["symptoms"].clear()
       for symptom in self.symptoms:
-         if symptom.check(self._data):
+         result = symptom.check(self._data)
+         if result:
             self.info(symptom.name)
-            positives.append(symptom.name)
+            self._data["symptoms"].append(symptom)
+      
             
 class Subservice():
    """

@@ -102,6 +102,11 @@ class ShareableBuffer(shared_memory.ShareableList):
          if not line or line.startswith(' '):
             break
          split = line.split(';')
+         # special case: symptoms
+         if split[0] == "symptoms":
+            symptom=(split[1],split[2],eval(split[3]))
+            data.setdefault("symptoms",[]).append(symptom)
+            continue
          # set default dicts
          d = data
          for category_index in range(len(split)-5):
@@ -140,19 +145,19 @@ class ShareableBuffer(shared_memory.ShareableList):
 
       """
       count=0
-
       for k,d in data.items():
          if k in skip:
             continue
          count += self._rb_count_rec(d)
-
       return count
 
    def write(self, data, skip=[], info=None):
+
       """
       write dict to ShareableMemory
 
       """
+      skip.append("symptoms")
       rb_count = self._rb_count(data, skip=skip)
       if rb_count != self._last_rb_count:
          self._write(data, write_all=True, skip=skip, info=info)
@@ -198,6 +203,9 @@ class ShareableBuffer(shared_memory.ShareableList):
          if k in skip:
             continue
          self._write_dict_rec(d, write_all, k)
+      # special entry: symptom
+      for s in data["symptoms"]:
+         self.append("symptoms", s.name, str(s.severity.value), str(s.args))
       self.validate()
       
    def append(self, *args):
