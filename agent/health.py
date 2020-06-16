@@ -720,7 +720,7 @@ class Subservice():
          if if_name not in self._data["kb"][kb_name]["kb_net_if"]:
             self._data["kb"][kb_name]["kb_net_if"][if_name] = self._init_kpis_rb("kb", "net_if")
          kpi_dict = self._data["kb"][kb_name]["kb_net_if"][if_name]
-         md_dict = self._data[framework+"/gnmi"][kb_name]["kb_net_if"][if_name]
+         md_dict = self._data[framework+"/gnmi"][kb_name]["net_if"][if_name]
          kpi_dict["kb_net_if_vector_rate"].append(
             self._data[framework+"/gnmi"][kb_name]["/sys/vector_rate"]._top())
          kpi_dict["kb_net_if_rx_packets"].append(md_dict["/if/rx/T0/packets"]._top())

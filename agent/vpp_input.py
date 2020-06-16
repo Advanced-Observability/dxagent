@@ -40,7 +40,7 @@ GNMI_SAMPLING_RATE=int(1e9)*10
 MAX_RETRIES=3
 #
 # time for gNMI to wait before retry connecting
-GNMI_RETRY_INTERVAL=60
+GNMI_RETRY_INTERVAL=30
 
 def vpp_support(api_sock='/run/vpp/api.sock',
                 stats_sock='/run/vpp/stats.sock'):
