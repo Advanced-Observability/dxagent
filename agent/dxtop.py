@@ -212,22 +212,33 @@ class DXTop(IOManager):
       self._format_attrs_list_rb("vpp/stats/err", 5)
 
       #vpp_gnmi
-      self._append_content(self._center_text("vpp/gnmi"), 5, curses.A_BOLD)
-      for kb_name in self._data["vpp/gnmi"]:
-         self._append_content(self._center_text(kb_name), 5, curses.A_DIM)
-         self._format_attrs_rb(kb_name, 5, subdict=self._data["vpp/gnmi"], title=False)
-         self._format_attrs_list_rb("net_if", 5, subdict=self._data["vpp/gnmi"][kb_name],
-                                    title=False)
+      if "vpp/gnmi" in self._data:
+         self._append_content(self._center_text("vpp/gnmi"), 5, curses.A_BOLD)
+         for kb_name in self._data["vpp/gnmi"]:
+            self._append_content(self._center_text(kb_name), 5, curses.A_DIM)
+            self._format_attrs_rb(kb_name, 5, subdict=self._data["vpp/gnmi"], title=False)
+            self._format_attrs_list_rb("kb_net_if", 5, 
+                                       subdict=self._data["vpp/gnmi"][kb_name],
+                                       title=False)
 
       # Health metrics Pad
       self._append_content(self._center_text("Symptoms"), 6, curses.A_REVERSE)
       self._append_content(self._center_text(" "), 6)
-      for name, severity, args in self._data["symptoms"]:
-         s=name+" "+", ".join(args)
-         lpad,rpad=self._center_padding(s)
-         flags = [(len(lpad),curses.color_pair(int(severity))),(len(s)+len(lpad),0)]
-         self._append_content(self._center_text(s), 6, flags=flags)
-      self._append_content(self._center_text(" "), 6)
+      if "symptoms" in self._data:
+         for name, severity, args in self._data["symptoms"]:
+            if not args:
+               s=name
+               lpad,rpad=self._center_padding(s)
+               flags = [(len(lpad),curses.color_pair(int(severity))),(len(s)+len(lpad),0)]
+               self._append_content(self._center_text(s), 6, flags=flags)
+            else:
+               for arg in args:
+                  s="{}: {}".format(name,arg)
+                  lpad,rpad=self._center_padding(s)
+                  flags = [(len(lpad),curses.color_pair(int(severity))),(len(s)+len(lpad),0)]
+                  self._append_content(self._center_text(s), 6, flags=flags)              
+         self._append_content(self._center_text(" "), 6)
+      
       self._append_content(self._center_text("Metrics"), 6, curses.A_REVERSE)
       self._format_attrs_list_rb_percpu("bm_cpu", 6)
       self._format_attrs_list_rb("bm_net_if", 6)
@@ -242,7 +253,7 @@ class DXTop(IOManager):
          for vm_name in self._data["vm"]:
             self._append_content(self._center_text(vm_name), 6, curses.A_DIM)
             self._format_attrs_rb(vm_name, 6, subdict=self._data["vm"], title=False)
-            self._format_attrs_list_rb("net_if", 6, subdict=self._data["vm"][vm_name],
+            self._format_attrs_list_rb("vm_net_if", 6, subdict=self._data["vm"][vm_name],
                                        title=False)
                                     
       if "kb" in self._data:
@@ -250,7 +261,7 @@ class DXTop(IOManager):
          for kb_name in self._data["kb"]:
             self._append_content(self._center_text(kb_name), 6, curses.A_DIM)
             self._format_attrs_rb(kb_name, 6, subdict=self._data["kb"], title=False)
-            self._format_attrs_list_rb("net_if", 6, subdict=self._data["kb"][kb_name],
+            self._format_attrs_list_rb("kb_net_if", 6, subdict=self._data["kb"][kb_name],
                                        title=False)
              
       self.resize_columns()

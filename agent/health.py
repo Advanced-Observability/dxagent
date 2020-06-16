@@ -11,6 +11,7 @@ import os
 import builtins
 import sys
 import ast
+import operator
 
 from agent.rbuffer import init_rb_dict, Severity
 from agent.sysinfo import SysInfo
@@ -35,20 +36,20 @@ class Symptom():
       self._compile_rule()
 
    def _compile_rule(self):
-#   return ast.Call(func=ast.Attribute(
-#                       value=ast.Name(id=node.id,ctx=ast.Load()),
-#                                      attr='_top',
-#                                      ctx=node.ctx
-#                                      ),
-#                    args=[],keywords=[])
       class RewriteName(ast.NodeTransformer):
          def visit_Name(self, node):
             # only if parent is not a func
-            # if node.id == "1min"
+            if node.id.startswith("_"):
+               return node
             return ast.Call(func=ast.Name(id="access", ctx=node.ctx),
                             args=[ast.Constant(value=node.id)],
                             keywords=[])
-      
+                            
+      # 1. string-level replacement
+      alias=[("1min","_1min"), ("5min","_5min")]
+      for old,new in alias:
+         self.rule=self.rule.replace(old,new)
+      # 2. ast-level replacement
       node = ast.parse(self.rule, mode='eval')
       node = ast.fix_missing_locations(RewriteName().visit(node))
       self._o=compile(node, '<string>', 'eval')
@@ -61,28 +62,107 @@ class Symptom():
       engine = self.engine
       kpis = self.engine.kpis
       
+      class Comparator():
+         def __init__(self, rb):
+            self.islist=isinstance(rb,list)
+            self.rb=rb
+            # how many samples are considered
+            self.count=1
+         def indexes(self):
+            return [index for (index,_) in self.rb]
+         def compare(self, other, _operator):
+            """
+            compare a Comparator with a constant or another Comparator
+            """
+            if not self.islist:
+               # not enough samples, skip
+               if len(self.rb) < self.count:
+                  return False
+               return all(_operator(v,other) for v in self.rb._tops(self.count))
+            ret=[]
+            for index, rb in self.rb:
+               if len(rb) < self.count:
+                  continue
+               if all(_operator(v,other) for v in rb._tops(self.count)):
+                  ret.append((index,rb))
+            # return a comparator if it matched
+            if not ret:
+               return False
+            self.rb = ret
+            return self         
+         
+         def __lt__(self, other):
+            return self.compare(other, operator.__lt__)
+         def __le__(self, other):
+            return self.compare(other, operator.__le__)
+         def __eq__(self, other):
+            return self.compare(other, operator.__eq__)
+         def __ne__(self, other):
+            return self.compare(other, operator.__ne__)
+         def __gt__(self, other):
+            return self.compare(other, operator.__gt__)
+         def __ge__(self, other):
+            return self.compare(other, operator.__ge__)
+            
+         def __and__(self, other):
+            engine.info("and")
+            if (not self.islist 
+                 or not isinstance(other,Comparator) 
+                 or not other.islist):
+               return self and other
+            intersection=list(set(self.indexes) & set(other.indexes))
+            self.rb = filter(lambda e: e[0] in intersection, self.rb)
+            if not self.rb:
+               return False
+            return self
+            
+         def __or__(self, other):
+            engine.info("or")
+            if (not self.islist 
+                 or not isinstance(other,Comparator) 
+                 or not other.islist):
+               return self and other
+            for e in other.rb:
+               if e not in self.rb:
+                  self.rb.append(e)
+            if not self.rb:
+               return False
+            return self
+      
       def access(var):
          kpi = kpis[var]
-         prefix="_".join(var.split("_")[:2])
+         prefix=kpi.prefix
+         split = var.split("_")
+         
+         if split[0] == "vm" or split[0] == "kb":
+            prefix2=split[0]
+            if not kpi.islist:
+               return Comparator([(dev, b[var]) for dev,b in data[prefix2].items()])
+            # double list
+            ret=[]
+            for dev,b in data[prefix2].items():
+               ret += [(dev+":"+dev2,rb[var]) for dev2,rb in b[prefix].items()]
+            return Comparator(ret)
+               
          if not kpi.islist:
-            return data[prefix][var]._top()
-
-         return [(dev, b[var]._top()) for dev,b in prefix.items()]
+            return Comparator(data[prefix][var])
+         return Comparator([(dev, b[var]) for dev,b in data[prefix].items()])
          
-      def _1min(var):
-         prefix="_".join(var.split("_")[:2])
-         return prefix[var]._tops(sample_per_min)   
-
+      def _1min(rb):
+         rb.count = engine.sample_per_min
+         return rb
       def _5min(var):
-         prefix="_".join(var.split("_")[:2])
-         return prefix[var]._tops(sample_per_min*5)
+         rb.count = engine.sample_per_min*5
+         return rb
          
+      ret=eval(self._o, globals(), locals())
+      
       try:
-         ret=eval(self._o, globals(), locals())
          self.args = []
          if ret:
-            if isinstance(ret, list):
-               self.args = ret
+            if isinstance(ret, Comparator):
+               #engine.info(ret.rb)
+               self.args = ret.indexes()
             return True
          return False
       except Exception as e:
@@ -98,6 +178,12 @@ class KPI():
       self._type=_type
       self.unit=unit
       self.islist=int(islist)
+      split=name.split("_")
+      if len(split) >= 3 and split[2] in ["if"]:
+         self.prefix="_".join(split[:3])
+      else:
+         self.prefix="_".join(split[:2])
+      
 
 class HealthEngine():
    def __init__(self, data, info, parent):      
@@ -107,7 +193,7 @@ class HealthEngine():
       self.sysinfo = SysInfo()
       self._data["vm"], self._data["kb"] = {}, {}
       self._data["symptoms"] = []
-      self.sample_per_min = 60/AGENT_INPUT_RATE
+      self.sample_per_min = int(60/AGENT_INPUT_RATE)
       
       self._read_kpi_file()
       self._read_rule_file()
@@ -563,20 +649,20 @@ class Subservice():
          # add if if needed
          attr="{}{}/Name".format(prefix, net_index)
          if_name=self._data[hypervisor+"/vms"][vm_name][attr]._top()
-         if if_name not in self._data["vm"][vm_name]["net_if"]:
-            self._data["vm"][vm_name]["net_if"][if_name] = self._init_kpis_rb("vm", "net_if")
+         if if_name not in self._data["vm"][vm_name]["vm_net_if"]:
+            self._data["vm"][vm_name]["vm_net_if"][if_name] = self._init_kpis_rb("vm", "net_if")
          # translate data
          for suffix in attrs_suffix:
             # if status
             attr="{}{}/Status".format(prefix, net_index)
-            self._data["vm"][vm_name]["net_if"][if_name]["vm_net_if_state"].append(
-               self._data[hypervisor+"/vms"][vm_name][attr]._top())
+            self._data["vm"][vm_name]["vm_net_if"][if_name]["vm_net_if_state"].append(
+               self._data[hypervisor+"/vms"][vm_name][attr]._top().lower())
             # XXX: per-interface instead of total rate
             attr="Net/Rate/Rx"
-            self._data["vm"][vm_name]["net_if"][if_name]["vm_net_if_rx_bytes"].append(
+            self._data["vm"][vm_name]["vm_net_if"][if_name]["vm_net_if_rx_bytes"].append(
                self._data[hypervisor+"/vms"][vm_name][attr]._top()/1000.0)
             attr="Net/Rate/Tx"
-            self._data["vm"][vm_name]["net_if"][if_name]["vm_net_if_tx_bytes"].append(
+            self._data["vm"][vm_name]["vm_net_if"][if_name]["vm_net_if_tx_bytes"].append(
                self._data[hypervisor+"/vms"][vm_name][attr]._top()/1000.0)
             
       # global KPIs
@@ -625,12 +711,12 @@ class Subservice():
       """
       kb_name=self.parent.name
       framework=self.parent.framework
-      for if_name, d in self._data[framework+"/gnmi"][kb_name]["net_if"].items():
+      for if_name, d in self._data[framework+"/gnmi"][kb_name]["kb_net_if"].items():
          # create interface entry if needed
-         if if_name not in self._data["kb"][kb_name]["net_if"]:
-            self._data["kb"][kb_name]["net_if"][if_name] = self._init_kpis_rb("kb", "net_if")
-         kpi_dict = self._data["kb"][kb_name]["net_if"][if_name]
-         md_dict = self._data[framework+"/gnmi"][kb_name]["net_if"][if_name]
+         if if_name not in self._data["kb"][kb_name]["kb_net_if"]:
+            self._data["kb"][kb_name]["kb_net_if"][if_name] = self._init_kpis_rb("kb", "net_if")
+         kpi_dict = self._data["kb"][kb_name]["kb_net_if"][if_name]
+         md_dict = self._data[framework+"/gnmi"][kb_name]["kb_net_if"][if_name]
          kpi_dict["kb_net_if_vector_rate"].append(
             self._data[framework+"/gnmi"][kb_name]["/sys/vector_rate"]._top())
          kpi_dict["kb_net_if_rx_packets"].append(md_dict["/if/rx/T0/packets"]._top())
@@ -716,7 +802,7 @@ class VM(Subservice):
       deps = ["cpu", "mem", "net", "proc"]
       self.dependencies = [Subservice(dep, self.engine, parent=self) for dep in deps]
       # init KPIs for non-list RBs
-      self._data["vm"][self.name] = {"net_if": {}}
+      self._data["vm"][self.name] = {"vm_net_if": {}}
       self._data["vm"][self.name].update(self._init_kpis_rb("vm", "proc"))
       self._data["vm"][self.name].update(self._init_kpis_rb("vm", "net"))
       self._data["vm"][self.name].update(self._init_kpis_rb("vm", "mem"))
@@ -749,7 +835,7 @@ class KBNet(Subservice):
       deps = ["proc", "mem", "net"]
       self.dependencies = [Subservice(dep, self.engine, parent=self) for dep in deps]
       # init KPIs for non-list RBs
-      self._data["kb"][self.name] = {"net_if": {}}
+      self._data["kb"][self.name] = {"kb_net_if": {}}
       self._data["kb"][self.name].update(self._init_kpis_rb("kb", "mem"))
       self._data["kb"][self.name].update(self._init_kpis_rb("kb", "proc"))
 

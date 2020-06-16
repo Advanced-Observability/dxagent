@@ -10,7 +10,7 @@ import numpy as np
 import collections
 import threading
 from contextlib import contextmanager
-from itertools import chain
+import itertools
 from enum import Enum
 
 # max number of collected values
@@ -132,8 +132,9 @@ class RingBuffer(collections.deque):
       @return last c value
 
       """
+      ret= [self.__getitem__(-i) for i in range(c,0,-1)]
       try:
-         return self[-c-1:-1]
+         return ret
       except:
          return []
 
