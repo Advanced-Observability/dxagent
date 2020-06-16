@@ -132,9 +132,8 @@ class RingBuffer(collections.deque):
       @return last c value
 
       """
-      ret= [self.__getitem__(-i) for i in range(c,0,-1)]
       try:
-         return ret
+         return [self.__getitem__(-i) for i in range(c,0,-1)]
       except:
          return []
 

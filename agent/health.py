@@ -37,6 +37,12 @@ class Symptom():
 
    def _compile_rule(self):
       class RewriteName(ast.NodeTransformer):
+         def visit_BoolOp(self, node):
+            self.generic_visit(node)
+            return ast.BinOp(left=node.values[0],
+               op=ast.BitAnd(),
+               right=node.values[1]
+               )
          def visit_Name(self, node):
             # only if parent is not a func
             if node.id.startswith("_"):
@@ -105,19 +111,17 @@ class Symptom():
             return self.compare(other, operator.__ge__)
             
          def __and__(self, other):
-            engine.info("and")
             if (not self.islist 
                  or not isinstance(other,Comparator) 
                  or not other.islist):
                return self and other
-            intersection=list(set(self.indexes) & set(other.indexes))
+            intersection=list(set(self.indexes()) & set(other.indexes()))
             self.rb = filter(lambda e: e[0] in intersection, self.rb)
             if not self.rb:
                return False
             return self
             
          def __or__(self, other):
-            engine.info("or")
             if (not self.islist 
                  or not isinstance(other,Comparator) 
                  or not other.islist):
@@ -711,7 +715,7 @@ class Subservice():
       """
       kb_name=self.parent.name
       framework=self.parent.framework
-      for if_name, d in self._data[framework+"/gnmi"][kb_name]["kb_net_if"].items():
+      for if_name, d in self._data[framework+"/gnmi"][kb_name]["net_if"].items():
          # create interface entry if needed
          if if_name not in self._data["kb"][kb_name]["kb_net_if"]:
             self._data["kb"][kb_name]["kb_net_if"][if_name] = self._init_kpis_rb("kb", "net_if")

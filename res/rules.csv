@@ -6,3 +6,5 @@ name,severity,rule,
 "Sensor reached maximum temperature",Orange,bm_sensors_input_temp>=bm_sensors_max_temp
 "Sensor reached critical temperature",Red,bm_sensors_input_temp>=bm_sensors_critical_temp
 "No SSH access to VM",Orange,vm_net_ssh==0
+"No ARP Entry For Default Gateway",Red,(bm_net_if_state=="up") and (bm_net_if_gw_in_arp==0)
+
