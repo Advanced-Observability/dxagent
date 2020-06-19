@@ -313,12 +313,13 @@ class HealthEngine():
             self.info(symptom.name)
             self._data["symptoms"].append(symptom)
       
-            
 class Subservice():
    """
    
    """
-   def __init__(self, name, engine, parent=None, is_leaf=False):
+   def __init__(self, _type, name, engine, parent=None, is_leaf=False):
+      # The type of subservice e.g., vm, bm, kb, node, net, if, etc
+      self._type = _type
       # The unique identifier of the subservice
       # e.g., VM id, VPP id, or net, cpu, proc for Subservices
       self.name = name
@@ -328,10 +329,31 @@ class Subservice():
       self.parent = parent
       self.is_leaf = is_leaf
       self.dependencies = []
-      # The type of subservice e.g., Subservice, VM, BareMetal, etc
-      self._type = type(self).__name__
-      self.fullname = self._type+"."+self.name
-      self.active = False
+      self.active = True
+      self.fullname = self.find_fullname()
+      self.path = self.find_path()
+      
+   def find_fullname(self):
+      """
+      compute fullname string, similar to the path string
+      with additional name/index (e.g.,
+         node:machine1.vm:vagrant_default_158504808.net.if:vboxnet0 )
+      """
+      fullname=self._type
+      if self.name:
+         fullname = "{}({})".format(fullname,self.name)
+      if self.parent:
+         fullname = "{}.{}".format(self.parent.fullname,fullname)
+      return fullname
+      
+   def find_path(self):
+      """
+      compute path string (e.g., node.bm.sensors.fan)
+      """
+      path=self._type
+      if self.parent:
+         path = "{}.{}".format(self.parent.path,path)
+      return path
 
    def __contains__(self, item):
       return any(subservice.name == item for subservice in self.dependencies)
@@ -384,25 +406,24 @@ class Subservice():
       
       """
       key = (self.sysinfo.system,
-             self.parent._type if self.parent else None, 
-             self.name)
+             self.path)
       funcs = {
-         ("Linux","Baremetal","cpu")     : self._update_kpis_linux_bm_cpu,
-         ("Linux","Baremetal","sensors") : self._update_kpis_linux_bm_sensors,
-         ("Linux","Baremetal","disk")    : self._update_kpis_linux_bm_disk,
-         ("Linux","Baremetal","mem")     : self._update_kpis_linux_bm_mem,
-         ("Linux","Baremetal","proc")    : self._update_kpis_linux_bm_proc,
-         ("Linux","Baremetal","net")     : self._update_kpis_linux_bm_net,
-         ("Linux","VM","cpu")  : self._update_kpis_linux_vm_cpu,
-         ("Linux","VM","mem")  : self._update_kpis_linux_vm_mem,
-         ("Linux","VM","net")  : self._update_kpis_linux_vm_net,
-         ("Linux","VM","proc") : self._update_kpis_linux_vm_proc,
-         ("Linux","KBNet","proc") : self._update_kpis_linux_kb_proc,
-         ("Linux","KBNet","mem")  : self._update_kpis_linux_kb_mem,
-         ("Linux","KBNet","net")  : self._update_kpis_linux_kb_net,
+         ("Linux","node.bm.cpu")     : self._update_kpis_linux_bm_cpu,
+         ("Linux","node.bm.sensors") : self._update_kpis_linux_bm_sensors,
+         ("Linux","node.bm.disk")    : self._update_kpis_linux_bm_disk,
+         ("Linux","node.bm.mem")     : self._update_kpis_linux_bm_mem,
+         ("Linux","node.bm.proc")    : self._update_kpis_linux_bm_proc,
+         ("Linux","node.bm.net")     : self._update_kpis_linux_bm_net,
+         ("Linux","node.vm.cpu")     : self._update_kpis_linux_vm_cpu,
+         ("Linux","node.vm.mem")     : self._update_kpis_linux_vm_mem,
+         ("Linux","node.vm.net")     : self._update_kpis_linux_vm_net,
+         ("Linux","node.vm.proc")    : self._update_kpis_linux_vm_proc,
+         ("Linux","node.kb.proc")    : self._update_kpis_linux_kb_proc,
+         ("Linux","node.kb.mem")     : self._update_kpis_linux_kb_mem,
+         ("Linux","node.kb.net")     : self._update_kpis_linux_kb_net,
         
-         ("Windows","BareMetal","cpu") : self._update_kpis_win_bm_cpu,
-         ("MacOS","BareMetal","cpu") : self._update_kpis_macos_bm_cpu,
+         ("Windows","node.bm.cpu") : self._update_kpis_win_bm_cpu,
+         ("MacOS","node.bm.cpu")   : self._update_kpis_macos_bm_cpu,
       }
       return funcs[key]()
 
@@ -743,10 +764,8 @@ class Node(Subservice):
 
    """
    def __init__(self, name, engine, parent=None):
-      super(Node, self).__init__(name, engine, parent=parent)
-      self.active = True
-      self.name = self.sysinfo.node
-      self.dependencies = [Baremetal(self.name, self.engine, parent=self)]
+      super(Node, self).__init__("node", name, engine, parent=parent)
+      self.dependencies = [Baremetal("", self.engine, parent=self)]
       
    def add_vm(self, name, hypervisor):
       self.dependencies.append(VM(name, self.engine, hypervisor, parent=self))
@@ -777,11 +796,10 @@ class Baremetal(Subservice):
    
    """
    def __init__(self, name, engine, parent=None):
-      super(Baremetal, self).__init__(name, engine, parent=parent)
-      self.active = True
+      super(Baremetal, self).__init__("bm", name, engine, parent=parent)
       
       deps = ["cpu", "sensors", "disk", "mem", "proc", "net"]
-      self.dependencies = [Subservice(dep, self.engine, parent=self) for dep in deps]
+      self.dependencies = [Subservice(dep, "", self.engine, parent=self) for dep in deps]
       # init KPIs for non-list RBs
       self._data["bm_net_if"] = {}
       self._data["bm_net"] = self._init_kpis_rb("bm", "net")
@@ -800,11 +818,11 @@ class VM(Subservice):
    
    """
    def __init__(self, name, engine, hypervisor, parent=None):
-      super(VM, self).__init__(name, engine, parent=parent)
+      super(VM, self).__init__("vm", name, engine, parent=parent)
       self.hypervisor=hypervisor
       
       deps = ["cpu", "mem", "net", "proc"]
-      self.dependencies = [Subservice(dep, self.engine, parent=self) for dep in deps]
+      self.dependencies = [Subservice(dep, "", self.engine, parent=self) for dep in deps]
       # init KPIs for non-list RBs
       self._data["vm"][self.name] = {"vm_net_if": {}}
       self._data["vm"][self.name].update(self._init_kpis_rb("vm", "proc"))
@@ -833,11 +851,11 @@ class KBNet(Subservice):
    
    """
    def __init__(self, name, engine, framework, parent=None):
-      super(KBNet, self).__init__(name, engine, parent=parent)
+      super(KBNet, self).__init__("kb", name, engine, parent=parent)
       self.framework=framework
       
       deps = ["proc", "mem", "net"]
-      self.dependencies = [Subservice(dep, self.engine, parent=self) for dep in deps]
+      self.dependencies = [Subservice(dep, "", self.engine, parent=self) for dep in deps]
       # init KPIs for non-list RBs
       self._data["kb"][self.name] = {"kb_net_if": {}}
       self._data["kb"][self.name].update(self._init_kpis_rb("kb", "mem"))
