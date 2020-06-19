@@ -66,7 +66,7 @@ class Symptom():
       
       """
       engine = self.engine
-      kpis = self.engine.kpis
+      metrics = self.engine.metrics
       
       class Comparator():
          def __init__(self, rb):
@@ -134,13 +134,13 @@ class Symptom():
             return self
       
       def access(var):
-         kpi = kpis[var]
-         prefix=kpi.prefix
+         metric = metrics[var]
+         prefix=metric.prefix
          split = var.split("_")
          
          if split[0] == "vm" or split[0] == "kb":
             prefix2=split[0]
-            if not kpi.islist:
+            if not metric.islist:
                return Comparator([(dev, b[var]) for dev,b in data[prefix2].items()])
             # double list
             ret=[]
@@ -148,7 +148,7 @@ class Symptom():
                ret += [(dev+":"+dev2,rb[var]) for dev2,rb in b[prefix].items()]
             return Comparator(ret)
                
-         if not kpi.islist:
+         if not metric.islist:
             return Comparator(data[prefix][var])
          return Comparator([(dev, b[var]) for dev,b in data[prefix].items()])
          
@@ -176,7 +176,7 @@ class Symptom():
    def __str__(self):
       return "{} {} {}".format(self.name, self.severity, self.rule)
 
-class KPI():
+class Metric():
    def __init__(self, name, _type, unit, islist):
       self.name=name
       self._type=_type
@@ -199,7 +199,7 @@ class HealthEngine():
       self._data["symptoms"] = []
       self.sample_per_min = int(60/AGENT_INPUT_RATE)
       
-      self._read_kpi_file()
+      self._read_metrics_file()
       self._read_rule_file()
       self._build_dependency_graph()
       
@@ -228,10 +228,10 @@ class HealthEngine():
 #               self.info("Invalid rule syntax: {}".format(rule))
 #               continue
       
-   def _read_kpi_file(self):
-      self.kpi_attrs, self.kpi_types, self.kpi_units = {}, {}, {}
-      self.kpis = {}
-      file_loc = os.path.join(self.parent.args.ressources_dir,"kpi.csv")
+   def _read_metrics_file(self):
+      self.metrics_attrs, self.metrics_types, self.metrics_units = {}, {}, {}
+      self.metrics = {}
+      file_loc = os.path.join(self.parent.args.ressources_dir,"metrics.csv")
       with open(file_loc) as csv_file:
          for r in csv.DictReader(csv_file):
             name,_type,unit,islist= r["name"], r["type"],r["unit"],r["is_list"]
@@ -245,12 +245,12 @@ class HealthEngine():
             dependency = "_".join(split[1:3]) if len(split) >= 3 and split[2] in ["if"] else split[1]
             
             key = (parent, dependency)
-            self.kpi_attrs.setdefault(key,[]).append(name)
+            self.metrics_attrs.setdefault(key,[]).append(name)
             # string to type conversion
-            self.kpi_types.setdefault(key,[]).append(getattr(builtins, _type))
-            self.kpi_units.setdefault(key,[]).append(unit)
-            kpi = KPI(name, getattr(builtins, _type), unit, islist)
-            self.kpis[name] = kpi
+            self.metrics_types.setdefault(key,[]).append(getattr(builtins, _type))
+            self.metrics_units.setdefault(key,[]).append(unit)
+            metric = Metric(name, getattr(builtins, _type), unit, islist)
+            self.metrics[name] = metric
 
    def _build_dependency_graph(self):
       self.node = Node(self.sysinfo.node, self)
@@ -288,21 +288,21 @@ class HealthEngine():
    def remove_kbnet(self, name):
       self.node.remove_kbnet(name)
 
-   def update_kpis(self):
+   def update_metrics(self):
       """
-      Update deps graph and subservices KPIs.
+      Update deps graph and subservices metrics.
 
       """
       self._update_dependency_graph()
-      self.node.update_kpis()
+      self.node.update_metrics()
 
-   def _update_kpis_bm(self):
+   def _update_metrics_bm(self):
       pass
 
-   def _update_kpis_vm(self):
+   def _update_metrics_vm(self):
       pass
 
-   def _update_kpis_kb(self):
+   def _update_metrics_kb(self):
       pass
 
    def update_symptoms(self):
@@ -358,7 +358,7 @@ class Subservice():
    def __contains__(self, item):
       return any(subservice.name == item for subservice in self.dependencies)
 
-   def del_kpis(self):
+   def del_metrics(self):
       """
       subservice cleanup, overload in child if needed.
       """
@@ -369,38 +369,38 @@ class Subservice():
    def get_health_score(self):
       return self.health_score
 
-   def _init_kpis_rb(self, parent, dependency):
+   def _init_metrics_rb(self, parent, dependency):
       """
-      return KPIs ringbuffers for subservices monitoring
+      return metrics ringbuffers for subservices monitoring
 
       @param parent the name of the parent node
       @param dependency the name of the subservice for which rbs
                         are getting initialized
 
-      XXX: class name != parent subservice name in kpi.csv
+      XXX: class name != parent subservice name in metrics.csv
       
       """
       category = parent+"_"+dependency
-      attrs = self.engine.kpi_attrs[(parent, dependency)]
-      types = self.engine.kpi_types[(parent, dependency)]
-      units = self.engine.kpi_units[(parent, dependency)]
+      attrs = self.engine.metrics_attrs[(parent, dependency)]
+      types = self.engine.metrics_types[(parent, dependency)]
+      units = self.engine.metrics_units[(parent, dependency)]
       return init_rb_dict(attrs,
                           types=types,
                           units=units)
-   def update_kpis(self):
+   def update_metrics(self):
       """
-      update KPIs for this subservice and its dependencies
+      update metrics for this subservice and its dependencies
 
       """
-      self._update_kpis()
+      self._update_metrics()
       if not self.active:
          return
       for subservice in self.dependencies:
-         subservice.update_kpis()
+         subservice.update_metrics()
 
-   def _update_kpis(self):
+   def _update_metrics(self):
       """
-      update KPIs for this subservice 
+      update metrics for this subservice 
 
       Pick the right function based on host OS and subservice.
       
@@ -408,34 +408,34 @@ class Subservice():
       key = (self.sysinfo.system,
              self.path)
       funcs = {
-         ("Linux","node.bm.cpu")     : self._update_kpis_linux_bm_cpu,
-         ("Linux","node.bm.sensors") : self._update_kpis_linux_bm_sensors,
-         ("Linux","node.bm.disk")    : self._update_kpis_linux_bm_disk,
-         ("Linux","node.bm.mem")     : self._update_kpis_linux_bm_mem,
-         ("Linux","node.bm.proc")    : self._update_kpis_linux_bm_proc,
-         ("Linux","node.bm.net")     : self._update_kpis_linux_bm_net,
-         ("Linux","node.vm.cpu")     : self._update_kpis_linux_vm_cpu,
-         ("Linux","node.vm.mem")     : self._update_kpis_linux_vm_mem,
-         ("Linux","node.vm.net")     : self._update_kpis_linux_vm_net,
-         ("Linux","node.vm.proc")    : self._update_kpis_linux_vm_proc,
-         ("Linux","node.kb.proc")    : self._update_kpis_linux_kb_proc,
-         ("Linux","node.kb.mem")     : self._update_kpis_linux_kb_mem,
-         ("Linux","node.kb.net")     : self._update_kpis_linux_kb_net,
+         ("Linux","node.bm.cpu")     : self._update_metrics_linux_bm_cpu,
+         ("Linux","node.bm.sensors") : self._update_metrics_linux_bm_sensors,
+         ("Linux","node.bm.disk")    : self._update_metrics_linux_bm_disk,
+         ("Linux","node.bm.mem")     : self._update_metrics_linux_bm_mem,
+         ("Linux","node.bm.proc")    : self._update_metrics_linux_bm_proc,
+         ("Linux","node.bm.net")     : self._update_metrics_linux_bm_net,
+         ("Linux","node.vm.cpu")     : self._update_metrics_linux_vm_cpu,
+         ("Linux","node.vm.mem")     : self._update_metrics_linux_vm_mem,
+         ("Linux","node.vm.net")     : self._update_metrics_linux_vm_net,
+         ("Linux","node.vm.proc")    : self._update_metrics_linux_vm_proc,
+         ("Linux","node.kb.proc")    : self._update_metrics_linux_kb_proc,
+         ("Linux","node.kb.mem")     : self._update_metrics_linux_kb_mem,
+         ("Linux","node.kb.net")     : self._update_metrics_linux_kb_net,
         
-         ("Windows","node.bm.cpu") : self._update_kpis_win_bm_cpu,
-         ("MacOS","node.bm.cpu")   : self._update_kpis_macos_bm_cpu,
+         ("Windows","node.bm.cpu") : self._update_metrics_win_bm_cpu,
+         ("MacOS","node.bm.cpu")   : self._update_metrics_macos_bm_cpu,
       }
       return funcs[key]()
 
-   def _update_kpis_linux_bm_cpu(self):
-      """Update KPIs for linux BM cpu subservice
+   def _update_metrics_linux_bm_cpu(self):
+      """Update metrics for linux BM cpu subservice
 
       """
-      # init KPI rbs if needed
+      # init metric rbs if needed
       if "bm_cpu" not in self._data:
          self._data["bm_cpu"] = {}
          for cpu_label in self._data["stat/cpu"]:
-            self._data["bm_cpu"][cpu_label] = self._init_kpis_rb("bm", "cpu")
+            self._data["bm_cpu"][cpu_label] = self._init_metrics_rb("bm", "cpu")
 
       # fill them
       for cpu_label in self._data["stat/cpu"]:
@@ -448,45 +448,45 @@ class Subservice():
          self._data["bm_cpu"][cpu_label]["bm_cpu_guest_time"].append(
             self._data["stat/cpu"][cpu_label]["guest_all_perc"]._top())
 
-   def _update_kpis_linux_bm_sensors(self):
-      """Update KPIs for linux BM sensors subservice
+   def _update_metrics_linux_bm_sensors(self):
+      """Update metrics for linux BM sensors subservice
 
       """
-      # init KPI rbs if needed
+      # init metric rbs if needed
       if "bm_sensors" not in self._data:
          self._data["bm_sensors"] = {}
          # thermal zones
          for zone_label,d in self._data["sensors/thermal"].items():
             zone_label += ":"+d["type"]._top()
-            self._data["bm_sensors"][zone_label] = self._init_kpis_rb("bm", "sensors")
+            self._data["bm_sensors"][zone_label] = self._init_metrics_rb("bm", "sensors")
             self._data["bm_sensors"][zone_label]["bm_sensors_type"].append("zone")
          # fan sensors
          for fan_label,d in self._data["sensors/fans"].items():
             fan_label += ":"+d["label"]._top()
-            self._data["bm_sensors"][fan_label] = self._init_kpis_rb("bm", "sensors")
+            self._data["bm_sensors"][fan_label] = self._init_metrics_rb("bm", "sensors")
             self._data["bm_sensors"][fan_label]["bm_sensors_type"].append("fan")
          # core sensors
          for core_label,d in self._data["sensors/coretemp"].items():
             core_label += ":"+d["label"]._top()
-            self._data["bm_sensors"][core_label] = self._init_kpis_rb("bm", "sensors")
+            self._data["bm_sensors"][core_label] = self._init_metrics_rb("bm", "sensors")
             self._data["bm_sensors"][core_label]["bm_sensors_type"].append("cpu")
 
       # thermal zones
       for zone_label,d in self._data["sensors/thermal"].items():
          zone_label += ":"+d["type"]._top()
          attr_mapping = {"temperature": "bm_sensors_input_temp",}
-         for attr,kpi in attr_mapping.items():
+         for attr,metric in attr_mapping.items():
             if attr in d:
-               self._data["bm_sensors"][zone_label][kpi].append(
+               self._data["bm_sensors"][zone_label][metric].append(
                  d[attr]._top())
       # fan sensors
       for fan_label,d in self._data["sensors/fans"].items():
          fan_label += ":"+d["label"]._top()
          attr_mapping = {"input": "bm_sensors_input_fanspeed",
                          "temperature": "bm_sensors_input_temp",}
-         for attr,kpi in attr_mapping.items():
+         for attr,metric in attr_mapping.items():
             if attr in d:
-               self._data["bm_sensors"][fan_label][kpi].append(
+               self._data["bm_sensors"][fan_label][metric].append(
                  d[attr]._top())
       # core sensors
       for core_label,d in self._data["sensors/coretemp"].items():
@@ -494,16 +494,16 @@ class Subservice():
          attr_mapping = {"input": "bm_sensors_input_temp",
                          "max": "bm_sensors_max_temp",
                          "critical": "bm_sensors_critical_temp",}
-         for attr,kpi in attr_mapping.items():
+         for attr,metric in attr_mapping.items():
             if attr in d:
-               self._data["bm_sensors"][core_label][kpi].append(
+               self._data["bm_sensors"][core_label][metric].append(
                  d[attr]._top())
 
-   def _update_kpis_linux_bm_disk(self):
-      """Update KPIs for linux BM disk subservice
+   def _update_metrics_linux_bm_disk(self):
+      """Update metrics for linux BM disk subservice
 
       """
-      # init KPI rbs if needed
+      # init metric rbs if needed
       if "bm_disk" not in self._data:
          self._data["bm_disk"] = {}
       previous=set(self._data["bm_disk"].keys())
@@ -511,7 +511,7 @@ class Subservice():
                   +list(self._data["swaps"].keys()))
       # add new disks
       for disk in current-previous:
-         self._data["bm_disk"][disk] = self._init_kpis_rb("bm", "disk")
+         self._data["bm_disk"][disk] = self._init_metrics_rb("bm", "disk")
       # remove unmounted disks
       for disk in previous-current:
          del self._data["bm_disk"][disk]
@@ -540,8 +540,8 @@ class Subservice():
          self._data["bm_disk"][disk]["bm_disk_swap_used"].append(
             rbs["used"]._top())
 
-   def _update_kpis_linux_bm_mem(self):
-      """Update KPIs for linux BM mem subservice
+   def _update_metrics_linux_bm_mem(self):
+      """Update metrics for linux BM mem subservice
 
       """
       self._data["bm_mem"]["bm_mem_total"].append(
@@ -567,8 +567,8 @@ class Subservice():
       self._data["bm_mem"]["bm_mem_pages_size"].append(
          self._data["meminfo"]["Hugepagesize"]._top()/1000)
 
-   def _update_kpis_linux_bm_proc(self):
-      """Update KPIs for linux BM proc subservice
+   def _update_metrics_linux_bm_proc(self):
+      """Update metrics for linux BM proc subservice
 
       """
       self._data["bm_proc"]["bm_proc_total_count"].append(
@@ -586,16 +586,16 @@ class Subservice():
       self._data["bm_proc"]["bm_proc_dead_count"].append(
          self._data["stats_global"]["dead_count"]._top())
 
-   def _update_kpis_linux_bm_net(self):
-      """Update KPIs for linux BM net subservice
+   def _update_metrics_linux_bm_net(self):
+      """Update metrics for linux BM net subservice
 
       """
-      # init KPI rbs if needed
+      # init metric rbs if needed
       previous=set(self._data["bm_net_if"].keys())
       current=set(self._data["net/dev"].keys())
       # add new ifs
       for net in current-previous:
-         self._data["bm_net_if"][net] = self._init_kpis_rb("bm", "net_if")
+         self._data["bm_net_if"][net] = self._init_metrics_rb("bm", "net_if")
       # remove down ifs
       for net in previous-current:
          del self._data["bm_net_if"][net]
@@ -617,9 +617,9 @@ class Subservice():
                       "tx_queue_len": "bm_net_if_tx_queue"}
       for net,rbs in self._data["net/dev"].items():
          # direct mapping
-         for attr,kpi in attr_mapping.items():
+         for attr,metric in attr_mapping.items():
             if attr in rbs:
-               self._data["bm_net_if"][net][kpi].append(
+               self._data["bm_net_if"][net][metric].append(
                  rbs[attr]._top())
          # other fields
          if "ip4_gw_addr" in rbs:
@@ -629,8 +629,8 @@ class Subservice():
       for field, rb in self._data["snmp"].items():
          self._data["bm_net"]["bm_net_snmp_"+field].append(rb._top())
 
-   def _update_kpis_linux_vm_cpu(self):
-      """Update KPIs for linux VM cpu subservice
+   def _update_metrics_linux_vm_cpu(self):
+      """Update metrics for linux VM cpu subservice
 
       """
       vm_name=self.parent.name
@@ -644,8 +644,8 @@ class Subservice():
       self._data["vm"][vm_name]["vm_cpu_idle_time"].append(
          self._data[hypervisor+"/vms"][vm_name]["Guest/CPU/Load/Idle"]._top())
    
-   def _update_kpis_linux_vm_mem(self):
-      """Update KPIs for linux VM mem subservice
+   def _update_metrics_linux_vm_mem(self):
+      """Update metrics for linux VM mem subservice
 
       """
       vm_name=self.parent.name
@@ -657,14 +657,14 @@ class Subservice():
       self._data["vm"][vm_name]["vm_mem_cache"].append(
          self._data[hypervisor+"/vms"][vm_name]["Guest/RAM/Usage/Cache"]._top()/1000.0)
       
-   def _update_kpis_linux_vm_net(self):
-      """Update KPIs for linux VM net subservice
+   def _update_metrics_linux_vm_net(self):
+      """Update metrics for linux VM net subservice
 
       """
       vm_name=self.parent.name
       hypervisor=self.parent.hypervisor
 
-      # per-interface KPIs
+      # per-interface metrics
       prefix="/VirtualBox/GuestInfo/Net/"
       attrs_suffix = ["MAC", "V4/IP", "V4/Broadcast",
                     "V4/Netmask", "Status"]
@@ -675,7 +675,7 @@ class Subservice():
          attr="{}{}/Name".format(prefix, net_index)
          if_name=self._data[hypervisor+"/vms"][vm_name][attr]._top()
          if if_name not in self._data["vm"][vm_name]["vm_net_if"]:
-            self._data["vm"][vm_name]["vm_net_if"][if_name] = self._init_kpis_rb("vm", "net_if")
+            self._data["vm"][vm_name]["vm_net_if"][if_name] = self._init_metrics_rb("vm", "net_if")
          # translate data
          for suffix in attrs_suffix:
             # if status
@@ -690,19 +690,19 @@ class Subservice():
             self._data["vm"][vm_name]["vm_net_if"][if_name]["vm_net_if_tx_bytes"].append(
                self._data[hypervisor+"/vms"][vm_name][attr]._top()/1000.0)
             
-      # global KPIs
+      # global metrics
       self._data["vm"][vm_name]["vm_net_ssh"].append(
           self._data[hypervisor+"/vms"][vm_name]["accessible"]._top())
           
-   def _update_kpis_linux_vm_proc(self):
-      """Update KPIs for linux VM proc subservice
+   def _update_metrics_linux_vm_proc(self):
+      """Update metrics for linux VM proc subservice
 
       """
       vm_name=self.parent.name
       hypervisor=self.parent.hypervisor
          
-   def _update_kpis_linux_kb_proc(self):
-      """Update KPIs for linux KB proc subservice
+   def _update_metrics_linux_kb_proc(self):
+      """Update metrics for linux KB proc subservice
 
       """
       kb_name=self.parent.name
@@ -710,8 +710,8 @@ class Subservice():
       self._data["kb"][kb_name]["kb_proc_thread_count"].append(
          self._data[framework+"/gnmi"][kb_name]["/sys/num_worker_threads"]._top())
       
-   def _update_kpis_linux_kb_mem(self):
-      """Update KPIs for linux KB mem subservice
+   def _update_metrics_linux_kb_mem(self):
+      """Update metrics for linux KB mem subservice
 
       """
       kb_name=self.parent.name
@@ -730,8 +730,8 @@ class Subservice():
       self._data["kb"][kb_name]["kb_mem_buffer_free"].append(buffer_free)
       self._data["kb"][kb_name]["kb_mem_buffer_cache"].append(self._data[framework+"/gnmi"][kb_name]["/buffer-pools/default-numa-0/cached"]._top())
       
-   def _update_kpis_linux_kb_net(self):
-      """Update KPIs for linux KB net subservice
+   def _update_metrics_linux_kb_net(self):
+      """Update metrics for linux KB net subservice
 
       """
       kb_name=self.parent.name
@@ -739,23 +739,23 @@ class Subservice():
       for if_name, d in self._data[framework+"/gnmi"][kb_name]["net_if"].items():
          # create interface entry if needed
          if if_name not in self._data["kb"][kb_name]["kb_net_if"]:
-            self._data["kb"][kb_name]["kb_net_if"][if_name] = self._init_kpis_rb("kb", "net_if")
-         kpi_dict = self._data["kb"][kb_name]["kb_net_if"][if_name]
+            self._data["kb"][kb_name]["kb_net_if"][if_name] = self._init_metrics_rb("kb", "net_if")
+         metric_dict = self._data["kb"][kb_name]["kb_net_if"][if_name]
          md_dict = self._data[framework+"/gnmi"][kb_name]["net_if"][if_name]
-         kpi_dict["kb_net_if_vector_rate"].append(
+         metric_dict["kb_net_if_vector_rate"].append(
             self._data[framework+"/gnmi"][kb_name]["/sys/vector_rate"]._top())
-         kpi_dict["kb_net_if_rx_packets"].append(md_dict["/if/rx/T0/packets"]._top())
-         kpi_dict["kb_net_if_rx_bytes"].append(md_dict["/if/rx/T0/bytes"]._top()/1000000.0)
-         kpi_dict["kb_net_if_rx_error"].append(md_dict["/if/rx-error/T0"]._top())
-         kpi_dict["kb_net_if_rx_drop"].append(md_dict["/if/rx-miss/T0"]._top())  
-         kpi_dict["kb_net_if_tx_packets"].append(md_dict["/if/tx/T0/packets"]._top())
-         kpi_dict["kb_net_if_tx_bytes"].append(md_dict["/if/tx/T0/bytes"]._top()/1000000.0)
-         kpi_dict["kb_net_if_tx_error"].append(md_dict["/if/tx-error/T0"]._top())
-         #kpi_dict["kb_net_tx_drop"].append(md_dict["/if/tx/T0/packets"]._top())
+         metric_dict["kb_net_if_rx_packets"].append(md_dict["/if/rx/T0/packets"]._top())
+         metric_dict["kb_net_if_rx_bytes"].append(md_dict["/if/rx/T0/bytes"]._top()/1000000.0)
+         metric_dict["kb_net_if_rx_error"].append(md_dict["/if/rx-error/T0"]._top())
+         metric_dict["kb_net_if_rx_drop"].append(md_dict["/if/rx-miss/T0"]._top())  
+         metric_dict["kb_net_if_tx_packets"].append(md_dict["/if/tx/T0/packets"]._top())
+         metric_dict["kb_net_if_tx_bytes"].append(md_dict["/if/tx/T0/bytes"]._top()/1000000.0)
+         metric_dict["kb_net_if_tx_error"].append(md_dict["/if/tx-error/T0"]._top())
+         #metric_dict["kb_net_tx_drop"].append(md_dict["/if/tx/T0/packets"]._top())
       
-   def _update_kpis_macos_bm_cpu(self):
+   def _update_metrics_macos_bm_cpu(self):
       pass
-   def _update_kpis_win_bm_cpu(self):
+   def _update_metrics_win_bm_cpu(self):
       pass
 
 class Node(Subservice):
@@ -774,19 +774,19 @@ class Node(Subservice):
    def remove_vm(self, name):
       for i, subservice in enumerate(self.dependencies):
          if isinstance(subservice, VM) and subservice.name == name:
-            subservice.del_kpis()
+            subservice.del_metrics()
             del self.dependencies[i]
             break
    def remove_kbnet(self, name):
       for i, subservice in enumerate(self.dependencies):
          if isinstance(subservice, KBNet) and subservice.name == name:
-            subservice.del_kpis()
+            subservice.del_metrics()
             del self.dependencies[i]
             break
 
-   def _update_kpis(self):
+   def _update_metrics(self):
       """
-      update KPIs for this subservice 
+      update metrics for this subservice 
 
       """
       pass
@@ -800,15 +800,15 @@ class Baremetal(Subservice):
       
       deps = ["cpu", "sensors", "disk", "mem", "proc", "net"]
       self.dependencies = [Subservice(dep, "", self.engine, parent=self) for dep in deps]
-      # init KPIs for non-list RBs
+      # init metrics for non-list RBs
       self._data["bm_net_if"] = {}
-      self._data["bm_net"] = self._init_kpis_rb("bm", "net")
-      self._data["bm_mem"] = self._init_kpis_rb("bm", "mem")
-      self._data["bm_proc"] = self._init_kpis_rb("bm", "proc")
+      self._data["bm_net"] = self._init_metrics_rb("bm", "net")
+      self._data["bm_mem"] = self._init_metrics_rb("bm", "mem")
+      self._data["bm_proc"] = self._init_metrics_rb("bm", "proc")
 
-   def _update_kpis(self):
+   def _update_metrics(self):
       """
-      update KPIs for this subservice 
+      update metrics for this subservice 
 
       """
       pass
@@ -823,16 +823,16 @@ class VM(Subservice):
       
       deps = ["cpu", "mem", "net", "proc"]
       self.dependencies = [Subservice(dep, "", self.engine, parent=self) for dep in deps]
-      # init KPIs for non-list RBs
+      # init metrics for non-list RBs
       self._data["vm"][self.name] = {"vm_net_if": {}}
-      self._data["vm"][self.name].update(self._init_kpis_rb("vm", "proc"))
-      self._data["vm"][self.name].update(self._init_kpis_rb("vm", "net"))
-      self._data["vm"][self.name].update(self._init_kpis_rb("vm", "mem"))
-      self._data["vm"][self.name].update(self._init_kpis_rb("vm", "cpu"))
+      self._data["vm"][self.name].update(self._init_metrics_rb("vm", "proc"))
+      self._data["vm"][self.name].update(self._init_metrics_rb("vm", "net"))
+      self._data["vm"][self.name].update(self._init_metrics_rb("vm", "mem"))
+      self._data["vm"][self.name].update(self._init_metrics_rb("vm", "cpu"))
 
-   def _update_kpis(self):
+   def _update_metrics(self):
       """
-      update KPIs for this subservice 
+      update metrics for this subservice 
 
       """
       vm_name=self.name
@@ -840,9 +840,9 @@ class VM(Subservice):
       self.active = self._data[hypervisor+"/vms"][vm_name]["state"]._top() == "Running"
       self._data["vm"][vm_name]["vm_proc_active"].append(self.active)
 
-   def del_kpis(self):
+   def del_metrics(self):
       """
-      remove this VM KPIs ringbuffers
+      remove this VM metrics ringbuffers
       """
       del self._data["vm"][self.name]
       
@@ -856,14 +856,14 @@ class KBNet(Subservice):
       
       deps = ["proc", "mem", "net"]
       self.dependencies = [Subservice(dep, "", self.engine, parent=self) for dep in deps]
-      # init KPIs for non-list RBs
+      # init metrics for non-list RBs
       self._data["kb"][self.name] = {"kb_net_if": {}}
-      self._data["kb"][self.name].update(self._init_kpis_rb("kb", "mem"))
-      self._data["kb"][self.name].update(self._init_kpis_rb("kb", "proc"))
+      self._data["kb"][self.name].update(self._init_metrics_rb("kb", "mem"))
+      self._data["kb"][self.name].update(self._init_metrics_rb("kb", "proc"))
 
-   def _update_kpis(self):
+   def _update_metrics(self):
       """
-      update KPIs for this subservice 
+      update metrics for this subservice 
 
       """
       kb_name=self.name
@@ -871,9 +871,9 @@ class KBNet(Subservice):
       self.active = self._data[framework+"/gnmi"][kb_name]["status"]._top() == "synced"
       self._data["kb"][kb_name]["kb_proc_active"].append(self.active)
 
-   def del_kpis(self):
+   def del_metrics(self):
       """
-      remove this VM KPIs ringbuffers
+      remove this VM metrics ringbuffers
       """
       del self._data["kb"][self.name]
 

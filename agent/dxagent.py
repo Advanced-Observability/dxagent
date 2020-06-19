@@ -78,8 +78,8 @@ class DXAgent(Daemon, IOManager):
       """
       # fetch input
       self._input()
-      # compute KPIs&symptoms from input
-      self.engine.update_kpis()
+      # compute metrics&symptoms from input
+      self.engine.update_metrics()
       self.engine.update_symptoms()
       # write to shmem
       if not self.args.disable_shm:
