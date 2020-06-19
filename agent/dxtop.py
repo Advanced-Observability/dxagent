@@ -240,20 +240,21 @@ class DXTop(IOManager):
          self._append_content(self._center_text(" "), 6)
       
       self._append_content(self._center_text("Metrics"), 6, curses.A_REVERSE)
-      self._format_attrs_list_rb_percpu("bm_cpu", 6)
-      self._format_attrs_list_rb("bm_net_if", 6)
-      self._format_attrs_list_rb("bm_sensors", 6)
-      self._format_attrs_rb("bm_mem", 6)
-      self._format_attrs_rb("bm_proc", 6)
-      self._format_attrs_list_rb("bm_disk", 6)
-      self._format_attrs_rb("bm_net", 6)
+      self._format_attrs_list_rb_percpu("node.bm.cpu", 6)
+      self._format_attrs_list_rb("node.bm.net.if", 6)
+      self._format_attrs_list_rb("node.bm.sensors", 6)
+      self._format_attrs_rb("node.bm.mem", 6)
+      self._format_attrs_rb("node.bm.proc", 6)
+      self._format_attrs_list_rb("node.bm.disk", 6)
+      self._format_attrs_rb("node.bm.net", 6)
       
       if "vm" in self._data:
          self._append_content(self._center_text("vm"), 6, curses.A_BOLD)
          for vm_name in self._data["vm"]:
             self._append_content(self._center_text(vm_name), 6, curses.A_DIM)
             self._format_attrs_rb(vm_name, 6, subdict=self._data["vm"], title=False)
-            self._format_attrs_list_rb("vm_net_if", 6, subdict=self._data["vm"][vm_name],
+            self._append_content(self._center_text("node.vm.net.if"), 6, curses.A_BOLD)
+            self._format_attrs_list_rb("node.vm.net.if", 6, subdict=self._data["vm"][vm_name],
                                        title=False)
                                     
       if "kb" in self._data:
@@ -261,7 +262,8 @@ class DXTop(IOManager):
          for kb_name in self._data["kb"]:
             self._append_content(self._center_text(kb_name), 6, curses.A_DIM)
             self._format_attrs_rb(kb_name, 6, subdict=self._data["kb"], title=False)
-            self._format_attrs_list_rb("kb_net_if", 6, subdict=self._data["kb"][kb_name],
+            self._append_content(self._center_text("node.kb.net.if"), 6, curses.A_BOLD)
+            self._format_attrs_list_rb("node.kb.net.if", 6, subdict=self._data["kb"][kb_name],
                                        title=False)
              
       self.resize_columns()

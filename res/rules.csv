@@ -1,10 +1,10 @@
-name,severity,rule,
-"Swap volume in use",Red,bm_disk_swap_used!=0
-"No free memory available",Orange,bm_mem_free<50
-"No free memory available for 1 min",Red,1min(bm_mem_free)<50
-"No CPU idle time for 1 min",Red,1min(bm_cpu_idle_time)<=1
-"Sensor reached maximum temperature",Orange,bm_sensors_input_temp>=bm_sensors_max_temp
-"Sensor reached critical temperature",Red,bm_sensors_input_temp>=bm_sensors_critical_temp
-"No SSH access to VM",Orange,vm_net_ssh==0
-"No ARP Entry For Default Gateway",Red,(bm_net_if_state=="up") and (bm_net_if_gw_in_arp==0)
+name,path,severity,rule,
+"Swap volume in use",node.bm.disk,Red,swap_used!=0
+"No free memory available",node.bm.mem,Orange,free<50
+"No free memory available for 1 min",node.bm.mem,Red,1min(free)<50
+"No CPU idle time for 1 min",node.bm.cpu,Red,1min(idle_time)<=1
+"Sensor reached maximum temperature",node.bm.sensors,Orange,input_temp>=max_temp
+"Sensor reached critical temperature",node.bm.sensors,Red,input_temp>=critical_temp
+"No SSH access to VM",node.vm.net,Orange,ssh==0
+"No ARP Entry For Default Gateway",node.bm.net.if,Red,(state=="up") and (gw_in_arp==0)
 

@@ -20,18 +20,12 @@ how this field is indexed).
 
 ### `metric.csv`
 
-This file contains a list of metrics, which are *standardized* vendor-independent
+This file contains a list of metrics, which are *standard* vendor-independent
 performance indicators fields. Each metric is defined by the following attributes:
-name, type (e.g., str, int or float), is_list (1 if this field is contained in
-a list, 0 if it is not) and unit. metric names follow this syntax: 
-`{bm|vm|kb}_{subservice}_NAME`, in which `bm|vm|kb` is the name of the
-parent subservice, and `subservice` can be:
+name, subservice, type (e.g., str, int or float), is_list (1 if this field is contained in
+a list, 0 if it is not) and unit. `subservice` can be:
 
-* bm: cpu, sensors, disk, mem, proc, net
-
-* vm: cpu, mem, net
-
-* kb: proc, mem, net
+* cpu, sensors, disk, mem, proc, net, if
 
 `metric.csv` is used by DxAgent, do not modify it.
 
@@ -51,7 +45,7 @@ respectively at least one element, and all elements, of the list in which it
 is contained (i.e., is_list). For instance, `all(bm_cpu_user_time>95)` is
 `True` if all CPUs are 95% busy.
 
-* 1min(), 5min(), 10min() return `True` if the expression inside is `True`
+* 1min(), 5min() return `True` if the expression inside is `True`
 for the given period of time.
 
 
