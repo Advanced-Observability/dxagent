@@ -1,29 +1,29 @@
 # Diagnostic Agent Ressources
 
-* `fields.csv`
+* `input.csv`
    An informative list of vendor-specific monitored fields.
    
-* `kpi.csv`
-   A list of vendor-independent Key Performance Indicators (KPIs).
+* `metrics.csv`
+   A list of vendor-independent performance metrics.
 
 * `rules.csv`
    A list of symptoms.
    
-### `fields.csv`
+### `input.csv`
 
 This file contains a list of vendor-specific input fields. Each field is described
 by the following attributes: category, name, type (e.g., str, int or float), 
 counter (1 if the field is a counter, 0 if it is not), unit, and index (e.g.,
 how this field is indexed).
 
-`fields.csv` is purely informative and not used in DxAgent at the moment.
+`input.csv` is purely informative and not used in DxAgent at the moment.
 
-### `kpi.csv`
+### `metric.csv`
 
-This file contains a list of KPIs, which are *standardized* vendor-independent
-performance indicators fields. Each KPI is defined by the following attributes:
+This file contains a list of metrics, which are *standardized* vendor-independent
+performance indicators fields. Each metric is defined by the following attributes:
 name, type (e.g., str, int or float), is_list (1 if this field is contained in
-a list, 0 if it is not) and unit. KPI names follow this syntax: 
+a list, 0 if it is not) and unit. metric names follow this syntax: 
 `{bm|vm|kb}_{subservice}_NAME`, in which `bm|vm|kb` is the name of the
 parent subservice, and `subservice` can be:
 
@@ -33,13 +33,13 @@ parent subservice, and `subservice` can be:
 
 * kb: proc, mem, net
 
-`kpi.csv` is used by DxAgent, do not modify it.
+`metric.csv` is used by DxAgent, do not modify it.
 
 ### `rules.csv`
 
 This file is the list of symptoms, it is used to determine a subservice health.
 Each symptom is defined by a name, (e.g., "Swap volume in use"), a severity (e.g.,
-Orange or Red), and a rule. Rules are boolean expressions using KPIs as variables
+Orange or Red), and a rule. Rules are boolean expressions using metrics as variables
 and the following operators (i,e., similar to Python's):
 
 * `and`, `or` and parentheses (i.e., grouping operators).
