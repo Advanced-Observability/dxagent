@@ -252,26 +252,34 @@ class DXTop(IOManager):
          self._append_content(self._center_text("vm"), 6, curses.A_BOLD)
          for vm_name in self._data["vm"]:
             self._append_content(self._center_text(vm_name), 6, curses.A_DIM)
-            self._format_attrs_rb(vm_name, 6, subdict=self._data["vm"], title=False)
-            self._append_content(self._center_text("node.vm.net.if"), 6, curses.A_BOLD)
-            self._format_attrs_list_rb("node.vm.net.if", 6, subdict=self._data["vm"][vm_name],
-                                       title=False)
+            vm_dict = self._data["vm"][vm_name]
+            skip = ["node.vm.net.if"]
+            for subservice in vm_dict:
+               if subservice in skip:
+                  continue
+               self._format_attrs_rb(subservice, 6, subdict=vm_dict)
+            self._format_attrs_list_rb("node.vm.net.if", 6, subdict=vm_dict)
                                     
       if "kb" in self._data:
          self._append_content(self._center_text("kb"), 6, curses.A_BOLD)         
          for kb_name in self._data["kb"]:
             self._append_content(self._center_text(kb_name), 6, curses.A_DIM)
-            self._format_attrs_rb(kb_name, 6, subdict=self._data["kb"], title=False)
-            self._append_content(self._center_text("node.kb.net.if"), 6, curses.A_BOLD)
-            self._format_attrs_list_rb("node.kb.net.if", 6, subdict=self._data["kb"][kb_name],
-                                       title=False)
+            kb_dict = self._data["kb"][kb_name]
+            skip = ["node.kb.net.if"]
+            for subservice in kb_dict:
+               if subservice in skip:
+                  continue
+               self._format_attrs_rb(subservice, 6, subdict=kb_dict)
+            self._format_attrs_list_rb("node.kb.net.if", 6, subdict=kb_dict)
              
       self.resize_columns()
 
-   def _format_attrs_rb(self, category, pad_index, skip_zero=False,
+   def _format_attrs_rb(self, category, pad_index, extend_name=False,
                         subdict=None, title=True):
       """
       format a dict of ringbuffers into a curses pad
+      
+      @param extend_name if True, prepend attr name with subservice path
  
       """
       if subdict:
@@ -287,7 +295,8 @@ class DXTop(IOManager):
 
       for k,d in data[category].items():
          if not isinstance(d, list):
-            continue
+            continue  
+            
          s = (" {}"+" "*self.col_sizes[0]).format(k)[:self.col_sizes[0]]
          s += VLINE_CHAR
          flags = []
@@ -339,11 +348,12 @@ class DXTop(IOManager):
 
 #         self._append_content(self.hline(self.col_sizes), pad_index)
 
-   def _format_attrs_list_rb(self, category, pad_index, skip_zero=False,
+   def _format_attrs_list_rb(self, category, pad_index, extend_name=False,
                              subdict=None, title=True):
       """
       format a dict of dict of ringbuffers into a curses pad
-      @param skip_zero do not print if value is zero
+      
+      @param extend_name if True, prepend attr name with subservice path
  
       """
       if subdict:
@@ -396,10 +406,11 @@ class DXTop(IOManager):
          else:
             self._append_content(self.hline_x(self.col_sizes), pad_index)
 
-   def _format_attrs_list_rb_percpu(self, category, pad_index):
+   def _format_attrs_list_rb_percpu(self, category, pad_index, extend_name=False):
       """
       format a dict of dict of ringbuffers into a curses pad
  
+      @param extend_name if True, prepend attr name with subservice path
       """
       if category not in self._data:
          return
