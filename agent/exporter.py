@@ -144,7 +144,7 @@ class DXAgentExporter():
             # avoid race condition with threads writing in dicts
             if isinstance(dd, MDict):
                dd.acquire()
-            self._iterate_data_rec(dd, *args, kk)
+            yield from self._iterate_data_rec(dd, *args, kk)
             if isinstance(dd, MDict):
                dd.release()
          else:
@@ -152,11 +152,33 @@ class DXAgentExporter():
                continue
             # write a line to ShareableMemory
             value, severity = dd.top()
-            path_string = self.build_path_string(
-                        "".join(["/"+key for key in list(args)+[kk]]))
-            yield path_string, value, dd.type
-
-   def build_path_string(self, path_string):
+            path_string = self.build_path_string(list(args)+[kk])
+            self.info(path_string)
+            if "node" in path_string:
+               self.info(path_string)
+               yield path_string, value, dd.type
+               
+   def _node_before_indexed(self, node):
+      _before_indexed = ["vm", "kb", "cpu", "if", "sensors", "disk"]
+      if node in _before_indexed:
+         return True
+      for before_indexed in _before_indexed:
+         if node.endswith(before_indexed):
+            return True
+      return False
+      
+   def build_path_string(self, nodes):
+      path_string = ""
+      indexed = False
+      
+      for node in nodes:
+         if indexed:
+            path_string += "[key={}]".format(node)
+            indexed = False
+         else:
+            path_string += "/{}".format(node)
+            indexed = self._node_before_indexed(node)
+            
       return path_string.replace('.', '/')
 
    def _iterate_data(self, skip=[]):
@@ -173,6 +195,7 @@ class DXAgentExporter():
       for k,d in self.data.items():
          if k in skip:
             continue
+         #self.info(k)
          yield from self._iterate_data_rec(d, k)
       # special entry: symptom
       for s in self.data["symptoms"]:
