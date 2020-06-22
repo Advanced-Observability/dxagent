@@ -80,6 +80,9 @@ class IOManager():
       parser.add_argument('-r' , '--ressources-dir', type=str,
                          default="./res/",
                          help='configuration file location')  
+      parser.add_argument('-k' , '--certs-dir', type=str,
+                         default="./certs/",
+                         help='certificate/key files location')                           
       parser.add_argument('-s' , '--disable-shm', action='store_true',
                          help='disable shared memory segment '
                               '(cannot use dxtop)')      
@@ -91,6 +94,7 @@ class IOManager():
       # retreive absolute paths
       self.args.config = os.path.abspath(self.args.config)
       self.args.ressources_dir = os.path.abspath(self.args.ressources_dir)
+      self.args.certs_dir = os.path.abspath(self.args.certs_dir)
 
       return self.args
 
@@ -117,8 +121,11 @@ class IOManager():
          default_config_dir = "/home/{}/.config".format(
                      self.config["virtualbox"]["vbox_user"])
          self.config["virtualbox"]["config_directory"] = default_config_dir
+         
+      # parse gnmi target url
+      self.gnmi_target = self.config["gnmi"].get("node")
 
-      # parse gNMI nodes
+      # parse VPP gNMI nodes
       self.gnmi_nodes = []
       gnmi_nodes = self.config["vpp"].get("gnmi_nodes")
       if gnmi_nodes:

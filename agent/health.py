@@ -410,6 +410,7 @@ class Subservice():
          ("Linux","node.bm.mem")     : self._update_metrics_linux_bm_mem,
          ("Linux","node.bm.proc")    : self._update_metrics_linux_bm_proc,
          ("Linux","node.bm.net")     : self._update_metrics_linux_bm_net,
+        # ("Linux","node.bm.net.if")  : self._update_metrics_linux_bm_net_if,
          ("Linux","node.vm.cpu")     : self._update_metrics_linux_vm_cpu,
          ("Linux","node.vm.mem")     : self._update_metrics_linux_vm_mem,
          ("Linux","node.vm.net")     : self._update_metrics_linux_vm_net,
@@ -417,6 +418,7 @@ class Subservice():
          ("Linux","node.kb.proc")    : self._update_metrics_linux_kb_proc,
          ("Linux","node.kb.mem")     : self._update_metrics_linux_kb_mem,
          ("Linux","node.kb.net")     : self._update_metrics_linux_kb_net,
+         
         
          ("Windows","node.bm.cpu") : self._update_metrics_win_bm_cpu,
          ("MacOS","node.bm.cpu")   : self._update_metrics_macos_bm_cpu,
@@ -596,6 +598,10 @@ class Subservice():
       for net in previous-current:
          del self._data["node.bm.net.if"][net]
          
+      # non interface-related fields
+      for field, rb in self._data["snmp"].items():
+         self._data["node.bm.net"]["snmp_"+field].append(rb._top())
+         
       attr_mapping = {"rx_packets": "rx_packets",
                       "rx_bytes": "rx_bytes",
                       "rx_errs": "rx_error",
@@ -621,9 +627,6 @@ class Subservice():
          if "ip4_gw_addr" in rbs:
             self._data["node.bm.net.if"][net]["gw_in_arp"].append(
                rbs["ip4_gw_addr"]._top() in self._data["net/arp"])
-      # non interface-related fields
-      for field, rb in self._data["snmp"].items():
-         self._data["node.bm.net"]["snmp_"+field].append(rb._top())
 
    def _update_metrics_linux_vm_cpu(self):
       """Update metrics for linux VM cpu subservice

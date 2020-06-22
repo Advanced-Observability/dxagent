@@ -21,6 +21,7 @@ from agent.vm_input import VMWatcher
 from agent.vpp_input import VPPWatcher
 from agent.shareablebuffer import ShareableBuffer
 from agent.health import HealthEngine
+from agent.exporter import DXAgentExporter
 
 class DXAgent(Daemon, IOManager):
    """
@@ -62,6 +63,11 @@ class DXAgent(Daemon, IOManager):
       # health engine
       self.engine = HealthEngine(self._data, self.info, self)
 
+      # exporter
+      self.exporter = DXAgentExporter(self._data, self.info, self,
+                                      target_url=self.gnmi_target)
+      self.exporter.run()
+
       # catch signal for cleanup
       signal.signal(signal.SIGTERM, self.exit)
 
@@ -85,6 +91,7 @@ class DXAgent(Daemon, IOManager):
       if not self.args.disable_shm:
          skip=["stats"] if not self.args.verbose else []
          self.sbuffer.write(self._data, skip=skip, info=self.info)
+      #self.info(list(self.exporter._iterate_data()))
       self.scheduler.enter(AGENT_INPUT_RATE,0,self.process)
 
    def exit(self, signum=None, stackframe=None):

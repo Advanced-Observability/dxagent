@@ -179,13 +179,13 @@ class ShareableBuffer(shared_memory.ShareableList):
                dd.acquire()
             self._write_dict_rec(dd, write_all, *args, kk)
             if isinstance(dd, MDict):
-               dd.release()              
+               dd.release()
          else:
             if dd.is_empty():
                continue
             if not write_all and not dd.has_changed(recently=True):
                self.index += 1
-               continue       
+               continue
             # write a line to ShareableMemory
             v,s,dv,ds = self._get_content(dd)
             self.append(*args, kk, v,s,dv,ds)
