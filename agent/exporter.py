@@ -155,6 +155,11 @@ class DXAgentExporter():
             yield path_string, value, dd.type
                
    def _node_before_indexed(self, node):
+      """
+      
+      @return True if node comes before an indexed node
+      
+      """
       _before_indexed = ["vm", "kb", "cpu", "if", "sensors", "disk"]
       if node in _before_indexed:
          return True
@@ -188,6 +193,7 @@ class DXAgentExporter():
       """
       skip.append("symptoms")
       skip.append("stats")
+      skip.append("health_scores")
       for k,d in self.data.items():
          if k in skip:
             continue
@@ -195,8 +201,11 @@ class DXAgentExporter():
          yield from self._iterate_data_rec(d, k)
       # special entry: symptom
       for s in self.data["symptoms"]:
-         yield "/symptoms/"+s.name, str(s.args), str
-         yield "/symptoms/"+s.name+"/severity", s.severity.value, int
+         for path in s.args:
+            yield "{}/symptoms[name={}]/".format(path,s.name), "", None
+            yield "{}/symptoms[name={}]/severity".format(path,s.name), s.severity.value, int
+      for path,score in self.data["health_scores"].items():
+         yield path+"/health", score, int   
       
 #def test():
 #   exporter = DXAgentExporter(None, print, None)

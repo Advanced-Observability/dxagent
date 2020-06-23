@@ -107,6 +107,10 @@ class ShareableBuffer(shared_memory.ShareableList):
             symptom=(split[1],split[2],eval(split[3]))
             data.setdefault("symptoms",[]).append(symptom)
             continue
+         elif split[0] == "health_scores":
+            path,score=split[1],split[2]
+            data.setdefault("health_scores",{})[path] = int(score)
+            continue
          # set default dicts
          d = data
          for category_index in range(len(split)-5):
@@ -158,6 +162,7 @@ class ShareableBuffer(shared_memory.ShareableList):
 
       """
       skip.append("symptoms")
+      skip.append("health_scores")
       rb_count = self._rb_count(data, skip=skip)
       if rb_count != self._last_rb_count:
          self._write(data, write_all=True, skip=skip, info=info)
@@ -206,6 +211,8 @@ class ShareableBuffer(shared_memory.ShareableList):
       # special entry: symptom
       for s in data["symptoms"]:
          self.append("symptoms", s.name, str(s.severity.value), str(s.args))
+      for path,score in data["health_scores"].items(): 
+         self.append("health_scores", path, str(score))         
       self.validate()
       
    def append(self, *args):

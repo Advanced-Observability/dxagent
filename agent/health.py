@@ -33,6 +33,7 @@ class HealthEngine():
       self.sysinfo = SysInfo()
       self._data["vm"], self._data["kb"] = {}, {}
       self._data["symptoms"] = []
+      self._data["health_scores"] = {}
       self.sample_per_min = int(60/AGENT_INPUT_RATE)
       
       self._read_metrics_file()
@@ -133,13 +134,12 @@ class HealthEngine():
    def update_health(self):
       self._update_dependency_graph()
       self.node.update_metrics()
-      self._data["symptoms"].clear()
-      self._data["symptoms"] = self.node.update_symptoms()
-      #self.info()
+      self._data["symptoms"], self._data["health_scores"] = self.node.update_symptoms()
       #self.walk(self.node)
       
    def walk(self, current):
-      self.info("path: {} fullname: {}".format(current.path, current.fullname))
+      self.info("path: {} fullname: {} score:{}".format(
+               current.path, current.fullname, current.health_score))
       #self.info("+".join([s.name for s in current.symptoms]))
       for dep in current.dependencies:
          self.walk(dep)
@@ -211,22 +211,29 @@ class Subservice():
       """
       bottom-up check of symptoms and update of health score
       
-      @return the list of positive symptoms
+      @return (symptoms,health_scores) 
+              symptoms: the list of positive symptoms
+              health
       """
       self.health_score = 100
-      positives = []
+      positives, health_scores = [], {}
       # update symptoms&health_score from deps
       for subservice in self.dependencies:
-         positives.extend(subservice.update_symptoms())
-         self.health_score = min(0,self.health_score-(100-subservice.health_score))
+         p, hs = subservice.update_symptoms()
+         positives.extend(p)
+         health_scores.update(hs)
+         self.health_score = max(0,self.health_score-(100-subservice.health_score))
+         
       # update for node
       for symptom in self.symptoms:
          result = symptom.check(self._data)
          if result:
             #self.engine.info(symptom.name)
             positives.append(symptom)
-            self.health_score = min(0,self.health_score-symptom.weight)
-      return positives
+            self.health_score = max(0,self.health_score-symptom.weight)
+            
+      health_scores[self.fullname] = self.health_score
+      return positives, health_scores
          
    def get_health_score(self):
       return self.health_score

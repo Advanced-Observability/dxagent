@@ -249,9 +249,9 @@ class DXTop(IOManager):
       self._format_attrs_rb("node.bm.net", 6)
       
       if "vm" in self._data:
-         self._append_content(self._center_text("vm"), 6, curses.A_BOLD)
          for vm_name in self._data["vm"]:
-            self._append_content(self._center_text(vm_name), 6, curses.A_DIM)
+            self._append_content(self._center_text("vm[name={}]".format(vm_name)),
+                                 6, curses.A_DIM)
             vm_dict = self._data["vm"][vm_name]
             skip = ["node.vm.net.if"]
             for subservice in vm_dict:
@@ -260,10 +260,10 @@ class DXTop(IOManager):
                self._format_attrs_rb(subservice, 6, subdict=vm_dict)
             self._format_attrs_list_rb("node.vm.net.if", 6, subdict=vm_dict)
                                     
-      if "kb" in self._data:
-         self._append_content(self._center_text("kb"), 6, curses.A_BOLD)         
+      if "kb" in self._data:      
          for kb_name in self._data["kb"]:
-            self._append_content(self._center_text(kb_name), 6, curses.A_DIM)
+            self._append_content(self._center_text("kb[name={}]".format(kb_name)),
+                                 6, curses.A_DIM)
             kb_dict = self._data["kb"][kb_name]
             skip = ["node.kb.net.if"]
             for subservice in kb_dict:
@@ -732,6 +732,7 @@ class DXTop(IOManager):
       # this list contains formatted text
       self.content = [[] for _ in range(self.max_screens)]
       self._data = self.sbuffer.dict(info=self.info)
+      self.info(self._data["health_scores"])
       self._format()
       self.scheduler.enter(TOP_INPUT_RATE,0,self.process)
 
@@ -746,7 +747,6 @@ class DXTop(IOManager):
          self._display()
 
          while True:
-
             # user input
             c = self.window.getch()
             while c != -1:
