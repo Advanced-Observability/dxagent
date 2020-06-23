@@ -240,42 +240,57 @@ class DXTop(IOManager):
          self._append_content(self._center_text(" "), 6)
       
       self._append_content(self._center_text("Metrics"), 6, curses.A_REVERSE)
-      self._format_attrs_list_rb_percpu("/node/bm/cpu", 6)
-      self._format_attrs_list_rb("/node/bm/net.if", 6)
-      self._format_attrs_list_rb("/node/bm/sensors", 6)
-      self._format_attrs_rb("/node/bm/mem", 6)
-      self._format_attrs_rb("/node/bm/proc", 6)
-      self._format_attrs_list_rb("/node/bm/disk", 6)
-      self._format_attrs_rb("/node/bm/net", 6)
+      self._format_attrs_list_rb_percpu("/node/bm/cpu", 6, health=True)
+      self._format_attrs_list_rb("/node/bm/net/if", 6, health=True)
+      self._format_attrs_list_rb("/node/bm/sensors", 6, health=True)
+      self._format_attrs_rb("/node/bm/mem", 6, health=True)
+      self._format_attrs_rb("/node/bm/proc", 6, health=True)
+      self._format_attrs_list_rb("/node/bm/disk", 6, health=True)
+      self._format_attrs_rb("/node/bm/net", 6, health=True)
       
       if "vm" in self._data:
          for vm_name in self._data["vm"]:
-            self._append_content(self._center_text("vm[name={}]".format(vm_name)),
-                                 6, curses.A_DIM)
+#            self._append_content(self._center_text("vm[name={}]".format(vm_name)),
+#                                 6, curses.A_DIM)
             vm_dict = self._data["vm"][vm_name]
             skip = ["/node/vm/net/if"]
             for subservice in vm_dict:
                if subservice in skip:
                   continue
-               self._format_attrs_rb(subservice, 6, subdict=vm_dict)
-            self._format_attrs_list_rb("/node/vm/net/if", 6, subdict=vm_dict)
+               self._format_attrs_rb(subservice, 6, subdict=vm_dict,
+                                     health=True, health_index=vm_name)
+            self._format_attrs_list_rb("/node/vm/net/if", 6, subdict=vm_dict,
+                                        health=True, health_index=vm_name)
                                     
       if "kb" in self._data:      
          for kb_name in self._data["kb"]:
-            self._append_content(self._center_text("kb[name={}]".format(kb_name)),
-                                 6, curses.A_DIM)
+#            self._append_content(self._center_text("kb[name={}]".format(kb_name)),
+#                                 6, curses.A_DIM)
             kb_dict = self._data["kb"][kb_name]
             skip = ["/node/kb/net/if"]
             for subservice in kb_dict:
                if subservice in skip:
                   continue
-               self._format_attrs_rb(subservice, 6, subdict=kb_dict)
-            self._format_attrs_list_rb("/node/kb/net/if", 6, subdict=kb_dict)
+               self._format_attrs_rb(subservice, 6, subdict=kb_dict,
+                                     health=True, health_index=kb_name)
+            self._format_attrs_list_rb("/node/kb/net/if", 6, subdict=kb_dict,
+                                      health=True, health_index=kb_name)
              
       self.resize_columns()
+      
+   def _indexed_path(self, path, index=""):
+      path = path.replace("node","node[name={}]".format(self.sysinfo.node))
+      path = path.replace("vm","vm[name={}]".format(index))
+      path = path.replace("kb","kb[name={}]".format(index))
+      return path      
+      
+   def _root_health_score(self, path):      
+      # XXX: 
+      path = path.replace("/if","")
+      return self._data["health_scores"][path]
 
    def _format_attrs_rb(self, category, pad_index, extend_name=False,
-                        subdict=None, title=True):
+                        subdict=None, title=True, health=False, health_index=""):
       """
       format a dict of ringbuffers into a curses pad
       
@@ -289,7 +304,12 @@ class DXTop(IOManager):
       if category not in data:
          return
       if title:
-         self._append_content(self._center_text(category),
+         title_str = category
+         if health:
+            title_str = self._indexed_path(category, index=health_index)
+            title_str += " health:{}".format(self._root_health_score(
+                                   title_str))
+         self._append_content(self._center_text(title_str),
                               pad_index, curses.A_BOLD)
       self._append_content(self.hline_top(self.col_sizes), pad_index)
 
@@ -349,7 +369,8 @@ class DXTop(IOManager):
 #         self._append_content(self.hline(self.col_sizes), pad_index)
 
    def _format_attrs_list_rb(self, category, pad_index, extend_name=False,
-                             subdict=None, title=True):
+                             subdict=None, title=True, health=False,
+                             health_index=""):
       """
       format a dict of dict of ringbuffers into a curses pad
       
@@ -363,7 +384,12 @@ class DXTop(IOManager):
       if category not in data:
          return
       if title:
-         self._append_content(self._center_text(category),
+         title_str = category
+         if health:
+            title_str = self._indexed_path(category, index=health_index)
+            title_str += " health:{}".format(self._root_health_score(
+                                   title_str))
+         self._append_content(self._center_text(title_str),
                               pad_index, curses.A_BOLD)
       self._append_content(self.hline_top(self.col_sizes), pad_index)
 
@@ -371,7 +397,8 @@ class DXTop(IOManager):
 
          s = " "*self.col_sizes[0]+VLINE_CHAR
          flags = [(len(s), curses.A_DIM)]
-         s +=  (k+" "*self.col_sizes[1])[:self.col_sizes[1]]
+         substitle = k
+         s +=  (substitle+" "*self.col_sizes[1])[:self.col_sizes[1]]
          flags.append((len(s), 0))
          s += VLINE_CHAR
          self._append_content(s, pad_index, fill=True, flags=flags)
@@ -406,7 +433,8 @@ class DXTop(IOManager):
          else:
             self._append_content(self.hline_x(self.col_sizes), pad_index)
 
-   def _format_attrs_list_rb_percpu(self, category, pad_index, extend_name=False):
+   def _format_attrs_list_rb_percpu(self, category, pad_index,
+                                    extend_name=False, health=False):
       """
       format a dict of dict of ringbuffers into a curses pad
  
@@ -419,7 +447,11 @@ class DXTop(IOManager):
       cpu_count = len(self._data[category])-1
       keys = self._data[category]["cpu0"].keys()
 
-      self._append_content(self._center_text(category),
+      title_str = category
+      if health:
+         title_str = self._indexed_path(category)
+         title_str += " health:{}".format(self._root_health_score(title_str))
+      self._append_content(self._center_text(title_str),
                            pad_index, curses.A_BOLD)
       self._append_content(self.hline(self.col_sizes), pad_index)
 
@@ -565,7 +597,7 @@ class DXTop(IOManager):
          kb_count=len(self._data["kb"]) if "kb" in self._data else 0
          s = "vm-count: {} kb-count:{}".format(vm_count, kb_count)
          self.top_pad.addstr(self._center_text(s))         
-         s = "symptoms-count: {}".format(len([]))
+         s = "symptoms-count: {}".format(len(self._data["symptoms"]))
          self.top_pad.addstr(self._center_text(s))
 
    def _fill_pad(self):
@@ -732,7 +764,6 @@ class DXTop(IOManager):
       # this list contains formatted text
       self.content = [[] for _ in range(self.max_screens)]
       self._data = self.sbuffer.dict(info=self.info)
-      self.info(self._data["health_scores"])
       self._format()
       self.scheduler.enter(TOP_INPUT_RATE,0,self.process)
 
