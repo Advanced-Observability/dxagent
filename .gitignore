@@ -130,4 +130,8 @@ dmypy.json
 
 *.ini
 TODO
-
+certs/*key
+certs/*pem
+certs/*csr
+certs/*crt
+certs/*srl
