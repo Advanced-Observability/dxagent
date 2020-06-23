@@ -85,8 +85,7 @@ class DXAgent(Daemon, IOManager):
       # fetch input
       self._input()
       # compute metrics&symptoms from input
-      self.engine.update_metrics()
-      self.engine.update_symptoms()
+      self.engine.update_health()
       # write to shmem
       if not self.args.disable_shm:
          skip=["stats"] if not self.args.verbose else []

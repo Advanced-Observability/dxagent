@@ -54,6 +54,18 @@ class Severity(Enum):
    GREEN=0
    ORANGE=1
    RED=2
+   
+   def weight(self):
+      """
+      @returns health malus of given severity
+      """
+      _weights = {
+      "GREEN":0,
+      "ORANGE":10,
+      "RED":50,
+      }
+      return _weights[self.name]
+      
 
 class MDict(dict):
    """Multithread Dict, a dict that with an integrated threading.Lock.
