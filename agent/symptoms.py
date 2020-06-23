@@ -21,7 +21,7 @@ class RuleException(Exception):
       return repr(self.value)
       
 class Symptom():
-   def __init__(self, name, path, severity, rule, engine, weight=None):
+   def __init__(self, name, path, severity, rule, engine, node=None, weight=None):
       self.name = name
       self.path = path
       self.severity = severity
@@ -29,6 +29,7 @@ class Symptom():
       self.engine = engine
       self.prefix = None
       self.weight = weight if weight else severity.weight()
+      self.node = node
       if "vm" in path:
          self.prefix="vm"
       if "kb" in path:
@@ -50,7 +51,7 @@ class Symptom():
            'Num', 'Or', 'RShift', 'Set', 'Slice', 'Str', 'Sub', 'Constant',
            'Tuple', 'UAdd', 'USub', 'UnaryOp', 'boolop', 'cmpop',
            'expr', 'expr_context', 'operator', 'slice', 'unaryop']
-       for subnode in ast.walk(self.node):
+       for subnode in ast.walk(self.tree):
            subnode_name = type(subnode).__name__
            if isinstance(subnode, ast.Name):
                if subnode.id not in _safe_names and subnode.id not in variables:
@@ -83,7 +84,7 @@ class Symptom():
          self.rule=self.rule.replace(old,new)
       # 2. ast-level replacement
       node = ast.parse(self.rule, mode='eval')
-      self.node = ast.fix_missing_locations(RewriteName().visit(node))
+      self.tree = ast.fix_missing_locations(RewriteName().visit(node))
       # 3. check()
       self._o=compile(node, '<string>', 'eval')
          
@@ -101,8 +102,10 @@ class Symptom():
             self.rb=rb
             # how many samples are considered
             self.count=1
+            
          def indexes(self):
             return [index for (index,_) in self.rb]
+            
          def compare(self, other, _operator):
             """
             compare a Comparator with a constant or another Comparator
@@ -152,7 +155,7 @@ class Symptom():
             if (not self.islist 
                  or not isinstance(other,Comparator) 
                  or not other.islist):
-               return self and other
+               return self or other
             for e in other.rb:
                if e not in self.rb:
                   self.rb.append(e)
@@ -173,7 +176,7 @@ class Symptom():
             for dev,b in data[prefix2].items():
                ret += [(dev+":"+dev2,rb[var]) for dev2,rb in b[path].items()]
             return Comparator(ret)
-               
+         
          if not metric.islist:
             return Comparator(data[path][var])
          return Comparator([(dev, b[var]) for dev,b in data[path].items()])
@@ -186,13 +189,17 @@ class Symptom():
          return rb
          
       ret=eval(self._o, globals(), locals())
-      
       try:
          self.args = []
          if ret:
             if isinstance(ret, Comparator):
-               #engine.info(ret.rb)
-               self.args = ret.indexes()
+               # XXX
+               if self.path.endswith("if"):
+                  self.args = ["{}/if[key={}]".format(self.node.fullname,index) for index in ret.indexes()]
+               else:
+                  self.args = ["{}[key={}]".format(self.node.fullname,index) for index in ret.indexes()]
+            else:
+               self.args = [self.node.fullname]
             return True
          return False
       except Exception as e:

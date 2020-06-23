@@ -40,7 +40,7 @@ class HealthEngine():
       self._build_dependency_graph()
       
    def _read_rule_file(self):
-      self._symptoms=[]
+      self._symptoms_args=[]
       file_loc = os.path.join(self.parent.args.ressources_dir,"rules.csv")
       metrics = list(itertools.chain.from_iterable(self.metrics_attrs.values()))
       
@@ -61,7 +61,20 @@ class HealthEngine():
             if not symptom._safe_rule(metrics):
                self.info("Invalid rule: {}".format(rule))
                continue
-            self._symptoms.append(symptom)
+            
+            self._symptoms_args.append((name, path, severity, rule, self))
+            
+   def get_symptoms(self, node):
+      """
+      Return a list of newly instantiated symptoms for given node
+      
+      """
+      symptoms = []
+      for args in self._symptoms_args:
+         # XXX: remove .if bit when adding single if nodes
+         if args[1] == node.path or args[1] == node.path+".if":
+            symptoms.append(Symptom(*args, node=node))
+      return symptoms
       
    def _read_metrics_file(self):
       self.metrics_attrs, self.metrics_types, self.metrics_units = {}, {}, {}
@@ -160,7 +173,7 @@ class Subservice():
       self.fullname = self.find_fullname()
       self.path = self.find_path()
       self.health_score = 100
-      self.symptoms = [symptom for symptom in self.engine._symptoms if symptom.path == self.path]
+      self.symptoms = self.engine.get_symptoms(self)
       
    def find_fullname(self):
       """
