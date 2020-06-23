@@ -12,6 +12,7 @@ import builtins
 import sys
 import ast
 import operator
+import itertools
 
 from agent.rbuffer import init_rb_dict, Severity
 from agent.sysinfo import SysInfo
@@ -41,6 +42,30 @@ class Symptom():
          self.prefix="kb"
       self._compile_rule()
       
+   def _safe_rule(self, variables):
+       """
+       
+       Returns True if rule is safe for eval()
+       """
+       variables += ['access', '_1min', '_5min']
+       _safe_names = {'None': None, 'True': True, 'False': False}
+       _safe_nodes = [
+           'Add', 'And', 'BinOp', 'BitAnd', 'BitOr', 'BitXor', 'BoolOp',
+           'Compare', 'Dict', 'Eq', 'Expr', 'Expression', 'Call',
+           'Gt', 'GtE', 'Is', 'In', 'IsNot', 'LShift', 'List',
+           'Load', 'Lt', 'LtE', 'Mod', 'Name', 'Not', 'NotEq', 'NotIn',
+           'Num', 'Or', 'RShift', 'Set', 'Slice', 'Str', 'Sub', 'Constant',
+           'Tuple', 'UAdd', 'USub', 'UnaryOp', 'boolop', 'cmpop',
+           'expr', 'expr_context', 'operator', 'slice', 'unaryop']
+       for subnode in ast.walk(self.node):
+           subnode_name = type(subnode).__name__
+           if isinstance(subnode, ast.Name):
+               if subnode.id not in _safe_names and subnode.id not in variables:
+                   raise RuleException("Unsafe rule {} contains {}".format(self._raw_rule, subnode.id))
+           if subnode_name not in _safe_nodes:
+               raise RuleException("Unsafe rule {} contains {}".format(self._raw_rule, subnode_name))
+
+       return True     
 
    def _compile_rule(self):
       class RewriteName(ast.NodeTransformer):
@@ -59,12 +84,13 @@ class Symptom():
                             keywords=[])
                             
       # 1. string-level replacement
+      self._raw_rule = self.rule
       alias=[("1min","_1min"), ("5min","_5min")]
       for old,new in alias:
          self.rule=self.rule.replace(old,new)
       # 2. ast-level replacement
       node = ast.parse(self.rule, mode='eval')
-      node = ast.fix_missing_locations(RewriteName().visit(node))
+      self.node = ast.fix_missing_locations(RewriteName().visit(node))
       # 3. check()
       self._o=compile(node, '<string>', 'eval')
          
@@ -205,34 +231,29 @@ class HealthEngine():
       self._read_rule_file()
       self._build_dependency_graph()
       
-   def _safe_rule(self, rule):
-      """
-      sane rule checking
-      
-      """
-      return True
-      
    def _read_rule_file(self):
       self.symptoms=[]
       file_loc = os.path.join(self.parent.args.ressources_dir,"rules.csv")
+      metrics = list(itertools.chain.from_iterable(self.metrics_attrs.values()))
+      
       with open(file_loc) as csv_file:
          for r in csv.DictReader(csv_file):
-            name, path = r["name"], r["path"]
+            name, path, rule = r["name"], r["path"], r["rule"]
             try:
                severity = Severity[str.upper(r["severity"])]
             except KeyError as e:
                self.info("Invalid rule Severity: {}".format(r["severity"]))
                continue
-            rule = r["rule"]
-            if not self._safe_rule(rule):
-               self.info("Invalid rule: {}".format(rule))
-               continue
-            self.symptoms.append(Symptom(name, path, severity, rule, self))
 #            try:
-#               self.symptoms.append(Symptom(name, severity, rule, self))
+#               symptom = Symptom(name, path, severity, rule, self)
 #            except Exception as e:
 #               self.info("Invalid rule syntax: {}".format(rule))
-#               continue
+#               continue       
+            symptom = Symptom(name, path, severity, rule, self)
+            if not symptom._safe_rule(metrics):
+               self.info("Invalid rule: {}".format(rule))
+               continue
+            self.symptoms.append(symptom)
       
    def _read_metrics_file(self):
       self.metrics_attrs, self.metrics_types, self.metrics_units = {}, {}, {}
