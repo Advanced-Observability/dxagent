@@ -240,37 +240,37 @@ class DXTop(IOManager):
          self._append_content(self._center_text(" "), 6)
       
       self._append_content(self._center_text("Metrics"), 6, curses.A_REVERSE)
-      self._format_attrs_list_rb_percpu("node.bm.cpu", 6)
-      self._format_attrs_list_rb("node.bm.net.if", 6)
-      self._format_attrs_list_rb("node.bm.sensors", 6)
-      self._format_attrs_rb("node.bm.mem", 6)
-      self._format_attrs_rb("node.bm.proc", 6)
-      self._format_attrs_list_rb("node.bm.disk", 6)
-      self._format_attrs_rb("node.bm.net", 6)
+      self._format_attrs_list_rb_percpu("/node/bm/cpu", 6)
+      self._format_attrs_list_rb("/node/bm/net.if", 6)
+      self._format_attrs_list_rb("/node/bm/sensors", 6)
+      self._format_attrs_rb("/node/bm/mem", 6)
+      self._format_attrs_rb("/node/bm/proc", 6)
+      self._format_attrs_list_rb("/node/bm/disk", 6)
+      self._format_attrs_rb("/node/bm/net", 6)
       
       if "vm" in self._data:
          for vm_name in self._data["vm"]:
             self._append_content(self._center_text("vm[name={}]".format(vm_name)),
                                  6, curses.A_DIM)
             vm_dict = self._data["vm"][vm_name]
-            skip = ["node.vm.net.if"]
+            skip = ["/node/vm/net/if"]
             for subservice in vm_dict:
                if subservice in skip:
                   continue
                self._format_attrs_rb(subservice, 6, subdict=vm_dict)
-            self._format_attrs_list_rb("node.vm.net.if", 6, subdict=vm_dict)
+            self._format_attrs_list_rb("/node/vm/net/if", 6, subdict=vm_dict)
                                     
       if "kb" in self._data:      
          for kb_name in self._data["kb"]:
             self._append_content(self._center_text("kb[name={}]".format(kb_name)),
                                  6, curses.A_DIM)
             kb_dict = self._data["kb"][kb_name]
-            skip = ["node.kb.net.if"]
+            skip = ["/node/kb/net/if"]
             for subservice in kb_dict:
                if subservice in skip:
                   continue
                self._format_attrs_rb(subservice, 6, subdict=kb_dict)
-            self._format_attrs_list_rb("node.kb.net.if", 6, subdict=kb_dict)
+            self._format_attrs_list_rb("/node/kb/net/if", 6, subdict=kb_dict)
              
       self.resize_columns()
 

@@ -72,8 +72,8 @@ class HealthEngine():
       """
       symptoms = []
       for args in self._symptoms_args:
-         # XXX: remove .if bit when adding single if nodes
-         if args[1] == node.path or args[1] == node.path+".if":
+         # XXX: remove /if bit when adding single if nodes
+         if args[1] == node.path or args[1] == node.path+"/if":
             symptoms.append(Symptom(*args, node=node))
       return symptoms
       
@@ -178,8 +178,9 @@ class Subservice():
    def find_fullname(self):
       """
       compute fullname string, similar to the path string
-      with additional name/index (e.g.,
-         node:machine1.vm:vagrant_default_158504808.net.if:vboxnet0 )
+      with additional name/index.
+      
+         /node[name=machine1]/vm[name=vagrant_default_158504808]/net/if[name=vboxnet0]
          
          compatible with gRPC path
       """
@@ -192,11 +193,13 @@ class Subservice():
       
    def find_path(self):
       """
-      compute path string (e.g., node.bm.sensors.fan)
+      compute path string (e.g., /node/bm/sensors/fan)
+      
+      NOTE: there are no key/name in path (see fullname)
       """
-      path=self._type
+      path="/"+self._type
       if self.parent:
-         path = "{}.{}".format(self.parent.path,path)
+         path = "{}{}".format(self.parent.path,path)
       return path
 
    def __contains__(self, item):
@@ -276,24 +279,24 @@ class Subservice():
       key = (self.sysinfo.system,
              self.path)
       funcs = {
-         ("Linux","node.bm.cpu")     : self._update_metrics_linux_bm_cpu,
-         ("Linux","node.bm.sensors") : self._update_metrics_linux_bm_sensors,
-         ("Linux","node.bm.disk")    : self._update_metrics_linux_bm_disk,
-         ("Linux","node.bm.mem")     : self._update_metrics_linux_bm_mem,
-         ("Linux","node.bm.proc")    : self._update_metrics_linux_bm_proc,
-         ("Linux","node.bm.net")     : self._update_metrics_linux_bm_net,
-        # ("Linux","node.bm.net.if")  : self._update_metrics_linux_bm_net_if,
-         ("Linux","node.vm.cpu")     : self._update_metrics_linux_vm_cpu,
-         ("Linux","node.vm.mem")     : self._update_metrics_linux_vm_mem,
-         ("Linux","node.vm.net")     : self._update_metrics_linux_vm_net,
-         ("Linux","node.vm.proc")    : self._update_metrics_linux_vm_proc,
-         ("Linux","node.kb.proc")    : self._update_metrics_linux_kb_proc,
-         ("Linux","node.kb.mem")     : self._update_metrics_linux_kb_mem,
-         ("Linux","node.kb.net")     : self._update_metrics_linux_kb_net,
+         ("Linux","/node/bm/cpu")     : self._update_metrics_linux_bm_cpu,
+         ("Linux","/node/bm/sensors") : self._update_metrics_linux_bm_sensors,
+         ("Linux","/node/bm/disks")    : self._update_metrics_linux_bm_disk,
+         ("Linux","/node/bm/mem")     : self._update_metrics_linux_bm_mem,
+         ("Linux","/node/bm/proc")    : self._update_metrics_linux_bm_proc,
+         ("Linux","/node/bm/net")     : self._update_metrics_linux_bm_net,
+        # ("Linux","/node/bm/net/if")  : self._update_metrics_linux_bm_net_if,
+         ("Linux","/node/vm/cpu")     : self._update_metrics_linux_vm_cpu,
+         ("Linux","/node/vm/mem")     : self._update_metrics_linux_vm_mem,
+         ("Linux","/node/vm/net")     : self._update_metrics_linux_vm_net,
+         ("Linux","/node/vm/proc")    : self._update_metrics_linux_vm_proc,
+         ("Linux","/node/kb/proc")    : self._update_metrics_linux_kb_proc,
+         ("Linux","/node/kb/mem")     : self._update_metrics_linux_kb_mem,
+         ("Linux","/node/kb/net")     : self._update_metrics_linux_kb_net,
          
         
-         ("Windows","node.bm.cpu") : self._update_metrics_win_bm_cpu,
-         ("MacOS","node.bm.cpu")   : self._update_metrics_macos_bm_cpu,
+         ("Windows","/node/bm/cpu") : self._update_metrics_win_bm_cpu,
+         ("MacOS","/node/bm/cpu")   : self._update_metrics_macos_bm_cpu,
       }
       return funcs[key]()
 
@@ -302,20 +305,20 @@ class Subservice():
 
       """
       # init metric rbs if needed
-      if "node.bm.cpu" not in self._data:
-         self._data["node.bm.cpu"] = {}
+      if "/node/bm/cpu" not in self._data:
+         self._data["/node/bm/cpu"] = {}
          for cpu_label in self._data["stat/cpu"]:
-            self._data["node.bm.cpu"][cpu_label] = self._init_metrics_rb("cpu")
+            self._data["/node/bm/cpu"][cpu_label] = self._init_metrics_rb("cpu")
 
       # fill them
       for cpu_label in self._data["stat/cpu"]:
-         self._data["node.bm.cpu"][cpu_label]["idle_time"].append(
+         self._data["/node/bm/cpu"][cpu_label]["idle_time"].append(
             self._data["stat/cpu"][cpu_label]["idle_all_perc"]._top())
-         self._data["node.bm.cpu"][cpu_label]["system_time"].append(
+         self._data["/node/bm/cpu"][cpu_label]["system_time"].append(
             self._data["stat/cpu"][cpu_label]["system_all_perc"]._top())
-         self._data["node.bm.cpu"][cpu_label]["user_time"].append(
+         self._data["/node/bm/cpu"][cpu_label]["user_time"].append(
             self._data["stat/cpu"][cpu_label]["user_perc"]._top())
-         self._data["node.bm.cpu"][cpu_label]["guest_time"].append(
+         self._data["/node/bm/cpu"][cpu_label]["guest_time"].append(
             self._data["stat/cpu"][cpu_label]["guest_all_perc"]._top())
 
    def _update_metrics_linux_bm_sensors(self):
@@ -323,23 +326,23 @@ class Subservice():
 
       """
       # init metric rbs if needed
-      if "node.bm.sensors" not in self._data:
-         self._data["node.bm.sensors"] = {}
+      if "/node/bm/sensors" not in self._data:
+         self._data["/node/bm/sensors"] = {}
          # thermal zones
          for zone_label,d in self._data["sensors/thermal"].items():
             zone_label += ":"+d["type"]._top()
-            self._data["node.bm.sensors"][zone_label] = self._init_metrics_rb("sensors")
-            self._data["node.bm.sensors"][zone_label]["type"].append("zone")
+            self._data["/node/bm/sensors"][zone_label] = self._init_metrics_rb("sensors")
+            self._data["/node/bm/sensors"][zone_label]["type"].append("zone")
          # fan sensors
          for fan_label,d in self._data["sensors/fans"].items():
             fan_label += ":"+d["label"]._top()
-            self._data["node.bm.sensors"][fan_label] = self._init_metrics_rb("sensors")
-            self._data["node.bm.sensors"][fan_label]["type"].append("fan")
+            self._data["/node/bm/sensors"][fan_label] = self._init_metrics_rb("sensors")
+            self._data["/node/bm/sensors"][fan_label]["type"].append("fan")
          # core sensors
          for core_label,d in self._data["sensors/coretemp"].items():
             core_label += ":"+d["label"]._top()
-            self._data["node.bm.sensors"][core_label] = self._init_metrics_rb("sensors")
-            self._data["node.bm.sensors"][core_label]["type"].append("cpu")
+            self._data["/node/bm/sensors"][core_label] = self._init_metrics_rb("sensors")
+            self._data["/node/bm/sensors"][core_label]["type"].append("cpu")
 
       # thermal zones
       for zone_label,d in self._data["sensors/thermal"].items():
@@ -347,7 +350,7 @@ class Subservice():
          attr_mapping = {"temperature": "input_temp",}
          for attr,metric in attr_mapping.items():
             if attr in d:
-               self._data["node.bm.sensors"][zone_label][metric].append(
+               self._data["/node/bm/sensors"][zone_label][metric].append(
                  d[attr]._top())
       # fan sensors
       for fan_label,d in self._data["sensors/fans"].items():
@@ -356,7 +359,7 @@ class Subservice():
                          "temperature": "input_temp",}
          for attr,metric in attr_mapping.items():
             if attr in d:
-               self._data["node.bm.sensors"][fan_label][metric].append(
+               self._data["/node/bm/sensors"][fan_label][metric].append(
                  d[attr]._top())
       # core sensors
       for core_label,d in self._data["sensors/coretemp"].items():
@@ -366,7 +369,7 @@ class Subservice():
                          "critical": "critical_temp",}
          for attr,metric in attr_mapping.items():
             if attr in d:
-               self._data["node.bm.sensors"][core_label][metric].append(
+               self._data["/node/bm/sensors"][core_label][metric].append(
                  d[attr]._top())
 
    def _update_metrics_linux_bm_disk(self):
@@ -374,86 +377,86 @@ class Subservice():
 
       """
       # init metric rbs if needed
-      if "node.bm.disk" not in self._data:
-         self._data["node.bm.disk"] = {}
-      previous=set(self._data["node.bm.disk"].keys())
+      if "/node/bm/disks" not in self._data:
+         self._data["/node/bm/disks"] = {}
+      previous=set(self._data["/node/bm/disks"].keys())
       current=set(list(self._data["diskstats"].keys())
                   +list(self._data["swaps"].keys()))
       # add new disks
       for disk in current-previous:
-         self._data["node.bm.disk"][disk] = self._init_metrics_rb("disk")
+         self._data["/node/bm/disks"][disk] = self._init_metrics_rb("disks")
       # remove unmounted disks
       for disk in previous-current:
-         del self._data["node.bm.disk"][disk]
+         del self._data["/node/bm/disks"][disk]
 
       for disk,rbs in self._data["diskstats"].items():
-         self._data["node.bm.disk"][disk]["type"].append(
+         self._data["/node/bm/disks"][disk]["type"].append(
             rbs["fs_vfstype"]._top())
-         self._data["node.bm.disk"][disk]["total_user"].append(
+         self._data["/node/bm/disks"][disk]["total_user"].append(
             rbs["total"]._top()/1000.0)
-         self._data["node.bm.disk"][disk]["free_user"].append(
+         self._data["/node/bm/disks"][disk]["free_user"].append(
             rbs["free_user"]._top()/1000.0)
-         self._data["node.bm.disk"][disk]["read_time"].append(
+         self._data["/node/bm/disks"][disk]["read_time"].append(
             rbs["perc_reading"]._top())
-         self._data["node.bm.disk"][disk]["write_time"].append(
+         self._data["/node/bm/disks"][disk]["write_time"].append(
             rbs["perc_writting"]._top())
-         self._data["node.bm.disk"][disk]["io_time"].append(
+         self._data["/node/bm/disks"][disk]["io_time"].append(
             rbs["perc_io"]._top())
-         self._data["node.bm.disk"][disk]["discard_time"].append(
+         self._data["/node/bm/disks"][disk]["discard_time"].append(
             rbs["perc_discarding"]._top())
 
       for disk,rbs in self._data["swaps"].items():
-         self._data["node.bm.disk"][disk]["type"].append(
+         self._data["/node/bm/disks"][disk]["type"].append(
             "swap")#rbs["type"]._top()
-         self._data["node.bm.disk"][disk]["total_user"].append(
+         self._data["/node/bm/disks"][disk]["total_user"].append(
             rbs["size"]._top()/1000.0)
-         self._data["node.bm.disk"][disk]["swap_used"].append(
+         self._data["/node/bm/disks"][disk]["swap_used"].append(
             rbs["used"]._top())
 
    def _update_metrics_linux_bm_mem(self):
       """Update metrics for linux BM mem subservice
 
       """
-      self._data["node.bm.mem"]["total"].append(
+      self._data["/node/bm/mem"]["total"].append(
          self._data["meminfo"]["MemTotal"]._top()/1000)
-      self._data["node.bm.mem"]["free"].append(
+      self._data["/node/bm/mem"]["free"].append(
          self._data["meminfo"]["MemFree"]._top()/1000)
-      self._data["node.bm.mem"]["available"].append(
+      self._data["/node/bm/mem"]["available"].append(
          self._data["meminfo"]["MemAvailable"]._top()/1000)
-      self._data["node.bm.mem"]["buffers"].append(
+      self._data["/node/bm/mem"]["buffers"].append(
          self._data["meminfo"]["Buffers"]._top()/1000)
-      self._data["node.bm.mem"]["cache"].append(
+      self._data["/node/bm/mem"]["cache"].append(
          self._data["meminfo"]["Cached"]._top()/1000)
-      self._data["node.bm.mem"]["active"].append(
+      self._data["/node/bm/mem"]["active"].append(
          self._data["meminfo"]["Active"]._top()/1000)
-      self._data["node.bm.mem"]["inactive"].append(
+      self._data["/node/bm/mem"]["inactive"].append(
          self._data["meminfo"]["Inactive"]._top()/1000)
-      self._data["node.bm.mem"]["pages_total"].append(
+      self._data["/node/bm/mem"]["pages_total"].append(
          self._data["meminfo"]["HugePages_Total"]._top())
-      self._data["node.bm.mem"]["pages_free"].append(
+      self._data["/node/bm/mem"]["pages_free"].append(
          self._data["meminfo"]["HugePages_Free"]._top())
-      self._data["node.bm.mem"]["pages_reserved"].append(
+      self._data["/node/bm/mem"]["pages_reserved"].append(
          self._data["meminfo"]["HugePages_Rsvd"]._top())
-      self._data["node.bm.mem"]["pages_size"].append(
+      self._data["/node/bm/mem"]["pages_size"].append(
          self._data["meminfo"]["Hugepagesize"]._top()/1000)
 
    def _update_metrics_linux_bm_proc(self):
       """Update metrics for linux BM proc subservice
 
       """
-      self._data["node.bm.proc"]["total_count"].append(
+      self._data["/node/bm/proc"]["total_count"].append(
          self._data["stats_global"]["proc_count"]._top())
-      self._data["node.bm.proc"]["run_count"].append(
+      self._data["/node/bm/proc"]["run_count"].append(
          self._data["stats_global"]["run_count"]._top())
-      self._data["node.bm.proc"]["sleep_count"].append(
+      self._data["/node/bm/proc"]["sleep_count"].append(
          self._data["stats_global"]["sleep_count"]._top())
-      self._data["node.bm.proc"]["idle_count"].append(
+      self._data["/node/bm/proc"]["idle_count"].append(
          self._data["stats_global"]["idle_count"]._top())
-      self._data["node.bm.proc"]["wait_count"].append(
+      self._data["/node/bm/proc"]["wait_count"].append(
          self._data["stats_global"]["wait_count"]._top())
-      self._data["node.bm.proc"]["zombie_count"].append(
+      self._data["/node/bm/proc"]["zombie_count"].append(
          self._data["stats_global"]["zombie_count"]._top())
-      self._data["node.bm.proc"]["dead_count"].append(
+      self._data["/node/bm/proc"]["dead_count"].append(
          self._data["stats_global"]["dead_count"]._top())
 
    def _update_metrics_linux_bm_net(self):
@@ -461,18 +464,18 @@ class Subservice():
 
       """
       # init metric rbs if needed
-      previous=set(self._data["node.bm.net.if"].keys())
+      previous=set(self._data["/node/bm/net/if"].keys())
       current=set(self._data["net/dev"].keys())
       # add new ifs
       for net in current-previous:
-         self._data["node.bm.net.if"][net] = self._init_metrics_rb("if")
+         self._data["/node/bm/net/if"][net] = self._init_metrics_rb("if")
       # remove down ifs
       for net in previous-current:
-         del self._data["node.bm.net.if"][net]
+         del self._data["/node/bm/net/if"][net]
          
       # non interface-related fields
       for field, rb in self._data["snmp"].items():
-         self._data["node.bm.net"]["snmp_"+field].append(rb._top())
+         self._data["/node/bm/net"]["snmp_"+field].append(rb._top())
          
       attr_mapping = {"rx_packets": "rx_packets",
                       "rx_bytes": "rx_bytes",
@@ -493,11 +496,11 @@ class Subservice():
          # direct mapping
          for attr,metric in attr_mapping.items():
             if attr in rbs:
-               self._data["node.bm.net.if"][net][metric].append(
+               self._data["/node/bm/net/if"][net][metric].append(
                  rbs[attr]._top())
          # other fields
          if "ip4_gw_addr" in rbs:
-            self._data["node.bm.net.if"][net]["gw_in_arp"].append(
+            self._data["/node/bm/net/if"][net]["gw_in_arp"].append(
                rbs["ip4_gw_addr"]._top() in self._data["net/arp"])
 
    def _update_metrics_linux_vm_cpu(self):
@@ -506,13 +509,13 @@ class Subservice():
       """
       vm_name=self.parent.name
       hypervisor=self.parent.hypervisor
-      self._data["vm"][vm_name]["node.vm.cpu"]["cpu_count"].append(
+      self._data["vm"][vm_name]["/node/vm/cpu"]["cpu_count"].append(
          self._data[hypervisor+"/vms"][vm_name]["cpu"]._top())
-      self._data["vm"][vm_name]["node.vm.cpu"]["user_time"].append(
+      self._data["vm"][vm_name]["/node/vm/cpu"]["user_time"].append(
          self._data[hypervisor+"/vms"][vm_name]["Guest/CPU/Load/User"]._top())
-      self._data["vm"][vm_name]["node.vm.cpu"]["system_time"].append(
+      self._data["vm"][vm_name]["/node/vm/cpu"]["system_time"].append(
          self._data[hypervisor+"/vms"][vm_name]["Guest/CPU/Load/Kernel"]._top())
-      self._data["vm"][vm_name]["node.vm.cpu"]["idle_time"].append(
+      self._data["vm"][vm_name]["/node/vm/cpu"]["idle_time"].append(
          self._data[hypervisor+"/vms"][vm_name]["Guest/CPU/Load/Idle"]._top())
    
    def _update_metrics_linux_vm_mem(self):
@@ -521,11 +524,11 @@ class Subservice():
       """
       vm_name=self.parent.name
       hypervisor=self.parent.hypervisor
-      self._data["vm"][vm_name]["node.vm.mem"]["total"].append(
+      self._data["vm"][vm_name]["/node/vm/mem"]["total"].append(
          self._data[hypervisor+"/vms"][vm_name]["Guest/RAM/Usage/Total"]._top()/1000.0)
-      self._data["vm"][vm_name]["node.vm.mem"]["free"].append(
+      self._data["vm"][vm_name]["/node/vm/mem"]["free"].append(
          self._data[hypervisor+"/vms"][vm_name]["Guest/RAM/Usage/Free"]._top()/1000.0)
-      self._data["vm"][vm_name]["node.vm.mem"]["cache"].append(
+      self._data["vm"][vm_name]["/node/vm/mem"]["cache"].append(
          self._data[hypervisor+"/vms"][vm_name]["Guest/RAM/Usage/Cache"]._top()/1000.0)
       
    def _update_metrics_linux_vm_net(self):
@@ -545,24 +548,24 @@ class Subservice():
          # add if if needed
          attr="{}{}/Name".format(prefix, net_index)
          if_name=self._data[hypervisor+"/vms"][vm_name][attr]._top()
-         if if_name not in self._data["vm"][vm_name]["node.vm.net.if"]:
-            self._data["vm"][vm_name]["node.vm.net.if"][if_name] = self._init_metrics_rb("if")
+         if if_name not in self._data["vm"][vm_name]["/node/vm/net/if"]:
+            self._data["vm"][vm_name]["/node/vm/net/if"][if_name] = self._init_metrics_rb("if")
          # translate data
          for suffix in attrs_suffix:
             # if status
             attr="{}{}/Status".format(prefix, net_index)
-            self._data["vm"][vm_name]["node.vm.net.if"][if_name]["state"].append(
+            self._data["vm"][vm_name]["/node/vm/net/if"][if_name]["state"].append(
                self._data[hypervisor+"/vms"][vm_name][attr]._top().lower())
             # XXX: per-interface instead of total rate
             attr="Net/Rate/Rx"
-            self._data["vm"][vm_name]["node.vm.net.if"][if_name]["rx_bytes"].append(
+            self._data["vm"][vm_name]["/node/vm/net/if"][if_name]["rx_bytes"].append(
                self._data[hypervisor+"/vms"][vm_name][attr]._top()/1000.0)
             attr="Net/Rate/Tx"
-            self._data["vm"][vm_name]["node.vm.net.if"][if_name]["tx_bytes"].append(
+            self._data["vm"][vm_name]["/node/vm/net/if"][if_name]["tx_bytes"].append(
                self._data[hypervisor+"/vms"][vm_name][attr]._top()/1000.0)
             
       # global metrics
-      self._data["vm"][vm_name]["node.vm.net"]["ssh"].append(
+      self._data["vm"][vm_name]["/node/vm/net"]["ssh"].append(
           self._data[hypervisor+"/vms"][vm_name]["accessible"]._top())
           
    def _update_metrics_linux_vm_proc(self):
@@ -578,7 +581,7 @@ class Subservice():
       """
       kb_name=self.parent.name
       framework=self.parent.framework
-      self._data["kb"][kb_name]["node.kb.proc"]["worker_count"].append(
+      self._data["kb"][kb_name]["/node/kb/proc"]["worker_count"].append(
          self._data[framework+"/gnmi"][kb_name]["/sys/num_worker_threads"]._top())
       
    def _update_metrics_linux_kb_mem(self):
@@ -591,15 +594,15 @@ class Subservice():
       mem_total = self._data[framework+"/gnmi"][kb_name]["/mem/statseg/total"]._top()/1000000.0
       mem_used = self._data[framework+"/gnmi"][kb_name]["/mem/statseg/used"]._top()/1000000.0
       mem_free = mem_total-mem_used
-      self._data["kb"][kb_name]["node.kb.mem"]["total"].append(mem_total)
-      self._data["kb"][kb_name]["node.kb.mem"]["free"].append(mem_free)
+      self._data["kb"][kb_name]["/node/kb/mem"]["total"].append(mem_total)
+      self._data["kb"][kb_name]["/node/kb/mem"]["free"].append(mem_free)
       # buffers
       buffer_free = self._data[framework+"/gnmi"][kb_name]["/buffer-pools/default-numa-0/available"]._top()
       buffer_used = self._data[framework+"/gnmi"][kb_name]["/buffer-pools/default-numa-0/used"]._top()
       buffer_total = buffer_free + buffer_used
-      self._data["kb"][kb_name]["node.kb.mem"]["buffer_total"].append(buffer_total)
-      self._data["kb"][kb_name]["node.kb.mem"]["buffer_free"].append(buffer_free)
-      self._data["kb"][kb_name]["node.kb.mem"]["buffer_cache"].append(self._data[framework+"/gnmi"][kb_name]["/buffer-pools/default-numa-0/cached"]._top())
+      self._data["kb"][kb_name]["/node/kb/mem"]["buffer_total"].append(buffer_total)
+      self._data["kb"][kb_name]["/node/kb/mem"]["buffer_free"].append(buffer_free)
+      self._data["kb"][kb_name]["/node/kb/mem"]["buffer_cache"].append(self._data[framework+"/gnmi"][kb_name]["/buffer-pools/default-numa-0/cached"]._top())
       
    def _update_metrics_linux_kb_net(self):
       """Update metrics for linux KB net subservice
@@ -609,10 +612,10 @@ class Subservice():
       framework=self.parent.framework
       for if_name, d in self._data[framework+"/gnmi"][kb_name]["net_if"].items():
          # create interface entry if needed
-         if if_name not in self._data["kb"][kb_name]["node.kb.net.if"]:
-            self._data["kb"][kb_name]["node.kb.net.if"][if_name] = self._init_metrics_rb("if")
+         if if_name not in self._data["kb"][kb_name]["/node/kb/net/if"]:
+            self._data["kb"][kb_name]["/node/kb/net/if"][if_name] = self._init_metrics_rb("if")
          
-         metric_dict = self._data["kb"][kb_name]["node.kb.net.if"][if_name]
+         metric_dict = self._data["kb"][kb_name]["/node/kb/net/if"][if_name]
          md_dict = self._data[framework+"/gnmi"][kb_name]["net_if"][if_name]
          metric_dict["vector_rate"].append(
             self._data[framework+"/gnmi"][kb_name]["/sys/vector_rate"]._top())
@@ -670,13 +673,13 @@ class Baremetal(Subservice):
    def __init__(self, name, engine, parent=None):
       super(Baremetal, self).__init__("bm", name, engine, parent=parent)
       
-      deps = ["cpu", "sensors", "disk", "mem", "proc", "net"]
+      deps = ["cpu", "sensors", "disks", "mem", "proc", "net"]
       self.dependencies = [Subservice(dep, "", self.engine, parent=self) for dep in deps]
       # init metrics for non-list RBs
-      self._data["node.bm.net.if"] = {}
-      self._data["node.bm.net"] = self._init_metrics_rb("net")
-      self._data["node.bm.mem"] = self._init_metrics_rb("mem")
-      self._data["node.bm.proc"] = self._init_metrics_rb("proc")
+      self._data["/node/bm/net/if"] = {}
+      self._data["/node/bm/net"] = self._init_metrics_rb("net")
+      self._data["/node/bm/mem"] = self._init_metrics_rb("mem")
+      self._data["/node/bm/proc"] = self._init_metrics_rb("proc")
 
    def _update_metrics(self):
       """
@@ -697,12 +700,12 @@ class VM(Subservice):
       self.dependencies = [Subservice(dep, "", self.engine, parent=self) for dep in deps]
       # init metrics for non-list RBs
       self._data["vm"][self.name] = {}
-      self._data["vm"][self.name]["node.vm"] = self._init_metrics_rb("vm")
-      self._data["vm"][self.name]["node.vm.net.if"] = {}
-      self._data["vm"][self.name]["node.vm.proc"] = self._init_metrics_rb("proc")
-      self._data["vm"][self.name]["node.vm.net"] = self._init_metrics_rb("net")
-      self._data["vm"][self.name]["node.vm.mem"] = self._init_metrics_rb("mem")
-      self._data["vm"][self.name]["node.vm.cpu"] = self._init_metrics_rb("cpu")
+      self._data["vm"][self.name]["/node/vm"] = self._init_metrics_rb("vm")
+      self._data["vm"][self.name]["/node/vm/net/if"] = {}
+      self._data["vm"][self.name]["/node/vm/proc"] = self._init_metrics_rb("proc")
+      self._data["vm"][self.name]["/node/vm/net"] = self._init_metrics_rb("net")
+      self._data["vm"][self.name]["/node/vm/mem"] = self._init_metrics_rb("mem")
+      self._data["vm"][self.name]["/node/vm/cpu"] = self._init_metrics_rb("cpu")
 
    def _update_metrics(self):
       """
@@ -713,7 +716,7 @@ class VM(Subservice):
       hypervisor=self.hypervisor
       
       self.active = self._data[hypervisor+"/vms"][vm_name]["state"]._top() == "Running"
-      self._data["vm"][vm_name]["node.vm"]["active"].append(self.active)
+      self._data["vm"][vm_name]["/node/vm"]["active"].append(self.active)
 
    def del_metrics(self):
       """
@@ -733,10 +736,10 @@ class KBNet(Subservice):
       self.dependencies = [Subservice(dep, "", self.engine, parent=self) for dep in deps]
       # init metrics for non-list RBs
       self._data["kb"][self.name] = {}
-      self._data["kb"][self.name]["node.kb"] = self._init_metrics_rb("kb")
-      self._data["kb"][self.name]["node.kb.net.if"] = {}
-      self._data["kb"][self.name]["node.kb.mem"] = self._init_metrics_rb("mem")
-      self._data["kb"][self.name]["node.kb.proc"] = self._init_metrics_rb("proc")
+      self._data["kb"][self.name]["/node/kb"] = self._init_metrics_rb("kb")
+      self._data["kb"][self.name]["/node/kb/net/if"] = {}
+      self._data["kb"][self.name]["/node/kb/mem"] = self._init_metrics_rb("mem")
+      self._data["kb"][self.name]["/node/kb/proc"] = self._init_metrics_rb("proc")
 
    def _update_metrics(self):
       """
@@ -747,7 +750,7 @@ class KBNet(Subservice):
       framework=self.framework
       
       self.active = self._data[framework+"/gnmi"][kb_name]["status"]._top() == "synced"
-      self._data["kb"][kb_name]["node.kb"]["active"].append(self.active)
+      self._data["kb"][kb_name]["/node/kb"]["active"].append(self.active)
 
    def del_metrics(self):
       """
