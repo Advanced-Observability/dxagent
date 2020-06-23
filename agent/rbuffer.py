@@ -18,7 +18,7 @@ _BUFFER_SIZE=60
 
 def init_rb_dict(keys, type=int, types=None, 
                        counter=False, counters=None, 
-                       unit=None, units=None,
+                       unit=None, units=None,metric=False,
                        thread_safe=False):
    """
    initalize a dict of ringbuffers
@@ -35,12 +35,14 @@ def init_rb_dict(keys, type=int, types=None,
    """
    if thread_safe:
       return MDict({attr:RingBuffer(attr, type=types[i] if types else type, 
-                              counter=counters[i] if counters else counter, 
+                              counter=counters[i] if counters else counter,
+                              metric=metric,
                               unit=units[i] if units else unit) 
                for i,attr in enumerate(keys)})
    else:
       return {attr:RingBuffer(attr, type=types[i] if types else type, 
-                              counter=counters[i] if counters else counter, 
+                              counter=counters[i] if counters else counter,
+                              metric=metric,
                               unit=units[i] if units else unit) 
                for i,attr in enumerate(keys)}
 
@@ -81,14 +83,16 @@ class MDict(dict):
 class RingBuffer(collections.deque):
 
    def __init__(self, attr_name, maxlen=_BUFFER_SIZE, 
-                      type=int, counter=False, unit=""):
+                      type=int, counter=False, unit="",
+                      metric=False):
       """
       RingBuffer
 
-      @maxlen the size of the ring buffer,
-      @type the type of stored elements (int, float or str)
-            note that str is a scalar type, it does not exclude int
-      @counter is True if the monitored value is a counter
+      @param maxlen the size of the ring buffer,
+      @param type the type of stored elements (int, float or str)
+                  note that str is a scalar type, it does not exclude int
+      @param counter is True if the monitored value is a counter
+      @param metric True if ringbuffer contains vendor-independant metric
 
       """
       super().__init__(maxlen=maxlen)
@@ -97,10 +101,13 @@ class RingBuffer(collections.deque):
       self._unit=unit
       self.type=type
       self.counter=counter
+      self.metric=metric
 
    def is_empty(self):
       return not self
-
+   def is_metric(self):
+      return self.metric
+      
    def append(self, e):
       """
       overload collections.deque to cast val before

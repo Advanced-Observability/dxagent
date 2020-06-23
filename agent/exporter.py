@@ -148,15 +148,11 @@ class DXAgentExporter():
             if isinstance(dd, MDict):
                dd.release()
          else:
-            if dd.is_empty():
+            if dd.is_empty() or not dd.is_metric():
                continue
-            # write a line to ShareableMemory
             value, severity = dd.top()
             path_string = self.build_path_string(list(args)+[kk])
-            self.info(path_string)
-            if "node" in path_string:
-               self.info(path_string)
-               yield path_string, value, dd.type
+            yield path_string, value, dd.type
                
    def _node_before_indexed(self, node):
       _before_indexed = ["vm", "kb", "cpu", "if", "sensors", "disk"]

@@ -401,7 +401,7 @@ class Subservice():
       attrs = self.engine.metrics_attrs[key]
       types = self.engine.metrics_types[key]
       units = self.engine.metrics_units[key]
-      return init_rb_dict(attrs,
+      return init_rb_dict(attrs, metric=True,
                           types=types,
                           units=units)
    def update_metrics(self):
