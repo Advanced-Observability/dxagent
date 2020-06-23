@@ -169,7 +169,7 @@ class DXAgentExporter():
       
       for node in nodes:
          if indexed:
-            path_string += "[key={}]".format(node)
+            path_string += "[name={}]".format(node)
             indexed = False
          else:
             path_string += "/{}".format(node)

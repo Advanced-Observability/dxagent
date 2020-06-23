@@ -185,7 +185,7 @@ class Subservice():
       """
       fullname="/"+self._type
       if self.name:
-         fullname = "{}[key={}]".format(fullname,self.name)
+         fullname = "{}[name={}]".format(fullname,self.name)
       if self.parent:
          fullname = "{}{}".format(self.parent.fullname,fullname)
       return fullname

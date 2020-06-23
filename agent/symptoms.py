@@ -195,9 +195,9 @@ class Symptom():
             if isinstance(ret, Comparator):
                # XXX
                if self.path.endswith("if"):
-                  self.args = ["{}/if[key={}]".format(self.node.fullname,index) for index in ret.indexes()]
+                  self.args = ["{}/if[name={}]".format(self.node.fullname,index) for index in ret.indexes()]
                else:
-                  self.args = ["{}[key={}]".format(self.node.fullname,index) for index in ret.indexes()]
+                  self.args = ["{}[name={}]".format(self.node.fullname,index) for index in ret.indexes()]
             else:
                self.args = [self.node.fullname]
             return True
