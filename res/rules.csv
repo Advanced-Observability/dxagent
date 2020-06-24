@@ -16,5 +16,5 @@ name,path,severity,rule,
 "Zombie Threads",/node/bm/proc,Orange,zombie_count>0
 "No SSH access to VM",/node/vm/net,Orange,ssh==0
 "No ARP Entry For Default Gateway",/node/bm/net/if,Red,(state=="up") and (gw_in_arp==0)
-"Non-standard ethernet MTU",/node/bm/net/if,Red,type=="ether" and mtu < 1500
+"Non-standard ethernet MTU",/node/bm/net/if,Red,(mtu!=1500) and (type=="ether")
 

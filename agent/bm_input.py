@@ -15,18 +15,20 @@ import subprocess
 from agent.rbuffer import init_rb_dict
 
 # linux/include/linux/if_arp.h
-_linux_if_types = { 0:"netrom", 1:"ether", 2:"eether", 3:"ax25", 4:"pronet",
-   5:"chaos", 6:"ieee802", 7:"arcnet", 8:"appletlk", 15:"dlci", 19:"atm",
-   23:"metricom", 24:"ieee1394", 27:"eui64", 32:"infiniband", 256:"slip", 
-   257:"cslip", 258:"slip6", 259:"cslip6", 260:"rsrvd", 264:"adapt", 270:"rose", 
-   271:"x25", 272:"hwx25", 280:"can", 512:"ppp", 513:"hdlc", 516:"lapb",
-   517:"ddcmp", 518:"rawhdlc", 768:"tunnel", 769:"tunnel6", 770:"frad",
-   771:"skip", 772:"loopback", 773:"localtlk", 774:"fddi", 775:"bif",
-   776:"sit", 777:"ipddp", 778:"ipgre", 779:"pimreg", 780:"hippi",
-   781:"ash", 782:"econet", 783:"irda", 784:"fcpp",
-   785:"fcal", 786:"fcpl", 787:"fcfabric", 800:"ieee802_tr",
-   801:"ieee80211", 802:"ieee802_prism", 803:"ieee80211_radiotap",
-   804:"ieee802154", 820:"phonet", 821:"phonet_pipe", 822:"caif"
+_linux_if_types = { "0":"netrom", "1":"ether", "2":"eether", "3":"ax25",
+   "4":"pronet","5":"chaos", "6":"ieee802", "7":"arcnet", "8":"appletlk", 
+   "15":"dlci", "19":"atm","23":"metricom", "24":"ieee1394", "27":"eui64", 
+   "32":"infiniband", "256":"slip", "257":"cslip", "258":"slip6",
+   "259":"cslip6", "260":"rsrvd","264":"adapt", "270":"rose", 
+   "271":"x25", "272":"hwx25", "280":"can", "512":"ppp", "513":"hdlc",
+   "516":"lapb",
+   "517":"ddcmp", "518":"rawhdlc", "768":"tunnel", "769":"tunnel6", "770":"frad",
+   "771":"skip", "772":"loopback", "773":"localtlk", "774":"fddi", "775":"bif",
+   "776":"sit", "777":"ipddp", "778":"ipgre", "779":"pimreg", "780":"hippi",
+   "781":"ash", "782":"econet", "783":"irda", "784":"fcpp",
+   "785":"fcal", "786":"fcpl", "787":"fcfabric", "800":"ieee802_tr",
+   "801":"ieee80211", "802":"ieee802_prism", "803":"ieee80211_radiotap",
+   "804":"ieee802154", "820":"phonet", "821":"phonet_pipe", "822":"caif"
 }
 
 def ratio(v, total):
@@ -810,7 +812,7 @@ class BMWatcher():
          "ip4_gw_addr", "ip4_gw_if", "ip4_gw_default",  
          "ip6_addr", "ip6_broadcast", "ip6_netmask", "ip6_peer",  
          "ip6_gw_addr", "ip6_gw_if", "ip6_gw_default",  
-         "dns",
+         "dns_server", "dhcp_server",
          "wireless",
          "numa_node", "local_cpulist", "local_cpu",
          "enable", "current_link_speed", "current_link_width",
@@ -819,8 +821,8 @@ class BMWatcher():
 
          "carrier_down_count", "carrier_up_count", "carrier_changes",
       ] + attr_list_netdev
-      type_list = 28*[str] + 2*[int] + 4*[str] + 19*[int]
-      counter_list = 34*[False] + 19*[True]
+      type_list = 29*[str] + 2*[int] + 4*[str] + 19*[int]
+      counter_list = 35*[False] + 19*[True]
 
       gws = netifaces.gateways()
       active_ifs = []
@@ -839,11 +841,25 @@ class BMWatcher():
       if not nameserver or nameserver == "127.0.0.53":
          res=subprocess.run(["systemd-resolve","--no-pager","--status"],
                         capture_output=True)
+         this_if = "global"
          for l in res.stdout.split(b'\n'):
             if b"Link" in l:
                this_if=l.split()[-1][1:-1].decode()
             elif b"Current DNS Server" in l:
                nameservers[this_if]=l.split()[-1].decode()
+      self.info(nameservers)
+      # DHCP
+      dhcp_servers={}
+      prefix='/var/lib/dhcp/'
+      for suffix in os.listdir(prefix):
+         if not suffix.endswith("leases"):
+            continue
+         with open(prefix+suffix) as f:
+            for l in f.readlines():
+               if "interface" in l:
+                  this_if = l.split()[-1][1:-2]
+               elif "dhcp-server-identifier" in l:
+                  dhcp_servers[this_if] = l.split()[-1][:-1]
       
       for if_name in netifaces.interfaces(): #os.listdir("/sys/class/net")
          
@@ -951,13 +967,16 @@ class BMWatcher():
              self._data["net/dev"][if_name]["carrier"])
          self._open_read_append(path_prefix+"operstate",
              self._data["net/dev"][if_name]["operstate"])
-         if_type = _linux_if_types.get(int(self._open_read(path_prefix+"type")),
+         if_type = _linux_if_types.get(self._open_read(path_prefix+"type"),
                                        "unknown")
          self._data["net/dev"][if_name]["type"].append(if_type)
          self._data["net/dev"][if_name]["wireless"].append(
                int(os.path.exists(path_prefix+"wireless")))
          self._data["net/dev"][if_name]["dns_server"].append(
                nameservers.get(if_name, nameserver))
+         self._data["net/dev"][if_name]["dhcp_server"].append(
+               dhcp_servers.get(if_name, ""))               
+               
 
       with open("/proc/net/dev", 'r') as f:
 

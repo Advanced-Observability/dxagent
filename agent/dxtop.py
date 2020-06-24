@@ -232,11 +232,10 @@ class DXTop(IOManager):
                flags = [(len(lpad),curses.color_pair(int(severity))),(len(s)+len(lpad),0)]
                self._append_content(self._center_text(s), 6, flags=flags)
             else:
-               for arg in args:
-                  s="{}: {}".format(name,arg)
-                  lpad,rpad=self._center_padding(s)
-                  flags = [(len(lpad),curses.color_pair(int(severity))),(len(s)+len(lpad),0)]
-                  self._append_content(self._center_text(s), 6, flags=flags)              
+               s="{}: {}".format(name,args)
+               lpad,rpad=self._center_padding(s)
+               flags = [(len(lpad),curses.color_pair(int(severity))),(len(s)+len(lpad),0)]
+               self._append_content(self._center_text(s), 6, flags=flags)              
          self._append_content(self._center_text(" "), 6)
       
       self._append_content(self._center_text("Metrics"), 6, curses.A_REVERSE)

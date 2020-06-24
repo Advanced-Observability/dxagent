@@ -104,7 +104,7 @@ class ShareableBuffer(shared_memory.ShareableList):
          split = line.split(';')
          # special case: symptoms
          if split[0] == "symptoms":
-            symptom=(split[1],split[2],eval(split[3]))
+            symptom=(split[1],split[2],split[3])
             data.setdefault("symptoms",[]).append(symptom)
             continue
          elif split[0] == "health_scores":
@@ -210,7 +210,8 @@ class ShareableBuffer(shared_memory.ShareableList):
          self._write_dict_rec(d, write_all, k)
       # special entry: symptom
       for s in data["symptoms"]:
-         self.append("symptoms", s.name, str(s.severity.value), str(s.args))
+         for arg in s.args:
+            self.append("symptoms", s.name, str(s.severity.value), arg)
       for path,score in data["health_scores"].items(): 
          self.append("health_scores", path, str(score))         
       self.validate()
