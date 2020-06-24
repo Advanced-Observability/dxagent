@@ -184,7 +184,7 @@ class Symptom():
       def _1min(rb):
          rb.count = engine.sample_per_min
          return rb
-      def _5min(var):
+      def _5min(rb):
          rb.count = engine.sample_per_min*5
          return rb
          

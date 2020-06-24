@@ -483,11 +483,14 @@ class Subservice():
                       "tx_drop": "tx_drop",
                       "carrier_up_count": "up_count",
                       "carrier_down_count": "down_count",
+                      "carrier_changes": "changes_count",
                       "operstate": "state",
                       "mtu": "mtu",
                       "numa_node": "numa",
                       "local_cpulist": "cpulist",
-                      "tx_queue_len": "tx_queue"}
+                      "tx_queue_len": "tx_queue",
+                      "wireless":"wireless",
+                      "type": "type"}
       for net,rbs in self._data["net/dev"].items():
          # direct mapping
          for attr,metric in attr_mapping.items():
@@ -505,13 +508,19 @@ class Subservice():
       """
       vm_name=self.parent.name
       hypervisor=self.parent.hypervisor
-      self._data["vm"][vm_name]["/node/vm/cpu"]["cpu_count"].append(
+      # init metric rbs if needed
+      cpu_label = "cpu"
+      if "/node/vm/cpu" not in self._data:
+         self._data["vm"][vm_name]["/node/vm/cpu"] = {}
+         self._data["vm"][vm_name]["/node/vm/cpu"][cpu_label] = self._init_metrics_rb("cpu")
+      
+      self._data["vm"][vm_name]["/node/vm/cpu"][cpu_label]["cpu_count"].append(
          self._data[hypervisor+"/vms"][vm_name]["cpu"]._top())
-      self._data["vm"][vm_name]["/node/vm/cpu"]["user_time"].append(
+      self._data["vm"][vm_name]["/node/vm/cpu"][cpu_label]["user_time"].append(
          self._data[hypervisor+"/vms"][vm_name]["Guest/CPU/Load/User"]._top())
-      self._data["vm"][vm_name]["/node/vm/cpu"]["system_time"].append(
+      self._data["vm"][vm_name]["/node/vm/cpu"][cpu_label]["system_time"].append(
          self._data[hypervisor+"/vms"][vm_name]["Guest/CPU/Load/Kernel"]._top())
-      self._data["vm"][vm_name]["/node/vm/cpu"]["idle_time"].append(
+      self._data["vm"][vm_name]["/node/vm/cpu"][cpu_label]["idle_time"].append(
          self._data[hypervisor+"/vms"][vm_name]["Guest/CPU/Load/Idle"]._top())
    
    def _update_metrics_linux_vm_mem(self):
@@ -701,7 +710,6 @@ class VM(Subservice):
       self._data["vm"][self.name]["/node/vm/proc"] = self._init_metrics_rb("proc")
       self._data["vm"][self.name]["/node/vm/net"] = self._init_metrics_rb("net")
       self._data["vm"][self.name]["/node/vm/mem"] = self._init_metrics_rb("mem")
-      self._data["vm"][self.name]["/node/vm/cpu"] = self._init_metrics_rb("cpu")
 
    def _update_metrics(self):
       """

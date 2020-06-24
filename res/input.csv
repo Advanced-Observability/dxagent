@@ -34,12 +34,15 @@ net/dev,enable,str,0,,if_name
 net/dev,current_link_speed,str,0,,if_name
 net/dev,current_link_width,str,0,,if_name
 net/dev,mtu,int,0,,if_name
+net/dev,type,int,0,,if_name
 net/dev,tx_queue_len,int,0,,if_name
 net/dev,duplex,str,0,,if_name
 net/dev,carrier,str,0,,if_name
 net/dev,operstate,str,0,,if_name
+net/dev,carrier_changes,int,1,,if_name
 net/dev,carrier_down_count,int,1,,if_name
 net/dev,carrier_up_count,int,1,,if_name
+net/dev,wireless,int,1,,if_name
 net/dev,rx_bytes,int,1,,if_name
 net/dev,rx_packets,int,1,,if_name
 net/dev,rx_errs,int,1,,if_name

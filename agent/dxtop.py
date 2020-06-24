@@ -253,12 +253,14 @@ class DXTop(IOManager):
 #            self._append_content(self._center_text("vm[name={}]".format(vm_name)),
 #                                 6, curses.A_DIM)
             vm_dict = self._data["vm"][vm_name]
-            skip = ["/node/vm/net/if"]
+            skip = ["/node/vm/net/if", "/node/vm/cpu"]
             for subservice in vm_dict:
                if subservice in skip:
                   continue
                self._format_attrs_rb(subservice, 6, subdict=vm_dict,
                                      health=True, health_index=vm_name)
+            self._format_attrs_list_rb("/node/vm/cpu", 6, subdict=vm_dict,
+                                              health=True, health_index=vm_name)
             self._format_attrs_list_rb("/node/vm/net/if", 6, subdict=vm_dict,
                                         health=True, health_index=vm_name)
                                     
@@ -453,24 +455,31 @@ class DXTop(IOManager):
          else:
             self._append_content(self.hline_x(self.col_sizes), pad_index)
 
-   def _format_attrs_list_rb_percpu(self, category, pad_index,
-                                    extend_name=False, health=False):
+   def _format_attrs_list_rb_percpu(self, category, pad_index, subdict=None,
+                                    extend_name=False, health=False,
+                                    health_index=""):
       """
       format a dict of dict of ringbuffers into a curses pad
  
       @param extend_name if True, prepend attr name with subservice path
       """
-      if category not in self._data:
+      if subdict:
+         data=subdict
+      else:
+         data=self._data
+      if category not in data:
          return
-
       cpu_slice = 8
-      cpu_count = len(self._data[category])-1
-      keys = self._data[category]["cpu0"].keys()
-
+      cpu_count = len(data[category])-1
+      if "cpu" in data[category]:
+         keys = data[category]["cpu"].keys()
+      else:
+         keys = data[category]["cpu0"].keys()
+      
       title_str = category
       flags = curses.A_BOLD
       if health:
-         title_str = self._indexed_path(category)
+         title_str = self._indexed_path(category, index=health_index)
          score = self._root_health_score(title_str)
          title_str += " health:"
          category_len = len(title_str)
@@ -487,7 +496,6 @@ class DXTop(IOManager):
       self._append_content(self.hline(self.col_sizes), pad_index)
 
       for i in range(0,cpu_count,cpu_slice):
-
          self._append_content(
             self._center_text("cpu{}-cpu{}".format(i,i+cpu_slice-1)),
             pad_index, curses.A_DIM)
@@ -501,7 +509,7 @@ class DXTop(IOManager):
             for cpu_index in range(i,i+cpu_slice):
 
                cpu_label="cpu{}".format(cpu_index)
-               d = self._data[category][cpu_label][k]
+               d = data[category][cpu_label][k]
                value, severity = d[:2]
                if severity:
                   flags.append((len(s),curses.color_pair(severity)))
