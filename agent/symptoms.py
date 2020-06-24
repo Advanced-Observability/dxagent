@@ -95,7 +95,7 @@ class Symptom():
       """
       engine = self.engine
       metrics = self.engine.metrics
-      
+      info = self.engine.info
       class Comparator():
          def __init__(self, rb):
             self.islist=isinstance(rb,list)
@@ -146,7 +146,7 @@ class Symptom():
                  or not other.islist):
                return self and other
             intersection=list(set(self.indexes()) & set(other.indexes()))
-            self.rb = filter(lambda e: e[0] in intersection, self.rb)
+            self.rb = list(filter(lambda e: e[0] in intersection, self.rb))
             if not self.rb:
                return False
             return self
