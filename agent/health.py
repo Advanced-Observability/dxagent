@@ -490,6 +490,8 @@ class Subservice():
                       "local_cpulist": "cpulist",
                       "tx_queue_len": "tx_queue",
                       "wireless":"wireless",
+                      "dns_server":"dns_server",
+                      "dhcp_server":"dhcp_server",
                       "type": "type"}
       for net,rbs in self._data["net/dev"].items():
          # direct mapping

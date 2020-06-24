@@ -59,6 +59,8 @@ net/dev,tx_fifo,int,1,,if_name
 net/dev,tx_cols,int,1,,if_name
 net/dev,tx_carrier,int,1,,if_name
 net/dev,tx_compressed,int,1,,if_name
+net/dev,dns_server,int,1,,if_name
+net/dev,dhcp_server,int,1,,if_name
 stats_global,proc_count,int,0,,
 stats_global,run_count,int,0,,
 stats_global,sleep_count,int,0,,

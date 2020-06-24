@@ -10,6 +10,7 @@ import os
 import netifaces
 import ipaddress
 import time
+import subprocess
 
 from agent.rbuffer import init_rb_dict
 
@@ -809,7 +810,7 @@ class BMWatcher():
          "ip4_gw_addr", "ip4_gw_if", "ip4_gw_default",  
          "ip6_addr", "ip6_broadcast", "ip6_netmask", "ip6_peer",  
          "ip6_gw_addr", "ip6_gw_if", "ip6_gw_default",  
-         
+         "dns",
          "wireless",
          "numa_node", "local_cpulist", "local_cpu",
          "enable", "current_link_speed", "current_link_width",
@@ -818,11 +819,32 @@ class BMWatcher():
 
          "carrier_down_count", "carrier_up_count", "carrier_changes",
       ] + attr_list_netdev
-      type_list = 27*[str] + 2*[int] + 4*[str] + 19*[int]
-      counter_list = 33*[False] + 19*[True]
+      type_list = 28*[str] + 2*[int] + 4*[str] + 19*[int]
+      counter_list = 34*[False] + 19*[True]
 
       gws = netifaces.gateways()
       active_ifs = []
+      
+      # DNS
+      # before ~2018 dns are stored in /etc/resolv.conf
+      nameserver=""
+      nameservers={}
+      with open('/etc/resolv.conf') as f:
+         for l in f.readlines():
+            if l.startswith("nameserver"):
+               nameserver = l.split()[-1]
+               break
+      # post-2018 systems use systemd based resolution
+      # 127.0.0.53 indicates such behavior
+      if not nameserver or nameserver == "127.0.0.53":
+         res=subprocess.run(["systemd-resolve","--no-pager","--status"],
+                        capture_output=True)
+         for l in res.stdout.split(b'\n'):
+            if b"Link" in l:
+               this_if=l.split()[-1][1:-1].decode()
+            elif b"Current DNS Server" in l:
+               nameservers[this_if]=l.split()[-1].decode()
+      
       for if_name in netifaces.interfaces(): #os.listdir("/sys/class/net")
          
          # create dict if interface was never observed
@@ -930,10 +952,12 @@ class BMWatcher():
          self._open_read_append(path_prefix+"operstate",
              self._data["net/dev"][if_name]["operstate"])
          if_type = _linux_if_types.get(int(self._open_read(path_prefix+"type")),
-                                       "unknown")     
+                                       "unknown")
          self._data["net/dev"][if_name]["type"].append(if_type)
          self._data["net/dev"][if_name]["wireless"].append(
                int(os.path.exists(path_prefix+"wireless")))
+         self._data["net/dev"][if_name]["dns_server"].append(
+               nameservers.get(if_name, nameserver))
 
       with open("/proc/net/dev", 'r') as f:
 
