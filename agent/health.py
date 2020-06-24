@@ -143,21 +143,13 @@ class HealthEngine():
       #self.info("+".join([s.name for s in current.symptoms]))
       for dep in current.dependencies:
          self.walk(dep)
-
-   def _update_metrics_bm(self):
-      pass
-
-   def _update_metrics_vm(self):
-      pass
-
-   def _update_metrics_kb(self):
-      pass
       
 class Subservice():
    """
    
    """
-   def __init__(self, _type, name, engine, parent=None, is_leaf=False):
+   def __init__(self, _type, name, engine,
+                parent=None, impacting=True):
       # The type of subservice e.g., vm, bm, kb, node, net, if, etc
       self._type = _type
       # The unique identifier of the subservice
@@ -167,7 +159,12 @@ class Subservice():
       self._data = self.engine._data
       self.sysinfo = self.engine.sysinfo
       self.parent = parent
-      self.is_leaf = is_leaf
+      # impacting
+      # if True:  dependencies transmit symptoms and health score malus
+      #           to parent.
+      # if False: symptoms and health score are displayed but not transmitted
+      #           to parent.
+      self.impacting = impacting
       self.dependencies = []
       self.active = True
       self.fullname = self.find_fullname()
@@ -225,7 +222,9 @@ class Subservice():
          p, hs = subservice.update_symptoms()
          positives.extend(p)
          health_scores.update(hs)
-         self.health_score = max(0,self.health_score-(100-subservice.health_score))
+         if subservice.impacting:
+            subservice_malus = 100-subservice.health_score
+            self.health_score = max(0,self.health_score-subservice_malus)
          
       # update for node
       for symptom in self.symptoms:
@@ -237,9 +236,6 @@ class Subservice():
             
       health_scores[self.fullname] = self.health_score
       return positives, health_scores
-         
-   def get_health_score(self):
-      return self.health_score
 
    def _init_metrics_rb(self, subservice):
       """
