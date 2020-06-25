@@ -10,6 +10,7 @@ import sys
 import argparse
 import configparser
 import logging
+import logging.config
 import os
 
 class IOManager():
@@ -143,7 +144,12 @@ class IOManager():
       """
       if self.args == None:
          raise IOManagerException("Arguments not found")
-
+         
+      import pyroute2
+      logging.config.dictConfig({
+          'version': 1,
+          'disable_existing_loggers': True,
+      })
       # create logger
       self.logger = logging.getLogger(self.child.__class__.__name__)
       self.logger.setLevel(logging.DEBUG)

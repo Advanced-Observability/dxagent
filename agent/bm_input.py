@@ -13,6 +13,8 @@ import time
 import subprocess
 
 import ethtool
+import logging
+import pyroute2
 
 from agent.rbuffer import init_rb_dict
 
@@ -47,6 +49,7 @@ class BMWatcher():
       self.parent=parent
       self._init_dicts()
       self.diskstats_timestamp=None
+      #self._ethtool = pyroute2.Ethtool()
 
    def _init_dicts(self):
 
@@ -825,21 +828,43 @@ class BMWatcher():
          "wireless",
          "numa_node", "local_cpulist", "local_cpu",
          "enable", "current_link_speed", "current_link_width",
-         "driver", "bus_info", "tso", "ufo", "gso", "gro", "sg",
+         "driver", "bus_info", 
          "bus_info", "wireless_protocol",
-         
-         "mtu", "tx_queue_len", "broadcast", "debug","loopback",
+         "duplex", "carrier",
+         "operstate", "type",
+          
+          
+         "mtu", "tx_queue_len", 
+         "ufo",
+         "broadcast", "debug","loopback",
          "point_to_point","notrailers","running","noarp","promisc",
          "allmulticast","lb_master","lb_slave","multicast_support",
          "portselect","automedia","dynamic",
          
-         "duplex", "carrier",
-         "operstate", "type",
-
+         "tx-scatter-gather","tx-checksum-ipv4",
+         "tx-checksum-ip-generic","tx-checksum-ipv6",
+         "highdma","tx-scatter-gather-fraglist","tx-vlan-hw-insert",
+         "rx-vlan-hw-parse","rx-vlan-filter","vlan-challenged",
+         "tx-generic-segmentation","tx-lockless","netns-local",
+         "rx-gro","rx-lro","tx-tcp-segmentation","tx-gso-robust",
+         "tx-tcp-ecn-segmentation","tx-tcp-mangleid-segmentation",
+         "tx-tcp6-segmentation","tx-fcoe-segmentation","tx-gre-segmentation",
+         "tx-gre-csum-segmentation","tx-ipxip4-segmentation",
+         "tx-ipxip6-segmentation","tx-udp_tnl-segmentation",
+         "tx-udp_tnl-csum-segmentation","tx-gso-partial",
+         "tx-sctp-segmentation","tx-esp-segmentation","tx-udp-segmentation",
+         "tx-checksum-fcoe-crc","tx-checksum-sctp","fcoe-mtu",
+         "rx-ntuple-filter","rx-hashing","rx-checksum","tx-nocache-copy",
+         "rx-fcs","rx-all","tx-vlan-stag-hw-insert","rx-vlan-stag-hw-parse",
+         "rx-vlan-stag-filter","l2-fwd-offload","hw-tc-offload",
+         "esp-hw-offload","esp-tx-csum-hw-offload","rx-udp_tunnel-port-offload",
+         "tls-hw-tx-offload","tls-hw-rx-offload","rx-gro-hw","tls-hw-record",
+         
+         # counters
          "carrier_down_count", "carrier_up_count", "carrier_changes",
       ] + attr_list_netdev
-      type_list = 38*[str] + 17*[int] + 4*[str] + 27*[int]
-      counter_list = 61*[False] + 27*[True]
+      type_list = 37*[str] + 70*[int] + 27*[int]
+      counter_list = 107*[False] + 27*[True]
 
       gws = netifaces.gateways()
       active_ifs = []
@@ -1013,17 +1038,26 @@ class BMWatcher():
 
       @see ethtool.c from python3-ethtool
       """
-      getters = [("driver", ethtool.get_module), ("bus_info", ethtool.get_businfo),
-                ("tso", ethtool.get_tso), ("ufo", ethtool.get_ufo),
-                ("gso", ethtool.get_gso), ("gro", ethtool.get_gro),
-                ("sg", ethtool.get_sg),
+      self._ethtool = pyroute2.Ethtool()
+      getters = [("driver", ethtool.get_module), 
+                 ("bus_info", ethtool.get_businfo),
+                # ("ufo", ethtool.get_ufo),
                 ("wireless_protocol", ethtool.get_wireless_protocol),
                ]
       for attr, getter in getters:
          try:
             if_dict[attr].append(getter(if_name))
          except:
-            pass   
+            pass
+            
+      for feature in self._ethtool.get_features(if_name)[0].values():
+         if not feature.name or not feature.available:
+            continue
+         #self.info("if: {} feature: {}".format(if_name,feature.name))
+         if_dict[feature.name].append(int(feature.enable))
+         #self.info("inserted {} type {}".format(if_dict[attr]._top(),
+         #                                       if_dict[attr].type))
+         
       #try:
       #   coalesce_settings = ethtool.get_coalesce(if_name)
       #except:
@@ -1045,7 +1079,7 @@ class BMWatcher():
          return
       if_dict["broadcast"].append((flags & ethtool.IFF_BROADCAST) != 0)
       if_dict["debug"].append((flags & ethtool.IFF_DEBUG) != 0)
-      if_dict["loopback"].append((flags & ethtool.IFF_LOOPBACK) != 0)
+      #if_dict["loopback"].append((flags & ethtool.IFF_LOOPBACK) != 0)
       if_dict["point_to_point"].append((flags & ethtool.IFF_POINTOPOINT) != 0)
       if_dict["notrailers"].append((flags & ethtool.IFF_NOTRAILERS) != 0)
       if_dict["running"].append((flags & ethtool.IFF_RUNNING) != 0)
@@ -1058,6 +1092,8 @@ class BMWatcher():
       if_dict["portselect"].append((flags & ethtool.IFF_PORTSEL) != 0)
       if_dict["automedia"].append((flags & ethtool.IFF_AUTOMEDIA) != 0)
       if_dict["dynamic"].append((flags & ethtool.IFF_DYNAMIC) != 0)
+      
+      self._ethtool.close()
 
    def _process_net_settings(self):
       """
