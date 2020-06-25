@@ -69,6 +69,9 @@ DxTop is a console app that displays data collected by DxAgent.
 
 - [netifaces](https://pypi.org/project/netifaces/)
    - `python3 -m pip install netifaces`
+   
+- [pyroute2](https://pypi.org/project/pyroute2/)
+   - `python3 -m pip install pyroute2`
 
 ### Optional Libs
 

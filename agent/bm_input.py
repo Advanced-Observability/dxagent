@@ -12,6 +12,8 @@ import ipaddress
 import time
 import subprocess
 
+import ethtool
+
 from agent.rbuffer import init_rb_dict
 
 # linux/include/linux/if_arp.h
@@ -19,9 +21,8 @@ _linux_if_types = { "0":"netrom", "1":"ether", "2":"eether", "3":"ax25",
    "4":"pronet","5":"chaos", "6":"ieee802", "7":"arcnet", "8":"appletlk", 
    "15":"dlci", "19":"atm","23":"metricom", "24":"ieee1394", "27":"eui64", 
    "32":"infiniband", "256":"slip", "257":"cslip", "258":"slip6",
-   "259":"cslip6", "260":"rsrvd","264":"adapt", "270":"rose", 
-   "271":"x25", "272":"hwx25", "280":"can", "512":"ppp", "513":"hdlc",
-   "516":"lapb",
+   "259":"cslip6", "260":"rsrvd","264":"adapt", "270":"rose", "271":"x25",
+   "272":"hwx25", "280":"can", "512":"ppp", "513":"hdlc", "516":"lapb",
    "517":"ddcmp", "518":"rawhdlc", "768":"tunnel", "769":"tunnel6", "770":"frad",
    "771":"skip", "772":"loopback", "773":"localtlk", "774":"fddi", "775":"bif",
    "776":"sit", "777":"ipddp", "778":"ipgre", "779":"pimreg", "780":"hippi",
@@ -799,11 +800,19 @@ class BMWatcher():
       index is if_name
 
       """
+      
+      
+
+      
       attr_list_netdev = [ 
          "rx_bytes", "rx_packets", "rx_errs", "rx_drop", "rx_fifo",
          "rx_frame", "rx_compressed", "rx_multicast", 
          "tx_bytes", "tx_packets", "tx_errs", "tx_drop", "tx_fifo",
-         "tx_cols", "tx_carrier", "tx_compressed" 
+         "tx_cols", "tx_carrier", "tx_compressed",
+         # ring params
+         "rx_max_pending",
+         "rx_mini_max_pending","rx_jumbo_max_pending","tx_max_pending",
+         "rx_pending", "rx_mini_pending", "rx_jumbo_pending", "tx_pending",
       ]
       attr_list = [
          "link_addr", "link_broadcast", "link_peer",  
@@ -816,13 +825,21 @@ class BMWatcher():
          "wireless",
          "numa_node", "local_cpulist", "local_cpu",
          "enable", "current_link_speed", "current_link_width",
-         "mtu", "tx_queue_len", "duplex", "carrier",
+         "driver", "bus_info", "tso", "ufo", "gso", "gro", "sg",
+         "bus_info", "wireless_protocol",
+         
+         "mtu", "tx_queue_len", "broadcast", "debug","loopback",
+         "point_to_point","notrailers","running","noarp","promisc",
+         "allmulticast","lb_master","lb_slave","multicast_support",
+         "portselect","automedia","dynamic",
+         
+         "duplex", "carrier",
          "operstate", "type",
 
          "carrier_down_count", "carrier_up_count", "carrier_changes",
       ] + attr_list_netdev
-      type_list = 29*[str] + 2*[int] + 4*[str] + 19*[int]
-      counter_list = 35*[False] + 19*[True]
+      type_list = 38*[str] + 17*[int] + 4*[str] + 27*[int]
+      counter_list = 61*[False] + 27*[True]
 
       gws = netifaces.gateways()
       active_ifs = []
@@ -847,8 +864,9 @@ class BMWatcher():
                this_if=l.split()[-1][1:-1].decode()
             elif b"Current DNS Server" in l:
                nameservers[this_if]=l.split()[-1].decode()
-      self.info(nameservers)
+      
       # DHCP
+      # parse dhcp lease files
       dhcp_servers={}
       prefix='/var/lib/dhcp/'
       for suffix in os.listdir(prefix):
@@ -867,135 +885,179 @@ class BMWatcher():
          active_ifs.append(if_name)
          self._data["net/dev"].setdefault(if_name, init_rb_dict(attr_list, 
                                           types=type_list, counters=counter_list))
+         if_dict = self._data["net/dev"][if_name]
          # link
          addrs = netifaces.ifaddresses(if_name)
          if netifaces.AF_LINK in addrs:
-
             # addresses
             for item in addrs[netifaces.AF_LINK]:
                if "addr" in item:
-                  self._data["net/dev"][if_name]["link_addr"].append(item["addr"])
+                  if_dict["link_addr"].append(item["addr"])
                if "broadcast" in item:
-                  self._data["net/dev"][if_name]["link_broadcast"].append(item["broadcast"])
+                  if_dict["link_broadcast"].append(item["broadcast"])
                if "peer" in item:
-                  self._data["net/dev"][if_name]["link_peer"].append(item["peer"])
-
+                  if_dict["link_peer"].append(item["peer"])
             # gateways
             if netifaces.AF_LINK in gws:
                for item in gws[netifaces.AF_LINK]:
                   if item[1] != if_name:
                      continue
-                  self._data["net/dev"][if_name]["link_gw_addr"].append(item[0])
-                  self._data["net/dev"][if_name]["link_gw_if"].append(item[1])
-                  self._data["net/dev"][if_name]["link_gw_default"].append(item[2])
+                  if_dict["link_gw_addr"].append(item[0])
+                  if_dict["link_gw_if"].append(item[1])
+                  if_dict["link_gw_default"].append(item[2])
 
          # ip4
          if netifaces.AF_INET in addrs:
-
             # addr
             for item in addrs[netifaces.AF_INET]:
                if "addr" in item:
-                  self._data["net/dev"][if_name]["ip4_addr"].append(item["addr"])
+                  if_dict["ip4_addr"].append(item["addr"])
                if "broadcast" in item:
-                  self._data["net/dev"][if_name]["ip4_broadcast"].append(item["broadcast"])
+                  if_dict["ip4_broadcast"].append(item["broadcast"])
                if "netmask" in item:
-                  self._data["net/dev"][if_name]["ip4_netmask"].append(item["netmask"])
+                  if_dict["ip4_netmask"].append(item["netmask"])
                if "peer" in item:
-                  self._data["net/dev"][if_name]["ip4_peer"].append(item["peer"])
-
+                  if_dict["ip4_peer"].append(item["peer"])
             # gateways
             if netifaces.AF_INET in gws:
                for item in gws[netifaces.AF_INET]:
                   if item[1] != if_name:
                      continue
-                  self._data["net/dev"][if_name]["ip4_gw_addr"].append(item[0])
-                  self._data["net/dev"][if_name]["ip4_gw_if"].append(item[1])
-                  self._data["net/dev"][if_name]["ip4_gw_default"].append(item[2])
+                  if_dict["ip4_gw_addr"].append(item[0])
+                  if_dict["ip4_gw_if"].append(item[1])
+                  if_dict["ip4_gw_default"].append(item[2])
 
          # ip6 addr
          if netifaces.AF_INET6 in addrs:
-
             # addr
             for item in addrs[netifaces.AF_INET6]:
                if "addr" in item:
-                  self._data["net/dev"][if_name]["ip6_addr"].append(item["addr"])
+                  if_dict["ip6_addr"].append(item["addr"])
                if "broadcast" in item:
-                  self._data["net/dev"][if_name]["ip6_broadcast"].append(item["broadcast"])
+                  if_dict["ip6_broadcast"].append(item["broadcast"])
                if "netmask" in item:
-                  self._data["net/dev"][if_name]["ip6_netmask"].append(item["netmask"])
+                  if_dict["ip6_netmask"].append(item["netmask"])
                if "peer" in item:
-                  self._data["net/dev"][if_name]["ip6_peer"].append(item["peer"])
-
+                  if_dict["ip6_peer"].append(item["peer"])
             # gateways
             if netifaces.AF_INET6 in gws:
                for item in gws[netifaces.AF_INET6]:
                   if item[1] != if_name:
                      continue
-                  self._data["net/dev"][if_name]["ip6_gw_addr"].append(item[0])
-                  self._data["net/dev"][if_name]["ip6_gw_if"].append(item[1])
-                  self._data["net/dev"][if_name]["ip6_gw_default"].append(tem[2])
+                  if_dict["ip6_gw_addr"].append(item[0])
+                  if_dict["ip6_gw_if"].append(item[1])
+                  if_dict["ip6_gw_default"].append(tem[2])
+                  
+         self.read_ethtool_info(if_name, if_dict)
+                  
          #
          # non-standard if attributes
          # https://www.kernel.org/doc/Documentation/ABI/testing/sysfs-class-net
          #
          path_prefix="/sys/class/net/{}/".format(if_name)
          self._open_read_append(path_prefix+"carrier_down_count",
-             self._data["net/dev"][if_name]["carrier_down_count"])
+             if_dict["carrier_down_count"])
          self._open_read_append(path_prefix+"carrier_up_count",
-             self._data["net/dev"][if_name]["carrier_up_count"])
+             if_dict["carrier_up_count"])
          self._open_read_append(path_prefix+"carrier_changes",
-             self._data["net/dev"][if_name]["carrier_changes"])             
+             if_dict["carrier_changes"])             
          self._open_read_append(path_prefix+"device/numa_node",
-             self._data["net/dev"][if_name]["numa_node"])
+             if_dict["numa_node"])
          self._open_read_append(path_prefix+"device/local_cpulist",
-             self._data["net/dev"][if_name]["local_cpulist"])
+             if_dict["local_cpulist"])
          self._open_read_append(path_prefix+"device/local_cpu",
-             self._data["net/dev"][if_name]["local_cpu"])
+             if_dict["local_cpu"])
          self._open_read_append(path_prefix+"device/enable",
-             self._data["net/dev"][if_name]["enable"])
+             if_dict["enable"])
          self._open_read_append(path_prefix+"device/current_link_speed",
-             self._data["net/dev"][if_name]["current_link_speed"])
+             if_dict["current_link_speed"])
          self._open_read_append(path_prefix+"device/current_link_width",
-             self._data["net/dev"][if_name]["current_link_width"])
+             if_dict["current_link_width"])
          self._open_read_append(path_prefix+"mtu",
-             self._data["net/dev"][if_name]["mtu"])
+             if_dict["mtu"])
          self._open_read_append(path_prefix+"tx_queue_len",
-             self._data["net/dev"][if_name]["tx_queue_len"])
+             if_dict["tx_queue_len"])
          self._open_read_append(path_prefix+"duplex",
-             self._data["net/dev"][if_name]["duplex"])
+             if_dict["duplex"])
          self._open_read_append(path_prefix+"carrier",
-             self._data["net/dev"][if_name]["carrier"])
+             if_dict["carrier"])
          self._open_read_append(path_prefix+"operstate",
-             self._data["net/dev"][if_name]["operstate"])
+             if_dict["operstate"])
          if_type = _linux_if_types.get(self._open_read(path_prefix+"type"),
                                        "unknown")
-         self._data["net/dev"][if_name]["type"].append(if_type)
-         self._data["net/dev"][if_name]["wireless"].append(
+         if_dict["type"].append(if_type)
+         if_dict["wireless"].append(
                int(os.path.exists(path_prefix+"wireless")))
-         self._data["net/dev"][if_name]["dns_server"].append(
+         if_dict["dns_server"].append(
                nameservers.get(if_name, nameserver))
-         self._data["net/dev"][if_name]["dhcp_server"].append(
+         if_dict["dhcp_server"].append(
                dhcp_servers.get(if_name, ""))               
                
-
       with open("/proc/net/dev", 'r') as f:
-
          for l in f.readlines()[2:]:
             attr_val = [e.rstrip(':') for e in l.rstrip().split()]
             index = attr_val[0] 
-
             self._data["net/dev"].setdefault(index, init_rb_dict(attr_list, 
                                     types=type_list, counters=counter_list))
-
             for i,e in enumerate(attr_val[1:]):
                self._data["net/dev"][index][attr_list_netdev[i]].append(e)
-
             active_ifs.append(index)
 
       # cleanup expired ifs
       for monitored_ifs in list(self._data["net/dev"].keys()):
          if monitored_ifs not in active_ifs:
             del self._data["net/dev"][monitored_ifs]
+
+   def read_ethtool_info(self, if_name, if_dict):
+      """
+
+      @see ethtool.c from python3-ethtool
+      """
+      getters = [("driver", ethtool.get_module), ("bus_info", ethtool.get_businfo),
+                ("tso", ethtool.get_tso), ("ufo", ethtool.get_ufo),
+                ("gso", ethtool.get_gso), ("gro", ethtool.get_gro),
+                ("sg", ethtool.get_sg),
+                ("wireless_protocol", ethtool.get_wireless_protocol),
+               ]
+      for attr, getter in getters:
+         try:
+            if_dict[attr].append(getter(if_name))
+         except:
+            pass   
+      #try:
+      #   coalesce_settings = ethtool.get_coalesce(if_name)
+      #except:
+      #   pass
+      
+      # 'rx_max_pending': 0, 'rx_mini_max_pending': 0,
+      # 'rx_jumbo_max_pending': 0, 'tx_max_pending': 0,
+      # 'rx_pending': 0, 'rx_mini_pending': 0, 'rx_jumbo_pending': 0,
+      # 'tx_pending': 0
+      try:
+         for attr,val in ethtool.get_ringparam(if_name).items():
+            if_dict[attr].append(val)
+      except:
+         pass
+         
+      try:
+         flags = ethtool.get_flags(if_name)
+      except:
+         return
+      if_dict["broadcast"].append((flags & ethtool.IFF_BROADCAST) != 0)
+      if_dict["debug"].append((flags & ethtool.IFF_DEBUG) != 0)
+      if_dict["loopback"].append((flags & ethtool.IFF_LOOPBACK) != 0)
+      if_dict["point_to_point"].append((flags & ethtool.IFF_POINTOPOINT) != 0)
+      if_dict["notrailers"].append((flags & ethtool.IFF_NOTRAILERS) != 0)
+      if_dict["running"].append((flags & ethtool.IFF_RUNNING) != 0)
+      if_dict["noarp"].append((flags & ethtool.IFF_NOARP) != 0)
+      if_dict["promisc"].append((flags & ethtool.IFF_PROMISC) != 0)
+      if_dict["allmulticast"].append((flags & ethtool.IFF_ALLMULTI) != 0)
+      if_dict["lb_master"].append((flags & ethtool.IFF_MASTER) != 0)
+      if_dict["lb_slave"].append((flags & ethtool.IFF_SLAVE) != 0)
+      if_dict["multicast_support"].append((flags & ethtool.IFF_MULTICAST) != 0)
+      if_dict["portselect"].append((flags & ethtool.IFF_PORTSEL) != 0)
+      if_dict["automedia"].append((flags & ethtool.IFF_AUTOMEDIA) != 0)
+      if_dict["dynamic"].append((flags & ethtool.IFF_DYNAMIC) != 0)
 
    def _process_net_settings(self):
       """

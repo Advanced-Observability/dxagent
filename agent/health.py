@@ -492,11 +492,22 @@ class Subservice():
                       "wireless":"wireless",
                       "dns_server":"dns_server",
                       "dhcp_server":"dhcp_server",
-                      "type": "type"}
+                      "type": "type", "driver" : "driver",
+                      "bus_info" : "bus_info",
+                      "tso" : "tso", "ufo" : "ufo", "gso" : "gso",
+                      "gro" : "gro", "sg" : "sg", "bus_info" : "bus_info",
+                      "wireless_protocol" : "wireless_protocol",
+                      "broadcast" : "broadcast", "debug" : "debug",
+                      "point_to_point" : "point_to_point",
+                      "notrailers" : "notrailers", "running" : "running",
+                      "noarp" : "noarp", "promisc" : "promisc",
+                      "allmulticast" : "allmulticast",
+                      "multicast_support" : "multicast_support",
+                      }
       for net,rbs in self._data["net/dev"].items():
          # direct mapping
          for attr,metric in attr_mapping.items():
-            if attr in rbs:
+            if attr in rbs and not rbs[attr].is_empty():
                self._data["/node/bm/net/if"][net][metric].append(
                  rbs[attr]._top())
          # other fields
