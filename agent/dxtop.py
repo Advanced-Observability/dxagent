@@ -189,6 +189,8 @@ class DXTop(IOManager):
          self._format_attrs_list_rb("stats", 2)
 
       self._format_attrs_list_rb("net/dev", 3)
+      self._format_attrs_list_rb("routes4", 3)
+      self._format_attrs_list_rb("routes6", 3)
       self._format_attrs_rb("proc/sys", 3)
       self._format_attrs_rb("netstat", 3)
       self._format_attrs_rb("snmp", 3)

@@ -11,10 +11,15 @@ import netifaces
 import ipaddress
 import time
 import subprocess
+import socket
 
 import ethtool
 import logging
 import pyroute2
+
+from pyroute2.netlink.rtnl import rt_type
+from pyroute2.netlink.rtnl import rt_scope
+from pyroute2.netlink.rtnl import rt_proto
 
 from agent.rbuffer import init_rb_dict
 
@@ -50,14 +55,15 @@ class BMWatcher():
       self._init_dicts()
       self.diskstats_timestamp=None
       self._ethtool = pyroute2.Ethtool()
-      
+      self._route = pyroute2.IPRoute()
 
    def _init_dicts(self):
 
       # init categories whose input count are prone to change during execution
       # e.g., interfaces , processes
       self._data["net/dev"] = {}
-      #self._data["bm_ifs"] = {}
+      self._data["routes4"] = {}
+      self._data["routes6"] = {}
       self._data["swaps"] = {}
       self._data["net/arp"] = {}
       self._data["stats"] = {}
@@ -202,32 +208,7 @@ class BMWatcher():
       baremetal health: Linux
 
       """
-
-      """
-      parse input from
-
-      /proc/<PID>/stat k
-      /proc/stat + stat/cpu k
-      /proc/meminfo k
-      /proc/loadavg       k
-      /proc/swaps      k
-      /proc/uptime k
-      /proc/diskstats
-      /proc/net/netstat k
-      /proc/net/snmp k
-      /proc/net/stat/arp_cache k
-      /proc/net/stat/ndisc_cache k
-      /proc/net/stat/rt_cache k
-      /proc/net/dev (interfaces listed in /sys/class/net/*) k
-      /sys/class/net/enp4s0/ k
-
-      /proc/net/tcp
-      /proc/net/udp
-      /proc/net/unix
-
-      /proc/net/arp k
-      /proc/net/route k
-      """
+      
       self._process_proc_meminfo()
       self._process_proc_stat()
       self._process_proc_stats()
@@ -241,12 +222,10 @@ class BMWatcher():
       self._process_proc_net_stat_ndisc_cache()
       self._process_proc_net_stat_rt_cache()
       self._process_proc_net_arp()
-      #self._process_proc_net_route()
       self._process_net_settings()
       self._process_sensors()
-
-      # non-standards
       self._process_interfaces()
+      self._process_routes()
 
    def _process_sensors(self):
       dev_cooling_path = "/sys/class/thermal/"
@@ -804,10 +783,6 @@ class BMWatcher():
       index is if_name
 
       """
-      
-      
-
-      
       attr_list_netdev = [ 
          "rx_bytes", "rx_packets", "rx_errs", "rx_drop", "rx_fifo",
          "rx_frame", "rx_compressed", "rx_multicast", 
@@ -1033,6 +1008,43 @@ class BMWatcher():
       for monitored_ifs in list(self._data["net/dev"].keys()):
          if monitored_ifs not in active_ifs:
             del self._data["net/dev"][monitored_ifs]
+            
+   def _process_routes(self):
+   
+      # https://man7.org/linux/man-pages/man7/rtnetlink.7.html
+      #
+      extra_attrs = ['RTA_PRIORITY', 'RTA_GATEWAY', 'RTA_OIF', 'RTA_DST',
+         'RTA_SRC', 'RTA_IIF', 'RTA_PREFSRC',]
+      base_attrs = [ 'dst_len', 'src_len', 'tos', 'proto', 'scope',
+         'type',  
+      ] 
+      attrs = base_attrs+ extra_attrs
+
+      # atm, we only consider main table
+      for route in self._route.get_routes(table=254):
+         if route['event'] != 'RTM_NEWROUTE':
+            self.info("Unexpected route event: {}".format(route['event']))
+         route['proto'] = rt_proto[route['proto']]
+         route['scope'] = rt_scope[route['scope']]
+         route['type'] = rt_type[route['type']]
+         route_attrs = dict(route["attrs"])
+         if route["family"] == socket.AF_INET:
+            route_dict = self._data["routes4"]
+         elif route["family"] == socket.AF_INET6:
+            route_dict = self._data["routes6"]
+            
+         if 'RTA_DST' in route_attrs:
+            key = "{}/{}".format(route_attrs["RTA_DST"], route['dst_len'])
+         else:
+            key = "default"
+         
+         route_dict.setdefault(key, init_rb_dict(attrs, type=str))
+         for attr in base_attrs:
+            route_dict[key][attr].append(route[attr])
+         for attr in extra_attrs:
+            if attr in route_attrs:
+               route_dict[key][attr].append(route_attrs[attr])
+      
 
    def read_ethtool_info(self, if_name, if_dict):
       """
