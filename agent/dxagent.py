@@ -12,7 +12,7 @@ import time
 import signal
 
 import agent
-from agent import AGENT_INPUT_RATE
+from agent.constants import AGENT_INPUT_RATE
 from agent.ios import IOManager
 from agent.daemon import Daemon
 from agent.sysinfo import SysInfo

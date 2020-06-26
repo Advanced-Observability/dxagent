@@ -145,11 +145,11 @@ class IOManager():
       if self.args == None:
          raise IOManagerException("Arguments not found")
          
-      import pyroute2
-      logging.config.dictConfig({
-          'version': 1,
-          'disable_existing_loggers': True,
-      })
+#      import pyroute2
+#      logging.config.dictConfig({
+#          'version': 1,
+#          'disable_existing_loggers': True,
+#      })
       # create logger
       self.logger = logging.getLogger(self.child.__class__.__name__)
       self.logger.setLevel(logging.DEBUG)
@@ -170,6 +170,9 @@ class IOManager():
       self.warn     = self.logger.warn
       self.error    = self.logger.error
       self.critical = self.logger.critical
+      
+      # Disable logging from other modules
+      self.logger.propagate = False
 
       return self.logger
 

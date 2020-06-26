@@ -14,7 +14,7 @@ import itertools
 
 from agent.rbuffer import init_rb_dict, Severity
 from agent.sysinfo import SysInfo
-from agent import AGENT_INPUT_RATE
+from agent.constants import AGENT_INPUT_RATE
 from agent.symptoms import Symptom, RuleException
 
 class Metric():

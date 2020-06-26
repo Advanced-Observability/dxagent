@@ -49,7 +49,8 @@ class BMWatcher():
       self.parent=parent
       self._init_dicts()
       self.diskstats_timestamp=None
-      #self._ethtool = pyroute2.Ethtool()
+      self._ethtool = pyroute2.Ethtool()
+      
 
    def _init_dicts(self):
 
@@ -1038,7 +1039,7 @@ class BMWatcher():
 
       @see ethtool.c from python3-ethtool
       """
-      self._ethtool = pyroute2.Ethtool()
+      #self._ethtool = pyroute2.Ethtool()
       getters = [("driver", ethtool.get_module), 
                  ("bus_info", ethtool.get_businfo),
                 # ("ufo", ethtool.get_ufo),
@@ -1093,7 +1094,7 @@ class BMWatcher():
       if_dict["automedia"].append((flags & ethtool.IFF_AUTOMEDIA) != 0)
       if_dict["dynamic"].append((flags & ethtool.IFF_DYNAMIC) != 0)
       
-      self._ethtool.close()
+      #self._ethtool.close()
 
    def _process_net_settings(self):
       """

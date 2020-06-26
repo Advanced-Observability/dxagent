@@ -13,7 +13,7 @@ import time
 import datetime
 import os
 
-from agent import TOP_INPUT_RATE, KEYBOARD_INPUT_RATE, SCREEN_REFRESH_RATE
+from agent.constants import *
 from agent.ios import IOManager
 from agent.sysinfo import SysInfo
 from agent.shareablebuffer import ShareableBuffer
