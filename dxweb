@@ -1,0 +1,18 @@
+#!/usr/bin/env python3
+"""
+dweb
+
+   DxWeb UNIX script
+
+@author: K.Edeline
+"""
+
+import sys
+
+from agent.web.dxweb import DXWeb
+
+dxw = DXWeb()
+if not dxw.gnmi_target:
+   sys.stdout.write("could not find target for dxagent gnmi exporter\n")
+   sys.exit(1)
+dxw.run()

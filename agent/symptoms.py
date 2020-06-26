@@ -30,10 +30,10 @@ class Symptom():
       self.prefix = None
       self.weight = weight if weight else severity.weight()
       self.node = node
-      if "vm" in path:
-         self.prefix="vm"
-      if "kb" in path:
-         self.prefix="kb"
+      if "/node/vm" in path:
+         self.prefix="/node/vm"
+      if "/node/kb" in path:
+         self.prefix="/node/kb"
       self._compile_rule()
       
    def _safe_rule(self, variables):
@@ -196,8 +196,10 @@ class Symptom():
                # XXX
                if self.path.endswith("if"):
                   self.args = ["{}/if[name={}]".format(self.node.fullname,index) for index in ret.indexes()]
-               else:
+               elif ret.islist:
                   self.args = ["{}[name={}]".format(self.node.fullname,index) for index in ret.indexes()]
+               else:
+                  self.args = ["{}{}".format(self.node.fullname,index) for index in ret.indexes()]
             else:
                self.args = [self.node.fullname]
             return True

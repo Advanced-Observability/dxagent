@@ -46,7 +46,7 @@ class DXTop(IOManager):
    def __init__(self):
       super(DXTop, self).__init__(self)
 
-      self.load_ios(module="dxtop")
+      self.load_ios()
       self.scheduler = sched.scheduler()
       self.sysinfo = SysInfo()
       
@@ -249,11 +249,11 @@ class DXTop(IOManager):
       self._format_attrs_list_rb("/node/bm/disk", 6, health=True)
       self._format_attrs_rb("/node/bm/net", 6, health=True)
       
-      if "vm" in self._data:
-         for vm_name in self._data["vm"]:
+      if "/node/vm" in self._data:
+         for vm_name in self._data["/node/vm"]:
 #            self._append_content(self._center_text("vm[name={}]".format(vm_name)),
 #                                 6, curses.A_DIM)
-            vm_dict = self._data["vm"][vm_name]
+            vm_dict = self._data["/node/vm"][vm_name]
             skip = ["/node/vm/net/if", "/node/vm/cpu"]
             for subservice in vm_dict:
                if subservice in skip:
@@ -265,11 +265,11 @@ class DXTop(IOManager):
             self._format_attrs_list_rb("/node/vm/net/if", 6, subdict=vm_dict,
                                         health=True, health_index=vm_name)
                                     
-      if "kb" in self._data:      
-         for kb_name in self._data["kb"]:
+      if "/node/kb" in self._data:      
+         for kb_name in self._data["/node/kb"]:
 #            self._append_content(self._center_text("kb[name={}]".format(kb_name)),
 #                                 6, curses.A_DIM)
-            kb_dict = self._data["kb"][kb_name]
+            kb_dict = self._data["/node/kb"][kb_name]
             skip = ["/node/kb/net/if"]
             for subservice in kb_dict:
                if subservice in skip:
@@ -633,8 +633,8 @@ class DXTop(IOManager):
             self.top_pad.addstr(self._center_text(v))
 
       elif self.screen == 6:
-         vm_count=len(self._data["vm"]) if "vm" in self._data else 0
-         kb_count=len(self._data["kb"]) if "kb" in self._data else 0
+         vm_count=len(self._data["/node/vm"]) if "/node/vm" in self._data else 0
+         kb_count=len(self._data["/node/vm"]) if "/node/vm" in self._data else 0
          s = "vm-count: {} kb-count:{}".format(vm_count, kb_count)
          self.top_pad.addstr(self._center_text(s))         
          s = "symptoms-count: {}".format(len(self._data["symptoms"]))

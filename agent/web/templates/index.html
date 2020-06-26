@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+<head>
+<link href="static/style.css" rel="stylesheet" />
+<meta charset=utf-8 />
+<meta name="viewport" content="user-scalable=no, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, minimal-ui">
+<title>Pie style</title>
+<script src="static/js/cytoscape.min.js"></script>
+</head>
+<body>
+<div id="cy"></div>
+
+<!-- Load application code at the end to ensure DOM is loaded -->
+<script type="text/javascript">
+   var michel = "{{ michel }}";
+   //var dxnodes = "{{ dxnodes }}"
+   var dxnodes = JSON.parse('{{ dxnodes|tojson }}');
+   var dxedges = JSON.parse('{{ dxedges|tojson }}');
+  
+</script>
+<script type="text/javascript" src="static/code.js"></script>
+</body>
+</html>

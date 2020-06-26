@@ -51,7 +51,7 @@ class DXAgentServicer(gNMIServicer):
       supModel = gnmi_pb2.ModelData(name="my_model",
                   organization="My Company Inc", version="1.0")
       response.supported_models.extend([supModel])
-      response.supported_encodings.extend(gnmi_pb2.PROTO)
+      response.supported_encodings.extend(gnmi_pb2.JSON)
       response.gNMI_version = "GNMI Version 1.0"
        
       return response
@@ -75,6 +75,7 @@ class DXAgentServicer(gNMIServicer):
          response.sync_response = True
          
          for path_string, val, _type in self.exporter._iterate_data():
+            #self.exporter.engine.info(path_string)
             path = path_from_string(path_string)
             # add an update message for path
             added = response.update.update.add()
@@ -160,7 +161,7 @@ class DXAgentExporter():
       @return True if node comes before an indexed node
       
       """
-      _before_indexed = ["vm", "kb", "cpu", "if", "sensors", "disk"]
+      _before_indexed = ["vm", "kb", "cpu", "if", "sensors", "disks"]
       if node in _before_indexed:
          return True
       for before_indexed in _before_indexed:
@@ -171,16 +172,25 @@ class DXAgentExporter():
    def build_path_string(self, nodes):
       path_string = ""
       indexed = False
-      
+      # XXX:
+      if nodes[0] == "/node/vm" or nodes[0] == "/node/kb":
+         nodes[2]=nodes[2].replace("/node/vm","")
+         nodes[2]=nodes[2].replace("/node/kb","")
+      nodes[0]=nodes[0].replace("/node",
+                                "/node[name={}]".format(self.engine.sysinfo.node))
       for node in nodes:
-         if indexed:
+         if not node:
+            continue
+         if indexed and node != "active":
             path_string += "[name={}]".format(node)
             indexed = False
          else:
-            path_string += "/{}".format(node)
+            if not node.startswith("/"):
+                path_string += "/"
+            path_string += node
             indexed = self._node_before_indexed(node)
             
-      return path_string.replace('.', '/')
+      return path_string
 
    def _iterate_data(self, skip=[]):
       """
@@ -197,17 +207,12 @@ class DXAgentExporter():
       for k,d in self.data.items():
          if k in skip:
             continue
-         #self.info(k)
          yield from self._iterate_data_rec(d, k)
       # special entry: symptom
       for s in self.data["symptoms"]:
          for path in s.args:
-            yield "{}/symptoms[name={}]/".format(path,s.name), "", None
-            yield "{}/symptoms[name={}]/severity".format(path,s.name), s.severity.value, int
+            #yield "{}/symptoms[name={}]/".format(path,s.name), "", None
+            yield "{}/symptoms[name={}]/severity".format(path,s.name), s.severity.weight(), int
       for path,score in self.data["health_scores"].items():
          yield path+"/health", score, int   
       
-#def test():
-#   exporter = DXAgentExporter(None, print, None)
-#   exporter.run()
-
