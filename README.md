@@ -55,6 +55,21 @@ DxTop is a console app that displays data collected by DxAgent.
 
 * `dxtop`
   DxTop script.
+  
+## DxWeb
+
+DxWeb is a web interface that display dependency graph, health metrics and
+symptoms from DxAgent.
+
+### DxWeb Important Files
+
+* `dxweb`
+  DxWeb script.
+
+### DxWeb Libs
+
+- [flask-socketio](https://flask-socketio.readthedocs.io/en/latest/)
+   - `python3 -m pip install flask-socketio`
 
 ## Requirements
 
@@ -86,6 +101,8 @@ DxTop is a console app that displays data collected by DxAgent.
 
 - [cisco-gNMI python](https://pypi.org/project/cisco-gnmi/)
    - `python3 -m pip install cisco-gnmi`
+   
+
 
 ## Author
 

@@ -4,19 +4,36 @@
 <link href="static/style.css" rel="stylesheet" />
 <meta charset=utf-8 />
 <meta name="viewport" content="user-scalable=no, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, minimal-ui">
-<title>Pie style</title>
+<title>Service Dependencies Graph</title>
 <script src="static/js/cytoscape.min.js"></script>
 </head>
 <body>
 <div id="cy"></div>
+ <script src="//cdnjs.cloudflare.com/ajax/libs/socket.io/2.2.0/socket.io.js" integrity="sha256-yr4fRk/GU1ehYJPAs8P4JlTgu0Hdsp4ZKrx8bDEDC3I=" crossorigin="anonymous"></script>
+ 
 
 <!-- Load application code at the end to ensure DOM is loaded -->
-<script type="text/javascript">
-   var michel = "{{ michel }}";
-   //var dxnodes = "{{ dxnodes }}"
+<script type="text/javascript"  charset="utf-8">
+   var socket = io();
    var dxnodes = JSON.parse('{{ dxnodes|tojson }}');
    var dxedges = JSON.parse('{{ dxedges|tojson }}');
-  
+      
+   socket.on('dxnodes', function(dxnodes) {
+        //dxnodes = JSON.parse('{{ dxnodes|tojson }}');
+        //graph_data["elements"]["nodes"] = dxnodes;
+        //console.log(sensor_values)
+        //document.getElementById("temp").value = sensor_values.temperature
+        //document.getElementById("hum").value = sensor_values.humidity
+   });
+   
+   socket.on('dxedges', function(dxedges) {
+        //dxedges = JSON.parse('{{ dxedges|tojson }}');
+        //graph_data["elements"]["edges"] = dxedges;
+        //console.log(sensor_values)
+        //document.getElementById("temp").value = sensor_values.temperature
+        //document.getElementById("hum").value = sensor_values.humidity
+   });
+
 </script>
 <script type="text/javascript" src="static/code.js"></script>
 </body>
