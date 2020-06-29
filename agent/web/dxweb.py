@@ -167,8 +167,6 @@ class DXWeb(IOManager):
       while True:
          self.fetch_data()
          self.format_data()
-         #self.info(self.json_nodes)
-         #self.socketio.emit("dxgraph", {"nodes":1, "edges":2})
          self.socketio.emit("dxgraph", {"nodes":self.json_nodes, "edges":self.json_edges})
          time.sleep(1)
          

@@ -76,7 +76,7 @@ class Symptom():
             return ast.Call(func=ast.Name(id="access", ctx=node.ctx),
                             args=[ast.Constant(value=node.id)],
                             keywords=[])
-                            
+
       # 1. string-level replacement
       self._raw_rule = self.rule
       alias=[("1min","_1min"), ("5min","_5min")]
@@ -96,7 +96,7 @@ class Symptom():
       engine = self.engine
       metrics = self.engine.metrics
       info = self.engine.info
-      class Comparator():
+      class IndexedVariable():
          def __init__(self, rb):
             self.islist=isinstance(rb,list)
             self.rb=rb
@@ -108,7 +108,7 @@ class Symptom():
             
          def compare(self, other, _operator):
             """
-            compare a Comparator with a constant or another Comparator
+            compare a IndexedVariable with a constant or another IndexedVariable
             """
             if not self.islist:
                # not enough samples, skip
@@ -121,7 +121,7 @@ class Symptom():
                   continue
                if all(_operator(v,other) for v in rb._tops(self.count)):
                   ret.append((index,rb))
-            # return a comparator if it matched
+            # return a IndexedVariable if it matched
             if not ret:
                return False
             self.rb = ret
@@ -142,7 +142,7 @@ class Symptom():
             
          def __and__(self, other):
             if (not self.islist 
-                 or not isinstance(other,Comparator) 
+                 or not isinstance(other,IndexedVariable) 
                  or not other.islist):
                return self and other
             intersection=list(set(self.indexes()) & set(other.indexes()))
@@ -153,7 +153,7 @@ class Symptom():
             
          def __or__(self, other):
             if (not self.islist 
-                 or not isinstance(other,Comparator) 
+                 or not isinstance(other,IndexedVariable) 
                  or not other.islist):
                return self or other
             for e in other.rb:
@@ -170,16 +170,16 @@ class Symptom():
          if self.prefix:
             prefix2=self.prefix
             if not metric.islist:
-               return Comparator([(dev, b[path][var]) for dev,b in data[prefix2].items()])
+               return IndexedVariable([(dev, b[path][var]) for dev,b in data[prefix2].items()])
             # double list
             ret=[]
             for dev,b in data[prefix2].items():
                ret += [(dev+":"+dev2,rb[var]) for dev2,rb in b[path].items()]
-            return Comparator(ret)
+            return IndexedVariable(ret)
          
          if not metric.islist:
-            return Comparator(data[path][var])
-         return Comparator([(dev, b[var]) for dev,b in data[path].items()])
+            return IndexedVariable(data[path][var])
+         return IndexedVariable([(dev, b[var]) for dev,b in data[path].items()])
          
       def _1min(rb):
          rb.count = engine.sample_per_min
@@ -193,7 +193,7 @@ class Symptom():
          
          self.args = []
          if ret:
-            if isinstance(ret, Comparator):
+            if isinstance(ret, IndexedVariable):
                # XXX
                if self.path.endswith("if"):
                   self.args = ["{}/if[name={}]".format(self.node.fullname,index) for index in ret.indexes()]
