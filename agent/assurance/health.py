@@ -12,10 +12,10 @@ import builtins
 import sys
 import itertools
 
-from agent.rbuffer import init_rb_dict, Severity
-from agent.sysinfo import SysInfo
+from agent.core.rbuffer import init_rb_dict, Severity
+from agent.input.sysinfo import SysInfo
 from agent.constants import AGENT_INPUT_RATE
-from agent.symptoms import Symptom, RuleException
+from agent.assurance.symptoms import Symptom, RuleException
 
 class Metric():
    def __init__(self, name, node, _type, unit, islist):

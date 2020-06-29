@@ -19,7 +19,7 @@ try:
 except:
    pass
 
-from agent.rbuffer import init_rb_dict
+from agent.core.rbuffer import init_rb_dict
 
 # vbox states without pseudo-states
 _virtualbox_states = [

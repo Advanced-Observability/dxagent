@@ -21,7 +21,7 @@ from pyroute2.netlink.rtnl import rt_type
 from pyroute2.netlink.rtnl import rt_scope
 from pyroute2.netlink.rtnl import rt_proto
 
-from agent.rbuffer import init_rb_dict
+from agent.core.rbuffer import init_rb_dict
 
 # linux/include/linux/if_arp.h
 _linux_if_types = { "0":"netrom", "1":"ether", "2":"eether", "3":"ax25",

@@ -15,7 +15,7 @@ from google.protobuf import json_format
 from cisco_gnmi.proto import gnmi_pb2, gnmi_pb2_grpc
 from cisco_gnmi.proto.gnmi_pb2_grpc import gNMIServicer 
 
-from agent.rbuffer import MDict
+from agent.core.rbuffer import MDict
 
 def list_from_path(path='/'):
    if path:

@@ -29,8 +29,8 @@ try:
 except:
    pass
 
-from agent.rbuffer import init_rb_dict
-from agent.rbuffer import RingBuffer
+from agent.core.rbuffer import init_rb_dict
+from agent.core.rbuffer import RingBuffer
 
 #
 # The rate at which gNMI sends updates

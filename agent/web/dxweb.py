@@ -7,8 +7,8 @@ dxweb.py
 
 """
 
-from agent.ios import IOManager
-from agent.gnmi_client import DXAgentGNMIClient
+from agent.core.ios import IOManager
+from agent.gnmi.gnmi_client import DXAgentGNMIClient
 
 import threading
 import time
@@ -173,7 +173,6 @@ class DXWeb(IOManager):
          self.info(self.json_nodes)
          self.socketio.emit("dxnodes", self.json_nodes)
          self.socketio.emit("dxedges", self.json_edges)
-         self.info("ok")
          time.sleep(1)
          
    def run(self):

@@ -13,7 +13,7 @@ import hashlib
 from multiprocessing import shared_memory
 from multiprocessing.resource_tracker import unregister
 
-from agent.rbuffer import MDict
+from agent.core.rbuffer import MDict
 
 #
 # line width

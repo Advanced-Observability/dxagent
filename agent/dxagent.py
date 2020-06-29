@@ -13,15 +13,15 @@ import signal
 
 import agent
 from agent.constants import AGENT_INPUT_RATE
-from agent.ios import IOManager
-from agent.daemon import Daemon
-from agent.sysinfo import SysInfo
-from agent.bm_input import BMWatcher
-from agent.vm_input import VMWatcher
-from agent.vpp_input import VPPWatcher
-from agent.shareablebuffer import ShareableBuffer
-from agent.health import HealthEngine
-from agent.exporter import DXAgentExporter
+from agent.core.ios import IOManager
+from agent.core.daemon import Daemon
+from agent.core.shareablebuffer import ShareableBuffer
+from agent.input.sysinfo import SysInfo
+from agent.input.bm_input import BMWatcher
+from agent.input.vm_input import VMWatcher
+from agent.input.vpp_input import VPPWatcher
+from agent.assurance.health import HealthEngine
+from agent.gnmi.exporter import DXAgentExporter
 
 class DXAgent(Daemon, IOManager):
    """

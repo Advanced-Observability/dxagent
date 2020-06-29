@@ -14,14 +14,13 @@ import datetime
 import os
 
 from agent.constants import *
-from agent.ios import IOManager
-from agent.sysinfo import SysInfo
-from agent.shareablebuffer import ShareableBuffer
-from agent.shareablebuffer import ShareableBufferException
-from agent.vpp_input import vpp_support
-from agent.vm_input import hypervisors_support
-from agent.rbuffer import RingBuffer, Severity
-
+from agent.core.ios import IOManager
+from agent.core.shareablebuffer import ShareableBuffer
+from agent.core.shareablebuffer import ShareableBufferException
+from agent.core.rbuffer import RingBuffer, Severity
+from agent.input.sysinfo import SysInfo
+from agent.input.vpp_input import vpp_support
+from agent.input.vm_input import hypervisors_support
 
 ESCAPE_CHAR=27
 ENTER_CHAR=10
