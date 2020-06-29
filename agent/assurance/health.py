@@ -128,8 +128,12 @@ class HealthEngine():
       self.node.add_kbnet(name, framework)
    def remove_vm(self, name):
       self.node.remove_vm(name)
+      # do not remove, keep monitoring
+      #pass
    def remove_kbnet(self, name):
       self.node.remove_kbnet(name)
+      # do not remove, keep monitoring
+      #pass
       
    def update_health(self):
       self._update_dependency_graph()
@@ -541,7 +545,7 @@ class Subservice():
       hypervisor=self.parent.hypervisor
       # init metric rbs if needed
       cpu_label = "cpu"
-      if "/node/vm/cpu" not in self._data:
+      if "/node/vm/cpu" not in self._data["/node/vm"][vm_name]:
          self._data["/node/vm"][vm_name]["/node/vm/cpu"] = {}
          self._data["/node/vm"][vm_name]["/node/vm/cpu"][cpu_label] = self._init_metrics_rb("cpu")
       

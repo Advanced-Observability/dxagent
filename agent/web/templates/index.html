@@ -19,19 +19,15 @@
    var dxedges = JSON.parse('{{ dxedges|tojson }}');
       
    socket.on('dxnodes', function(dxnodes) {
-        //dxnodes = JSON.parse('{{ dxnodes|tojson }}');
-        //graph_data["elements"]["nodes"] = dxnodes;
-        //console.log(sensor_values)
-        //document.getElementById("temp").value = sensor_values.temperature
-        //document.getElementById("hum").value = sensor_values.humidity
+        dxnodes = JSON.parse('{{ dxnodes|tojson }}');
+        graph_data["elements"]["nodes"] = dxnodes;
+        //cytoscape(graph_data);
    });
    
    socket.on('dxedges', function(dxedges) {
-        //dxedges = JSON.parse('{{ dxedges|tojson }}');
-        //graph_data["elements"]["edges"] = dxedges;
-        //console.log(sensor_values)
-        //document.getElementById("temp").value = sensor_values.temperature
-        //document.getElementById("hum").value = sensor_values.humidity
+        dxedges = JSON.parse('{{ dxedges|tojson }}');
+        graph_data["elements"]["edges"] = dxedges;
+        //cytoscape(graph_data);
    });
 
 </script>

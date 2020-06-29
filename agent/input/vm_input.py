@@ -184,14 +184,16 @@ class VMWatcher():
       
       for m in self._vbox.machines:
          name = m.name
+         state = _virtualbox_states[int(m.state)]
+         
          # check if machine is online/offline
          if not self.virtualbox_vm_is_active(m):
-            # if it went inactive, delete all VM entries
+            # if it went inactive, update state only
             if name in self._data["virtualbox/vms"]:
-               del self._data["virtualbox/vms"][name]
+            #   del self._data["virtualbox/vms"][name]
+               self._data["virtualbox/vms"][name]["state"].append(state)
             continue
-
-         state = _virtualbox_states[int(m.state)]
+         
          self.vbox_vm_count += 1
          # add entry if needed
          self._data["virtualbox/vms"].setdefault(name, init_rb_dict(attr_list, 
@@ -199,7 +201,8 @@ class VMWatcher():
          #sc=m.storage_controllers # IStorageController
          vm_attrs = [
             ("cpu", str(m.cpu_count)),
-            ("state", state), ("accessible", str(int(m.accessible))),
+            ("state", state), 
+            ("accessible", str(int(m.accessible))),
             ("id", m.id_p), ("os_type_id",m.os_type_id),
             ("cpu_cap", str(m.cpu_execution_cap)), 
             ("mem_size", str(m.memory_size)), 

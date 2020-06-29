@@ -190,6 +190,7 @@ class Symptom():
          
       ret=eval(self._o, globals(), locals())
       try:
+         
          self.args = []
          if ret:
             if isinstance(ret, Comparator):
