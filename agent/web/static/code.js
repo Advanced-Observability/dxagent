@@ -37,7 +37,7 @@ var graph_data = {
       }),
 
   elements: {
-    nodes : dxnodes,
+    nodes : dxnodes, // function( ele ) { return ele.data('dxnodes') },
     edges: dxedges
   },
 

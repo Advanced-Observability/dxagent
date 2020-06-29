@@ -17,17 +17,9 @@
    var socket = io();
    var dxnodes = JSON.parse('{{ dxnodes|tojson }}');
    var dxedges = JSON.parse('{{ dxedges|tojson }}');
-      
-   socket.on('dxnodes', function(dxnodes) {
-        dxnodes = JSON.parse('{{ dxnodes|tojson }}');
-        graph_data["elements"]["nodes"] = dxnodes;
-        //cytoscape(graph_data);
-   });
    
-   socket.on('dxedges', function(dxedges) {
-        dxedges = JSON.parse('{{ dxedges|tojson }}');
-        graph_data["elements"]["edges"] = dxedges;
-        //cytoscape(graph_data);
+   socket.on('dxgraph', function(dxgraph) {
+        cy.json({ elements: dxgraph });
    });
 
 </script>

@@ -26,10 +26,7 @@ class DXWeb(IOManager):
       self.gnmi_client = DXAgentGNMIClient(self.gnmi_target, self)
       self.app = Flask(__name__)
       self.app.add_url_rule('/', 'index', self.index)
-      
       self.socketio = SocketIO(self.app)
-#      self.socketio.on_event('update_targets', self.update_targets_handler)
-#      self.socketio.on_event('get_targets', self.get_targets_handler)
       
    def index(self):
       self.format_data()
@@ -170,9 +167,9 @@ class DXWeb(IOManager):
       while True:
          self.fetch_data()
          self.format_data()
-         self.info(self.json_nodes)
-         self.socketio.emit("dxnodes", self.json_nodes)
-         self.socketio.emit("dxedges", self.json_edges)
+         #self.info(self.json_nodes)
+         #self.socketio.emit("dxgraph", {"nodes":1, "edges":2})
+         self.socketio.emit("dxgraph", {"nodes":self.json_nodes, "edges":self.json_edges})
          time.sleep(1)
          
    def run(self):
