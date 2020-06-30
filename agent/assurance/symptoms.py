@@ -14,7 +14,6 @@ class RuleException(Exception):
    """
    RuleException(Exception)
    """
-   
    def __init__(self, value):
       self.value = value
    def __str__(self):
@@ -41,7 +40,7 @@ class Symptom():
        
        Returns True if rule is safe for eval()
        """
-       variables += ['access', '_1min', '_5min']
+       variables += ['access', '_1min', '_5min', '_dynamicity']
        _safe_names = {'None': None, 'True': True, 'False': False}
        _safe_nodes = [
            'Add', 'And', 'BinOp', 'BitAnd', 'BitOr', 'BitXor', 'BoolOp',
@@ -79,7 +78,7 @@ class Symptom():
 
       # 1. string-level replacement
       self._raw_rule = self.rule
-      alias=[("1min","_1min"), ("5min","_5min")]
+      alias=[("1min","_1min"), ("5min","_5min"), ("dynamicity","_dynamicity")]
       for old,new in alias:
          self.rule=self.rule.replace(old,new)
       # 2. ast-level replacement
@@ -102,6 +101,8 @@ class Symptom():
             self.rb=rb
             # how many samples are considered
             self.count=1
+            # whether to compare value or dynamicty
+            self.dynamicity=False
             
          def indexes(self):
             return [index for (index,_) in self.rb]
@@ -114,13 +115,20 @@ class Symptom():
                # not enough samples, skip
                if len(self.rb) < self.count:
                   return False
-               return all(_operator(v,other) for v in self.rb._tops(self.count))
+               if not self.dynamicity:
+                  return all(_operator(v,other) for v in self.rb._tops(self.count))
+               else:
+                  return _operator(self.rb._dynamicity(self.count),other)
             ret=[]
             for index, rb in self.rb:
                if len(rb) < self.count:
                   continue
-               if all(_operator(v,other) for v in rb._tops(self.count)):
-                  ret.append((index,rb))
+               if not self.dynamicity:
+                  if all(_operator(v,other) for v in rb._tops(self.count)):
+                     ret.append((index,rb))
+               else:
+                  if _operator(rb._dynamicity(self.count),other):
+                     ret.append((index,rb))                  
             # return a IndexedVariable if it matched
             if not ret:
                return False
@@ -181,12 +189,15 @@ class Symptom():
             return IndexedVariable(data[path][var])
          return IndexedVariable([(dev, b[var]) for dev,b in data[path].items()])
          
-      def _1min(rb):
-         rb.count = engine.sample_per_min
-         return rb
-      def _5min(rb):
-         rb.count = engine.sample_per_min*5
-         return rb
+      def _dynamicity(indexed_var):
+         indexed_var.dynamicity=True
+         return indexed_var
+      def _1min(indexed_var):
+         indexed_var.count = engine.sample_per_min
+         return indexed_var
+      def _5min(indexed_var):
+         indexed_var.count = engine.sample_per_min*5
+         return indexed_var
          
       ret=eval(self._o, globals(), locals())
       try:

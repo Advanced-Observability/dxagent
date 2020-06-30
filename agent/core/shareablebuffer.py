@@ -188,7 +188,7 @@ class ShareableBuffer(shared_memory.ShareableList):
          else:
             if dd.is_empty():
                continue
-            if not write_all and not dd.has_changed(recently=True):
+            if not write_all and not dd.has_changed(count=2):
                self.index += 1
                continue
             # write a line to ShareableMemory

@@ -88,6 +88,9 @@ class DXTop(IOManager):
       self._format_colname_pad()
       if self._data:
          self._format_top_pad()
+      
+      self.info("resized {}".format(str(self.col_sizes)))
+      self.info("width: {}".format(self.width))
 
    def _center_text(self, s, width=None):
       """
@@ -183,7 +186,7 @@ class DXTop(IOManager):
       self._format_attrs_rb("loadavg", 2)
       self._format_attrs_rb("stat", 2)
 
-#      # XXX: very verbose at the end, also very greedy
+      # XXX: very verbose at the end, also very greedy
       if self.args.verbose:
          self._format_attrs_list_rb("stats", 2)
 
@@ -194,7 +197,6 @@ class DXTop(IOManager):
       self._format_attrs_rb("netstat", 3)
       self._format_attrs_rb("snmp", 3)
       self._format_attrs_list_rb("net/arp", 3)
-#      self._format_attrs_list("net/route", 3)
 
       # VM
       # virtualbox
@@ -250,8 +252,6 @@ class DXTop(IOManager):
       
       if "/node/vm" in self._data:
          for vm_name in self._data["/node/vm"]:
-#            self._append_content(self._center_text("vm[name={}]".format(vm_name)),
-#                                 6, curses.A_DIM)
             vm_dict = self._data["/node/vm"][vm_name]
             skip = ["/node/vm/net/if", "/node/vm/cpu"]
             for subservice in vm_dict:
@@ -266,8 +266,6 @@ class DXTop(IOManager):
                                     
       if "/node/kb" in self._data:      
          for kb_name in self._data["/node/kb"]:
-#            self._append_content(self._center_text("kb[name={}]".format(kb_name)),
-#                                 6, curses.A_DIM)
             kb_dict = self._data["/node/kb"][kb_name]
             skip = ["/node/kb/net/if"]
             for subservice in kb_dict:
@@ -352,33 +350,6 @@ class DXTop(IOManager):
          self._append_content(s, pad_index, flags, fill=True)      
 
       self._append_content(self.hline_bottom(self.col_sizes), pad_index)
-
-#   def _format_attrs_list(self, category, pad_index):
-#      """
-#      format a list of list (opt:of list) of tuples into a curses pad
-# 
-#      """
-
-#      self._append_content(self._center_text(category),
-#                           pad_index, curses.A_BOLD)
-#      self._append_content(self.hline_top(self.col_sizes), pad_index)
-
-#      for l in self._data[category]:
-#         for e in l:
-#            if type(e) is list:
-#               for t in e:
-#                  if type(t) is list:
-#                     for tt in t:
-#                        self._append_content(" "+tt[0]+": "+" ".join(tt[1:])+"\n", 
-#                                             pad_index)
-#                  else:
-#                     self._append_content(" "+t[0]+": "+" ".join(t[1:])+"\n",
-#                                          pad_index)
-#            else:
-#               self._append_content(" "+e[0]+": "+" ".join(e[1:])+"\n",
-#                                    pad_index)
-
-#         self._append_content(self.hline(self.col_sizes), pad_index)
 
    def _format_attrs_list_rb(self, category, pad_index, extend_name=False,
                              subdict=None, title=True, health=False,
@@ -701,9 +672,9 @@ class DXTop(IOManager):
       self.window = curses.initscr()
       curses.noecho()
       curses.cbreak()
-      self.window.keypad(True)
+      self.window.keypad(1)
       os.environ.setdefault('ESCDELAY', '25')
-      self.window.nodelay(True)
+      self.window.nodelay(1)
       curses.curs_set(0)
       
       curses.start_color()
@@ -750,16 +721,16 @@ class DXTop(IOManager):
       curses.echo()
       curses.endwin()
 
-   def _clear_pads(self):
-      """
-      if screen was not resized, clear pads
-      otherwise create new pads
+#   def _clear_pads(self):
+#      """
+#      if screen was not resized, clear pads
+#      otherwise create new pads
 
-      """
-      if (self.height, self.width) == self.window.getmaxyx():
-         self.pad.clear()
-      else:
-         self._init_pads()
+#      """
+#      if (self.height, self.width) == self.window.getmaxyx():
+#         self.pad.clear()
+#      else:
+#         self._init_pads()
 
    def _init_pads(self):
       self.height, self.width = self.window.getmaxyx()
@@ -840,19 +811,20 @@ class DXTop(IOManager):
                if c == ord('q') or c == ESCAPE_CHAR: 
                   raise KeyboardInterrupt()
                elif c == curses.KEY_UP:
-                   self.scroll(self.UP)
+                  self.scroll(self.UP)
                elif c == curses.KEY_DOWN:
-                   self.scroll(self.DOWN)
+                  self.scroll(self.DOWN)
                elif c == curses.KEY_PPAGE:
-                   self.paging(self.UP)
+                  self.paging(self.UP)
                elif c == curses.KEY_NPAGE:
-                   self.paging(self.DOWN)
+                  self.paging(self.DOWN)
                elif c == curses.KEY_LEFT:
-                   self.switch_screen(self.UP)
+                  self.switch_screen(self.UP)
                elif c == curses.KEY_RIGHT:
-                   self.switch_screen(self.DOWN)
+                  self.switch_screen(self.DOWN)
+               elif c == curses.KEY_RESIZE:
+                  self.info("KEY_RESIZE")
                c = self.window.getch()
- 
             self.scheduler.run(blocking=False)
             time.sleep(KEYBOARD_INPUT_RATE)
 

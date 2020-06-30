@@ -18,12 +18,13 @@ from agent.constants import AGENT_INPUT_RATE
 from agent.assurance.symptoms import Symptom, RuleException
 
 class Metric():
-   def __init__(self, name, node, _type, unit, islist):
+   def __init__(self, name, node, _type, unit, islist, counter):
       self.name=name
       self.node=node
       self._type=_type
       self.unit=unit
-      self.islist=int(islist)
+      self.islist=bool(int(islist))
+      self.counter=bool(counter)
       
 class HealthEngine():
    def __init__(self, data, info, parent):      
@@ -43,7 +44,7 @@ class HealthEngine():
    def _read_rule_file(self):
       self._symptoms_args=[]
       file_loc = os.path.join(self.parent.args.ressources_dir,"rules.csv")
-      metrics = list(itertools.chain.from_iterable(self.metrics_attrs.values()))
+      metrics = list(self.metrics.keys())
       
       with open(file_loc) as csv_file:
          for r in csv.DictReader(csv_file):
@@ -78,19 +79,22 @@ class HealthEngine():
       return symptoms
       
    def _read_metrics_file(self):
-      self.metrics_attrs, self.metrics_types, self.metrics_units = {}, {}, {}
+      self.metrics_lookup = {}
       self.metrics = {}
       file_loc = os.path.join(self.parent.args.ressources_dir,"metrics.csv")
       with open(file_loc) as csv_file:
          for r in csv.DictReader(csv_file):
-            name,_type,unit,islist,subservice= r["name"],r["type"],r["unit"],r["is_list"],r["subservice"]
-            key = (subservice,)
-            self.metrics_attrs.setdefault(key,[]).append(name)
-            self.metrics_types.setdefault(key,[]).append(getattr(builtins, _type))
-            self.metrics_units.setdefault(key,[]).append(unit)
-            
-            metric = Metric(name, subservice, getattr(builtins, _type), unit, islist)
-            self.metrics[name] = metric
+                 
+            key = (r["subservice"],)
+            rec = self.metrics_lookup.setdefault(key,
+                     {"types":[],"units":[],"names":[]})
+            rec["names"].append(r["name"])
+            rec["types"].append(getattr(builtins, r["type"]))
+            rec["units"].append(r["unit"])
+            metric = Metric(r["name"], r["subservice"],
+                            getattr(builtins, r["type"]),
+                            r["unit"], r["is_list"], r["counter"])
+            self.metrics[r["name"]] = metric
 
    def _build_dependency_graph(self):
       """
@@ -252,12 +256,10 @@ class Subservice():
       
       """
       key = (subservice,)
-      attrs = self.engine.metrics_attrs[key]
-      types = self.engine.metrics_types[key]
-      units = self.engine.metrics_units[key]
-      return init_rb_dict(attrs, metric=True,
-                          types=types,
-                          units=units)
+      rec = self.engine.metrics_lookup[key]
+      return init_rb_dict(rec["names"], metric=True,
+                          types=rec["types"],
+                          units=rec["units"])
    def update_metrics(self):
       """
       update metrics for this subservice and its dependencies

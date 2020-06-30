@@ -182,19 +182,21 @@ class RingBuffer(collections.deque):
 
       return Severity.GREEN
 
-   def mean(self):
+   def mean(self, count=0):
       """
       @return mean value on entire buffer
 
       """
       if len(self) == 0:
          return 0
+      if count==0:
+         count = len(self)
       
       try:
          if self.type == float:
-            return round(np.mean(list(self)), 2)
+            return round(np.mean(self._tops(count)), 2)
          elif self.type == int:
-            return int(np.mean(list(self)))
+            return int(np.mean(self._tops(count)))
          else:
             return 0
 
@@ -210,14 +212,21 @@ class RingBuffer(collections.deque):
    def is_number(self):
       return self.type == int or self.type == float
 
-   def delta(self, first=0):
+   def delta(self, count=0):
       """
-      @return delta value on entire buffer.
-      
       the delta value is the difference between the first and
       last observed values. Applicable for counters.
-         
+      
+      @return delta value on entire buffer.
+      
+      @param count the number of *other* elements to consider (max: len(rb)-1)
+                   e.g. delta(count=1) returns rb[-1]-rb[-2]
+                      
       """
+      if count == 0:
+         first = 0
+      else:
+         first = max(-count-1,-len(self))
       
       try:
          delta = self.__getitem__(-1) - self.__getitem__(first)
@@ -231,20 +240,21 @@ class RingBuffer(collections.deque):
       except:
          return 0
 
-   def has_changed(self, recently=False):
+   def has_changed(self, count=0):
       """
       indicates if the ringbuffer has observed a value change
 
-      @param recently If true consider last two value
-                      If false consider all value
+      @param count the number of value to consider
                      
       """
-      if not recently:
-         return not self.is_empty() and self.count(self.__getitem__(0)) != len(self)
-      else:
-         return len(self) > 1 and self.__getitem__(-1) != self.__getitem__(-2)
+      if count == 0:
+         count = len(self)
+      if len(self) == 0 or len(self) < count:
+         return False
+         
+      return self._tops(count).count(self.__getitem__(-1)) == count
 
-   def _dynamicity(self):
+   def _dynamicity(self, count=0):
       """
 
       @return delta() if counter is True
@@ -252,11 +262,11 @@ class RingBuffer(collections.deque):
               mean() else
       """
       if self.type == str:
-         return int(self.has_changed())
+         return int(self.has_changed(count=count))
       elif self.counter:
-         return self.delta()
+         return self.delta(count=count)
       else:
-         return self.mean()
+         return self.mean(count=count)
 
    def dynamicity(self):
       """

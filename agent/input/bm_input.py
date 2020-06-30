@@ -444,14 +444,14 @@ class BMWatcher():
 
                # compute total period first
                totalperiod = self._data["stat/cpu"][cpu_label]["total_time"].delta(
-                                                                   first=-2)
+                                                                   count=1)
                self._data["stat/cpu"][cpu_label]["total_period"].append(
                                                                 totalperiod)
                # compute&append period attrs
                for tname,pname,percname in zip(time_names, 
                                                period_names, 
                                                perc_names):
-                  v = self._data["stat/cpu"][cpu_label][tname].delta(first=-2)
+                  v = self._data["stat/cpu"][cpu_label][tname].delta(count=1)
                   self._data["stat/cpu"][cpu_label][pname].append(v)
                   self._data["stat/cpu"][cpu_label][percname].append(
                                                    ratio(v,totalperiod))
@@ -605,7 +605,7 @@ class BMWatcher():
                for tname,pname,percname in zip(time_names, 
                                                period_names, 
                                                perc_names):
-                  v = self._data["diskstats"][dev_name][tname].delta(first=-2)
+                  v = self._data["diskstats"][dev_name][tname].delta(count=1)
                   # periods are sums of per-CPU counters, compute avg.
                   self._data["diskstats"][dev_name][pname].append(v)
                   self._data["diskstats"][dev_name][percname].append(

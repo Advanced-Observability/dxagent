@@ -17,4 +17,4 @@ name,path,severity,rule,
 "No SSH access to VM",/node/vm/net,Orange,ssh==0
 "No ARP Entry For Default Gateway",/node/bm/net/if,Red,(state=="up") and (gw_in_arp==0)
 "Non-standard Ethernet MTU",/node/bm/net/if,Red,(mtu!=1500) and (type=="ether")
-
+"Interface Flapping",/node/bm/net/if,Red,1min(dynamicity(changes_count))>=6
