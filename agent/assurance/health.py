@@ -11,6 +11,8 @@ import os
 import builtins
 import sys
 import itertools
+import time
+import json
 
 from agent.core.rbuffer import init_rb_dict, Severity
 from agent.input.sysinfo import SysInfo
@@ -32,6 +34,7 @@ class HealthEngine():
       self.info = info
       self.parent = parent
       self.sysinfo = SysInfo()
+      
       self._data["/node/vm"], self._data["/node/kb"] = {}, {}
       self._data["symptoms"] = []
       self._data["health_scores"] = {}
@@ -40,6 +43,7 @@ class HealthEngine():
       self._read_metrics_file()
       self._read_rule_file()
       self._build_dependency_graph()
+      self._update_graph_changed_timestamp()
       
    def _read_rule_file(self):
       self._symptoms_args=[]
@@ -95,6 +99,9 @@ class HealthEngine():
                             getattr(builtins, r["type"]),
                             r["unit"], r["is_list"], r["counter"])
             self.metrics[r["name"]] = metric
+            
+   def _update_graph_changed_timestamp(self):
+      self.dependency_graph_changed = str(time.time())
 
    def _build_dependency_graph(self):
       """
@@ -128,14 +135,19 @@ class HealthEngine():
 
    def add_vm(self, name, hypervisor="virtualbox"):
       self.root.add_vm(name, hypervisor)
+      self._update_graph_changed_timestamp()
    def add_kbnet(self, name, framework="vpp"):
       self.root.add_kbnet(name, framework)
+      self._update_graph_changed_timestamp()
+      
    def remove_vm(self, name):
       self.root.remove_vm(name)
+      self._update_graph_changed_timestamp()
       # do not remove, keep monitoring
       #pass
    def remove_kbnet(self, name):
       self.root.remove_kbnet(name)
+      self._update_graph_changed_timestamp()
       # do not remove, keep monitoring
       #pass
       
@@ -232,9 +244,7 @@ class Subservice():
          
          "last-change":"2020-12-30T12:00:00-08:00",
          "label": "The ko node ",
-         "under-maintenance": False,
-         "maintenance-contact": "korian.edeline@uliege.be",
-         
+
          "health-score": 100,
          
          "symptoms": [
@@ -262,10 +272,8 @@ class Subservice():
                  "service": self.path, 
                  "instance-name": self.name
                 },
-               "last-change":"2020-12-30T12:00:00-08:00",
+               "last-change":self.engine.dependency_graph_changed,
                "label": self.fullname,
-               #"under-maintenance": False,
-               #"maintenance-contact": "korian.edeline@uliege.be",
                "health-score": self.health_score,
             
                "symptoms": [ 
@@ -287,7 +295,7 @@ class Subservice():
                ] 
             }
       
-      return bag
+      return json.dumps(bag)
 
    def __contains__(self, item):
       return any(subservice._type == item for subservice in self.dependencies)

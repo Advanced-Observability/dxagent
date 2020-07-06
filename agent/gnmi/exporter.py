@@ -111,7 +111,7 @@ class DXAgentServicer(gNMIServicer):
             elif _type == float:
                added.val.float_val = val
             elif _type == "json": # grpc will base64 encode
-               added.val.json_val = json.dumps(val).encode("utf-8")
+               added.val.json_val = val.encode("utf-8")
          yield response
       
    # gNMI Services Capabilities Routine
