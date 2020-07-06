@@ -79,8 +79,7 @@ class DXWeb(IOManager):
               "symptoms": self.symptoms.get("/"+"/".join(path), ""),
             }
          }
-         self.info(self.symptoms)
-         #self.info(self.actives)
+         #self.info(self.symptoms)
          is_active = self.actives.get(fullpath, True)
          if is_active:
             health = self.health_scores.get(fullpath,100)
@@ -90,13 +89,14 @@ class DXWeb(IOManager):
          else:
             node_data["data"]["grey"] = 10
          self.json_nodes.append(node_data)    
-      
+         
+      #self.info(self.health_scores)
       for fullpath in self.health_scores:
          path = fullpath.lstrip("/").split('/')
          insert_node(fullpath, path, nodes)   
       for fullpath in self.nodes:
          path = self.path_to_nodes(fullpath.lstrip("/"))#fullpath.lstrip("/").split('/')
-         fullpath = "/".join(path)
+         fullpath = "/"+"/".join(path)
          insert_node(fullpath, path, nodes)     
                                            
    def path_to_nodes(self, path):

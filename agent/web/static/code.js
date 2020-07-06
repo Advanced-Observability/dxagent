@@ -49,7 +49,7 @@ var graph_data = {
     nodes : dxnodes,
     edges: dxedges
   },
-
+  selectionType : "additive",
   layout: {
     name: 'breadthfirst',//'cose',
     directed: true,
