@@ -8,7 +8,7 @@ dxweb.py
 """
 
 from agent.core.ios import IOManager
-from agent.gnmi.gnmi_client import DXAgentGNMIClient
+from agent.gnmi.client import DXAgentGNMIClient
 
 import threading
 import time

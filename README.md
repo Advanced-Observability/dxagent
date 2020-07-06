@@ -36,6 +36,10 @@ exporter, and via shared memory for displaying DxTop.
 
 * `rules.csv`
    A list of symptoms.
+   
+### gNMI exporter
+
+See agent/gnmi/README.md
 
 ## DxTop
 

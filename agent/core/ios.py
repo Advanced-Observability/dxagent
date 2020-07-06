@@ -135,7 +135,7 @@ class IOManager():
          sys.exit(1)
          
       # parse gnmi target url
-      self.gnmi_target = self.config["gnmi"].get("node")    
+      self.gnmi_target = self.config["gnmi"].get("target")    
       return self.config     
          
    def configuration_dxagent(self):
@@ -159,7 +159,7 @@ class IOManager():
          self.config["virtualbox"]["config_directory"] = default_config_dir
          
       # parse gnmi target url
-      self.gnmi_target = self.config["gnmi"].get("node")
+      self.gnmi_target = self.config["gnmi"].get("target")
 
       # parse VPP gNMI nodes
       self.gnmi_nodes = []

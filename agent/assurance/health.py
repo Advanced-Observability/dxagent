@@ -201,6 +201,10 @@ class Subservice():
       self.path = self.find_path()
       self.health_score = 100
       self.symptoms = self.engine.get_symptoms(self)
+      self._update_graph_changed_timestamp()
+      
+   def _update_graph_changed_timestamp(self):
+      self.dependency_graph_changed = str(time.time())
       
    def find_fullname(self):
       """
@@ -272,7 +276,7 @@ class Subservice():
                  "service": self.path, 
                  "instance-name": self.name
                 },
-               "last-change":self.engine.dependency_graph_changed,
+               "last-change":self.dependency_graph_changed,
                "label": self.fullname,
                "health-score": self.health_score,
             
