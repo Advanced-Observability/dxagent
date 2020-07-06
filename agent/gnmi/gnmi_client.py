@@ -24,7 +24,7 @@ class DXAgentGNMIClient:
       elif certs:
          cert_path = certs
       else:
-         cert_path = "../certs/"
+         cert_path = "../../certs/"
       builder.set_secure_from_file(cert_path+"/rootCA.pem",
                                    cert_path+"/client.key",
                                    cert_path+"/client.crt")
@@ -41,8 +41,20 @@ class DXAgentGNMIClient:
       return [json_format.MessageToJson(response) 
                for response in self.client.subscribe_xpaths(xpath)]
      
+import json
+import base64
+
 if __name__ == "__main__":
    cli = DXAgentGNMIClient("0.0.0.0:50051", None)
    print(cli.capabilities())
-   #cli.subscribe()
-   #print(cli.get(["/"]))
+   responses = cli.subscribe(xpath=["/subservices"])
+   for response in responses:
+      response_json = json.loads(response)
+      print(response_json)
+      for i in response_json["update"]["update"]:
+         print(base64.b64decode(i["val"]["jsonVal"]))
+      print(base64.b64decode(response_json["update"]["update"][0]["val"]["jsonVal"]))
+      
+      
+      
+

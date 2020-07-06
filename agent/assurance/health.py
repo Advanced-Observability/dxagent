@@ -100,7 +100,7 @@ class HealthEngine():
       """
       build deps graph and insert symptoms in nodes
       """
-      self.node = Node(self.sysinfo.node, self)
+      self.root = Node(self.sysinfo.node, self)
 
    def _update_dependency_graph(self):
       """
@@ -108,7 +108,7 @@ class HealthEngine():
 
       """
       vms, kbs = set(), set()
-      for subservice in self.node.dependencies:
+      for subservice in self.root.dependencies:
          if isinstance(subservice, VM):
             vms.add(subservice.name)
          elif isinstance(subservice, KBNet):
@@ -127,23 +127,22 @@ class HealthEngine():
          self.add_kbnet(kb)      
 
    def add_vm(self, name, hypervisor="virtualbox"):
-      self.node.add_vm(name, hypervisor)
+      self.root.add_vm(name, hypervisor)
    def add_kbnet(self, name, framework="vpp"):
-      self.node.add_kbnet(name, framework)
+      self.root.add_kbnet(name, framework)
    def remove_vm(self, name):
-      self.node.remove_vm(name)
+      self.root.remove_vm(name)
       # do not remove, keep monitoring
       #pass
    def remove_kbnet(self, name):
-      self.node.remove_kbnet(name)
+      self.root.remove_kbnet(name)
       # do not remove, keep monitoring
       #pass
       
    def update_health(self):
       self._update_dependency_graph()
-      self.node.update_metrics()
-      self._data["symptoms"], self._data["health_scores"] = self.node.update_symptoms()
-      #self.walk(self.node)
+      self.root.update_metrics()
+      self._data["symptoms"], self._data["health_scores"] = self.root.update_symptoms()
       
    def walk(self, current):
       self.info("path: {} fullname: {} score:{}".format(
@@ -151,6 +150,17 @@ class HealthEngine():
       #self.info("+".join([s.name for s in current.symptoms]))
       for dep in current.dependencies:
          self.walk(dep)
+         
+   def __iter__(self, current=None):
+      """
+      Return a subservices iterator 
+      
+      """
+      if not current:
+         current = self.root
+      yield current
+      for dep in current.dependencies:
+         yield from self.__iter__(dep)
       
 class Subservice():
    """
@@ -206,6 +216,78 @@ class Subservice():
       if self.parent:
          path = "{}{}".format(self.parent.path,path)
       return path
+      
+   def json_bag(self):
+      """
+      @return a json string that describes this subservice, formatted as
+              specified by ietf-service-assurance.yang
+              See https://tools.ietf.org/html/draft-claise-opsawg-service-assurance-yang-04
+      {
+         "type": "subservice-idty",
+         "id": "/node[name=ko]",
+         "subservice-parameters": {
+              "service": "custom_service", 
+              "instance-name": "initial_custom_service"
+         },
+         
+         "last-change":"2020-12-30T12:00:00-08:00",
+         "label": "The ko node ",
+         "under-maintenance": False,
+         "maintenance-contact": "korian.edeline@uliege.be",
+         
+         "health-score": 100,
+         
+         "symptoms": [
+            {
+               "id": 6834403197888517606,
+               "health-score-weight": 50,
+               "label": "test",
+               "start-date-time": 1593792317.5360885
+            }
+         ],
+         "dependencies" : [
+           {
+             "type": "xconnect-idty",
+             "id": "('sain-pe-1', 'l2vpn', 'P2P_BNP')",
+             "dependency-type": "impacting-dependency"
+            }   
+         ]
+         
+      }          
+              
+      """
+      bag =  { "type": "subservice-idty",
+               "id": self.fullname,
+               "subservice-parameters": {
+                 "service": self.path, 
+                 "instance-name": self.name
+                },
+               "last-change":"2020-12-30T12:00:00-08:00",
+               "label": self.fullname,
+               #"under-maintenance": False,
+               #"maintenance-contact": "korian.edeline@uliege.be",
+               "health-score": self.health_score,
+            
+               "symptoms": [ 
+                  {
+                     "id": s.id,
+                     "health-score-weight": s.severity.weight(),
+                     "label": s.name,
+                     "start-date-time":s.timestamp
+                  
+                  } for s in self.positive_symptoms
+               ],
+               "dependencies" : [ 
+                  { 
+                     "type": "subservice-idty",
+                     "id" : dep.fullname,
+                     "dependency-type": "impacting-dependency" if dep.impacting
+                                        else "informational-dependency"
+                  } for dep in self.dependencies
+               ] 
+            }
+      
+      return bag
 
    def __contains__(self, item):
       return any(subservice._type == item for subservice in self.dependencies)
@@ -224,6 +306,7 @@ class Subservice():
               health
       """
       self.health_score = 100
+      self.positive_symptoms = []
       positives, health_scores = [], {}
       # update symptoms&health_score from deps
       for subservice in self.dependencies:
@@ -238,10 +321,10 @@ class Subservice():
       for symptom in self.symptoms:
          result = symptom.check(self._data)
          if result:
-            #self.engine.info(symptom.name)
-            positives.append(symptom)
+            self.positive_symptoms.append(symptom)
             self.health_score = max(0,self.health_score-symptom.weight)
             
+      positives.extend(self.positive_symptoms)
       health_scores[self.fullname] = self.health_score
       return positives, health_scores
 
@@ -296,7 +379,6 @@ class Subservice():
          ("Linux","/node/kb/mem")     : self._update_metrics_linux_kb_mem,
          ("Linux","/node/kb/net")     : self._update_metrics_linux_kb_net,
          
-        
          ("Windows","/node/bm/cpu") : self._update_metrics_win_bm_cpu,
          ("MacOS","/node/bm/cpu")   : self._update_metrics_macos_bm_cpu,
       }

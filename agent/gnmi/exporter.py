@@ -14,6 +14,7 @@ from cisco_gnmi import ClientBuilder
 from google.protobuf import json_format
 from cisco_gnmi.proto import gnmi_pb2, gnmi_pb2_grpc
 from cisco_gnmi.proto.gnmi_pb2_grpc import gNMIServicer 
+import json
 
 from agent.core.rbuffer import MDict
 
@@ -48,7 +49,7 @@ class DXAgentServicer(gNMIServicer):
 
    def _capabilitiesResponse(self):
       response = gnmi_pb2.CapabilityResponse()
-      supModel = gnmi_pb2.ModelData(name="my_model",
+      supModel = gnmi_pb2.ModelData(name="ietf-service-assurance",
                   organization="My Company Inc", version="1.0")
       response.supported_models.extend([supModel])
       response.supported_encodings.extend(gnmi_pb2.JSON)
@@ -60,6 +61,27 @@ class DXAgentServicer(gNMIServicer):
       response = gnmi_pb2.GetResponse()
       return response
       
+   def _validate_subscriptions(self, request):
+      """
+      validate and return string-converted paths
+      
+      
+      """
+      paths = []
+      if "subscribe" not in request or "subscription" not in request["subscribe"]:
+         return paths
+      subscriptions = request["subscribe"]["subscription"]
+      for subscription in subscriptions:
+         path_str = ""
+         path_elements = subscription["path"]["elem"]
+         for name in path_elements:
+            if "name" in name:
+               path_str += "/{}".format(name["name"])
+            else:
+               path_str += "/"
+         paths.append(path_str)
+      return paths
+      
    def _subscribeResponse(self, requests):
       """
       build SubscribeResponse
@@ -67,14 +89,16 @@ class DXAgentServicer(gNMIServicer):
       only allows for subscription to root
       """
       for request in requests:
-         #print(request.subscribe.subscription[0].path)
-         #print(request.subscribe.prefix)
+         request_json = json.loads(json_format.MessageToJson(request))
+         paths=self._validate_subscriptions(request_json)
+         #self.exporter.info(request.subscribe.prefix)
+         
          # build reponse
          response = gnmi_pb2.SubscribeResponse()
          response.update.timestamp = int(time.time())
          response.sync_response = True
          
-         for path_string, val, _type in self.exporter._iterate_data():
+         for path_string, val, _type in self.exporter._iterate_data(paths):
             #self.exporter.engine.info(path_string)
             path = path_from_string(path_string)
             # add an update message for path
@@ -86,6 +110,8 @@ class DXAgentServicer(gNMIServicer):
                added.val.string_val = val
             elif _type == float:
                added.val.float_val = val
+            elif _type == "json": # grpc will base64 encode
+               added.val.json_val = json.dumps(val).encode("utf-8")
          yield response
       
    # gNMI Services Capabilities Routine
@@ -102,16 +128,16 @@ class DXAgentServicer(gNMIServicer):
         
         
 class DXAgentExporter():
-   def __init__(self, data, info, engine,
+   def __init__(self, data, info, agent,
                 target_url="0.0.0.0:50051",
                 tls_enabled=True):
       self.data = data
       self.info = info
-      self.engine = engine
+      self.agent = agent
       self.target_url = target_url
       
-      pkeypath = self.engine.args.certs_dir+"/device.key"
-      certpath = self.engine.args.certs_dir+"/device.crt"
+      pkeypath = self.agent.args.certs_dir+"/device.key"
+      certpath = self.agent.args.certs_dir+"/device.crt"
       
       self._server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
       gnmi_pb2_grpc.add_gNMIServicer_to_server(
@@ -177,7 +203,7 @@ class DXAgentExporter():
          nodes[2]=nodes[2].replace("/node/vm","")
          nodes[2]=nodes[2].replace("/node/kb","")
       nodes[0]=nodes[0].replace("/node",
-                                "/node[name={}]".format(self.engine.sysinfo.node))
+                                "/node[name={}]".format(self.agent.sysinfo.node))
       for node in nodes:
          if not node:
             continue
@@ -192,27 +218,44 @@ class DXAgentExporter():
             
       return path_string
 
-   def _iterate_data(self, skip=[]):
+   def _iterate_data(self, subscribed, skip=[]):
       """
       write dict to ShareableMemory
 
       only write fields that changed
            if total datafield changed, rewrite all
             otherwise skip all if not has_changed()
+            
+      @param subscribed the list of subscribed paths
+             /subservices
+             /metrics 
+             /symptoms
+             /health
+             / 
 
       """
       skip.append("symptoms")
       skip.append("stats")
       skip.append("health_scores")
-      for k,d in self.data.items():
-         if k in skip:
-            continue
-         yield from self._iterate_data_rec(d, k)
-      # special entry: symptom
-      for s in self.data["symptoms"]:
-         for path in s.args:
-            #yield "{}/symptoms[name={}]/".format(path,s.name), "", None
-            yield "{}/symptoms[name={}]/severity".format(path,s.name), s.severity.weight(), int
-      for path,score in self.data["health_scores"].items():
-         yield path+"/health", score, int   
+      if "/" in subscribed or "/metrics" in subscribed:
+         for k,d in self.data.items():
+            if k in skip:
+               continue
+            yield from self._iterate_data_rec(d, k)
+         # special entry: symptom
+      
+      if "/" in subscribed or "/symptoms" in subscribed:
+         for s in self.data["symptoms"]:
+            for path in s.args:
+               #yield "{}/symptoms[name={}]/".format(path,s.name), "", None
+               yield "{}/symptoms[name={}]/severity".format(path,s.name), s.severity.weight(), int
+            
+      if "/" in subscribed or "/health" in subscribed:
+         for path,score in self.data["health_scores"].items():
+            yield path+"/health", score, int 
+            
+      if "/" in subscribed or "/subservices" in subscribed:
+         for subservice in self.agent.engine:
+            yield subservice.fullname, subservice.json_bag(), "json"
+            
       

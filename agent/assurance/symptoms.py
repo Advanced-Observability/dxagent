@@ -9,6 +9,8 @@ symptoms.py
 
 import ast
 import operator
+import hashlib
+import time
 
 class RuleException(Exception):
    """
@@ -29,6 +31,8 @@ class Symptom():
       self.prefix = None
       self.weight = weight if weight else severity.weight()
       self.node = node
+      self.id = hashlib.sha1(self.name.encode('utf-8')).hexdigest()
+      self.timestamp = "0"
       if "/node/vm" in path:
          self.prefix="/node/vm"
       if "/node/kb" in path:
@@ -204,6 +208,7 @@ class Symptom():
          
          self.args = []
          if ret:
+            self.timestamp = str(time.time())
             if isinstance(ret, IndexedVariable):
                # XXX
                if self.path.endswith("if"):
