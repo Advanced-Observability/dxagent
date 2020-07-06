@@ -3,6 +3,17 @@ body {
   font-size: 14px;
 }
 
+.symptom1 {
+   font-size: 18px;
+   color: #FF8C00;
+   font-weight: bold;
+}
+.symptom2 {
+   font-size: 20px;
+   color: #DC143C;
+   font-weight: bold;
+}
+
 #cy {
   height: 100%;
   width: 100%;

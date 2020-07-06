@@ -6,14 +6,7 @@ var graph_data = {
       .css({
         'width': '100px',
         'height': '100px',
-        'content': function(e) { 
-                     if (e.selected()) { 
-                        return e.data("name")+e.data("symptoms")
-                     } else { 
-                        return e.data("name")
-                     }
-                   },
-        
+        'content': "data(name)",    
         //'data(name)',//+'\n'+'data(health)',
         'pie-size': '80%',
         'pie-1-background-color': '#E8747C',
@@ -57,7 +50,6 @@ var graph_data = {
     spacingFactor: 3,
     animate: false,
     avoidOverlap: true,
-    //roots: '#cpu',
     //componentSpacing:200,
     //nodeDimensionsIncludeLabels:true,
   },
@@ -66,10 +58,22 @@ var graph_data = {
     window.cy = this;
   }
 };
-cytoscape(graph_data);
-//cy.nodes().on('click', function(e) {
-//   var ele = e.target;
-//   console.log(ele.selected());
-//   ele.data("selected", ! ele.data("selected") );
-//});
-
+var cyInstance = cytoscape(graph_data);
+cyInstance.nodeHtmlLabel([
+   {
+       query : '.l1',
+       halign: 'center', // title vertical position. Can be 'left',''center, 'right'
+       valign: 'bottom', // title vertical position. Can be 'top',''center, 'bottom'
+       halignBox: 'center', // title vertical position. Can be 'left',''center, 'right'
+       valignBox: 'center', // title relative box vertical position. Can be 'top',''center, 'bottom'
+       cssClass: '', // any classes will be as attribute of <div> container for every title     
+       tpl: function(data) {
+         var node = cy.nodes('[id ="'+data.id+'"]')
+         console.log(node);
+         if (node.selected()) { 
+            return '<p class="symptom2">'+data.symptoms+'</p>';
+         } 
+         return "";
+    }
+   }
+]);

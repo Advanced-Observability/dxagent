@@ -77,7 +77,8 @@ class DXWeb(IOManager):
               "grey":0,
               "selected":False,
               "symptoms": self.symptoms.get("/"+"/".join(path), ""),
-            }
+             
+            },  "classes": 'l1'
          }
          #self.info(self.symptoms)
          is_active = self.actives.get(fullpath, True)
@@ -159,7 +160,7 @@ class DXWeb(IOManager):
             split = path_str.split("/symptoms[name=")
             path_str = split[0]
             name = split[1].rstrip("]/severity")
-            symptoms = self.symptoms.get(path_str, "") +"\n{} ({})".format(name, val)
+            symptoms = self.symptoms.get(path_str, "") +"<br>{} ({})".format(name, val)
             self.symptoms[path_str] = symptoms
          elif "active" in path_str and "/bm/mem" not in path_str:
             self.actives[path_str.replace("/active","")] = val
