@@ -7,6 +7,8 @@
 <title>Service Dependencies Graph</title>
 <script src="static/js/cytoscape.min.js"></script>
 <script src="static/js/cytoscape-node-html-label.js"></script>
+<script src="https://unpkg.com/cytoscape-undo-redo/cytoscape-undo-redo.js"></script>
+<script src="static/js/cytoscape-expand-collapse.js"></script>
 </head>
 <body>
 <div id="cy"></div>
@@ -19,7 +21,21 @@
    var dxedges = {{ dxedges|tojson }};
    
    socket.on('dxgraph', function(dxgraph) {
-      cy.json({ elements: dxgraph });
+      // do not add collapsed compound nodes
+      var api = cy.expandCollapse('get');
+      dxgraph["nodes"].forEach(function (item, index) {
+         //console.log(item.data.id);
+         var node = cy.nodes('[id ="'+item.data.id+'"]');
+         if (!api.isExpandable(node)) { 
+            cy.json([item]);
+            node.json(item);
+         };
+      });
+      dxgraph["edges"].forEach(function (item, index) {
+         var edge = cy.edges('[id ="'+item.data.id+'"]');
+         cy.json([item]);
+         edge.json(item);
+      });
    });
 
 </script>

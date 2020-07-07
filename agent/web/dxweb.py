@@ -7,8 +7,10 @@ dxweb.py
 
 """
 
+from agent.constants import DXWEB_EMIT_PERIOD
 from agent.core.ios import IOManager
 from agent.gnmi.client import DXAgentGNMIClient
+
 
 import threading
 import time
@@ -43,6 +45,7 @@ class DXWeb(IOManager):
        # format data
       self.json_nodes,self.json_edges = [],[]
       nodes={}
+      compound_nodes=set()
       
       def insert_node(fullpath, node_list, tree):
          """
@@ -64,7 +67,11 @@ class DXWeb(IOManager):
                        "weight":len(self.json_edges)+1,
                        "source":src,
                        "target":dst,
-                     }
+                       #
+                     },
+                     "group":"edges",
+                     #"position":{},
+                     #"edgeType" : "type1",
                   })
             prev=node
             path.append(node)
@@ -75,12 +82,17 @@ class DXWeb(IOManager):
               "red":0,
               "green":0,
               "grey":0,
-              "selected":False,
+              #"selected":False,
               "symptoms": self.symptoms.get("/"+"/".join(path), ""),
-             
-            },  "classes": 'l1'
+              "parent": "/".join(path[:-1])+"parent" if len(path)>3 else "",
+              "depth":len(path)-1,
+            },  "classes": 'l1',
+            "group":"nodes",
          }
-         #self.info(self.symptoms)
+         compound_nodes.add("/".join(path[:-1])+"parent" if len(path)>3 else "")
+#         
+#         self.info("id: {} parent: {}".format(node_data["data"]["id"],
+#                                             node_data["data"]["parent"]))
          is_active = self.actives.get(fullpath, True)
          if is_active:
             health = self.health_scores.get(fullpath,100)
@@ -90,8 +102,8 @@ class DXWeb(IOManager):
          else:
             node_data["data"]["grey"] = 10
          self.json_nodes.append(node_data)    
-         
-      #self.info(self.health_scores)
+      
+      self.info(self.health_scores)
       for fullpath in self.health_scores:
          path = fullpath.lstrip("/").split('/')
          insert_node(fullpath, path, nodes)   
@@ -99,7 +111,17 @@ class DXWeb(IOManager):
          path = self.path_to_nodes(fullpath.lstrip("/"))#fullpath.lstrip("/").split('/')
          fullpath = "/"+"/".join(path)
          insert_node(fullpath, path, nodes)     
-                                           
+       #compound nodes
+      for cnode in compound_nodes:
+         if not cnode:
+            continue
+         self.json_nodes.append({"data":
+                                    { "id": cnode,"name":"",
+                                    "red":0,
+                                   "green":0,
+                                   "grey":0,
+                                    }})
+          
    def path_to_nodes(self, path):
    
       nodes = []
@@ -147,13 +169,13 @@ class DXWeb(IOManager):
             else:
                path_str = path_str + "/{}".format(path_elem["name"])
                
+         val = None
          if "val" in e:
             if "intVal" in e["val"]:
                val = int(e["val"]["intVal"])
             elif "stringVal" in e["val"]:
                val = e["val"]["stringVal"]
-         else:
-            val = None
+            
          if "health" in path_str:
             self.health_scores[path_str.replace("/health","")] = val
          elif "symptoms" in path_str:
@@ -176,7 +198,7 @@ class DXWeb(IOManager):
          self.fetch_data()
          self.format_data()
          self.socketio.emit("dxgraph", {"nodes":self.json_nodes, "edges":self.json_edges})
-         time.sleep(1)
+         time.sleep(DXWEB_EMIT_PERIOD)
          
    def run(self):
       thread = threading.Thread(target=self.gnmi_read_loop)

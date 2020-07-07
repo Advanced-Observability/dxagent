@@ -7,7 +7,6 @@ var graph_data = {
         'width': '100px',
         'height': '100px',
         'content': "data(name)",    
-        //'data(name)',//+'\n'+'data(health)',
         'pie-size': '80%',
         'pie-1-background-color': '#E8747C',
         'pie-1-background-size': 'mapData(red, 0, 10, 0, 100)',
@@ -19,7 +18,7 @@ var graph_data = {
       })
     .selector('edge')
       .css({
-        'curve-style': 'bezier',
+        'curve-style': 'straight',
         'width': 4,
         'target-arrow-shape': 'triangle',
         'opacity': 0.5,
@@ -36,29 +35,50 @@ var graph_data = {
       .css({
         'opacity': 0.25,
         'text-opacity': 0
-      }),
+      })
+    .selector('node.cy-expand-collapse-collapsed-node')
+      .css({
+         "background-color": "darkblue",
+      })     
+    .selector(':parent')
+      .css({
+            'background-opacity': 0.2,
+       }),
 
   elements: {
     nodes : dxnodes,
     edges: dxedges
   },
-  selectionType : "additive",
+ // selectionType : "additive",
   layout: {
-    name: 'breadthfirst',//'cose',
+    name: 'breadthfirst',
+   //fit:true,
+   
     directed: true,
-    padding: 10,
-    spacingFactor: 3,
+    padding: 150,
+    spacingFactor: 0.7,
     animate: false,
     avoidOverlap: true,
     //componentSpacing:200,
-    //nodeDimensionsIncludeLabels:true,
+    nodeDimensionsIncludeLabels:true,
   },
 
   ready: function(){
     window.cy = this;
+    var ur = this.undoRedo();
+    var api = this.expandCollapse({
+        undoable: true,
+        expandCollapseCueSize: 24, 
+        expandCollapseCueLineSize: 16, 
+        expandCueImage :"static/icon-plus.png",
+		  collapseCueImage:"static/icon-minus.png",
+		  fisheye:false,
+		  animate:false,
+      });
   }
 };
 var cyInstance = cytoscape(graph_data);
+
 cyInstance.nodeHtmlLabel([
    {
        query : '.l1',
@@ -69,7 +89,7 @@ cyInstance.nodeHtmlLabel([
        cssClass: '', // any classes will be as attribute of <div> container for every title     
        tpl: function(data) {
          var node = cy.nodes('[id ="'+data.id+'"]')
-         console.log(node);
+         //console.log(node);
          if (node.selected()) { 
             return '<p class="symptom2">'+data.symptoms+'</p>';
          } 
@@ -77,3 +97,20 @@ cyInstance.nodeHtmlLabel([
     }
    }
 ]);
+
+
+//document.getElementById("collapseRecursively").addEventListener("click", function () {
+//	api.collapseRecursively(cy.$(":selected"));
+//});
+
+//document.getElementById("expandRecursively").addEventListener("click", function () {
+//	api.expandRecursively(cy.$(":selected"));
+//});
+
+//document.getElementById("collapseAll").addEventListener("click", function () {
+//	api.collapseAll();
+//});
+
+//document.getElementById("expandAll").addEventListener("click", function () {
+//	api.expandAll();
+//});

@@ -12,7 +12,7 @@ import time
 import signal
 
 import agent
-from agent.constants import AGENT_INPUT_RATE
+from agent.constants import AGENT_INPUT_PERIOD
 from agent.core.ios import IOManager
 from agent.core.daemon import Daemon
 from agent.core.shareablebuffer import ShareableBuffer
@@ -35,7 +35,7 @@ class DXAgent(Daemon, IOManager):
                       stdout='/var/log/dxagent.log', 
                       stderr='/var/log/dxagent.log',
                       name='dxagent',
-                      input_rate=AGENT_INPUT_RATE)
+                      input_rate=AGENT_INPUT_PERIOD)
       IOManager.__init__(self, child=self, parse_args=parse_args)
 
       self.load_ios()
@@ -91,7 +91,7 @@ class DXAgent(Daemon, IOManager):
          skip=["stats"] if not self.args.verbose else []
          self.sbuffer.write(self._data, skip=skip, info=self.info)
       #self.info(list(self.exporter._iterate_data()))
-      self.scheduler.enter(AGENT_INPUT_RATE,0,self.process)
+      self.scheduler.enter(AGENT_INPUT_PERIOD,0,self.process)
 
    def exit(self, signum=None, stackframe=None):
       """
@@ -99,7 +99,7 @@ class DXAgent(Daemon, IOManager):
 
       """
       self.running = False
-      time.sleep(AGENT_INPUT_RATE)
+      time.sleep(AGENT_INPUT_PERIOD)
 
       self.vm_watcher.exit()
       self.vpp_watcher.exit()
@@ -120,5 +120,5 @@ class DXAgent(Daemon, IOManager):
 
       while self.running:
          self.scheduler.run(blocking=False)
-         time.sleep(AGENT_INPUT_RATE)
+         time.sleep(AGENT_INPUT_PERIOD)
 

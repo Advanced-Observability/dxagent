@@ -247,7 +247,7 @@ class DXTop(IOManager):
       self._format_attrs_list_rb("/node/bm/sensors", 6, health=True)
       self._format_attrs_rb("/node/bm/mem", 6, health=True)
       self._format_attrs_rb("/node/bm/proc", 6, health=True)
-      self._format_attrs_list_rb("/node/bm/disk", 6, health=True)
+      self._format_attrs_list_rb("/node/bm/disks", 6, health=True)
       self._format_attrs_rb("/node/bm/net", 6, health=True)
       
       if "/node/vm" in self._data:
@@ -665,7 +665,7 @@ class DXTop(IOManager):
       except:
          pass
 
-      self.scheduler.enter(SCREEN_REFRESH_RATE,1,self._display)
+      self.scheduler.enter(SCREEN_REFRESH_PERIOD,1,self._display)
 
    def start_gui(self):
 
@@ -792,7 +792,7 @@ class DXTop(IOManager):
       self.content = [[] for _ in range(self.max_screens)]
       self._data = self.sbuffer.dict(info=self.info)
       self._format()
-      self.scheduler.enter(TOP_INPUT_RATE,0,self.process)
+      self.scheduler.enter(TOP_INPUT_PERIOD,0,self.process)
 
    def run(self):
       """
@@ -826,7 +826,7 @@ class DXTop(IOManager):
                   self.info("KEY_RESIZE")
                c = self.window.getch()
             self.scheduler.run(blocking=False)
-            time.sleep(KEYBOARD_INPUT_RATE)
+            time.sleep(KEYBOARD_INPUT_PERIOD)
 
       except KeyboardInterrupt:
          pass

@@ -16,7 +16,7 @@ import json
 
 from agent.core.rbuffer import init_rb_dict, Severity
 from agent.input.sysinfo import SysInfo
-from agent.constants import AGENT_INPUT_RATE
+from agent.constants import AGENT_INPUT_PERIOD
 from agent.assurance.symptoms import Symptom, RuleException
 
 class Metric():
@@ -38,7 +38,7 @@ class HealthEngine():
       self._data["/node/vm"], self._data["/node/kb"] = {}, {}
       self._data["symptoms"] = []
       self._data["health_scores"] = {}
-      self.sample_per_min = int(60/AGENT_INPUT_RATE)
+      self.sample_per_min = int(60/AGENT_INPUT_PERIOD)
       
       self._read_metrics_file()
       self._read_rule_file()

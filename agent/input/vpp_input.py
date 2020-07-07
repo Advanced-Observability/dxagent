@@ -34,7 +34,7 @@ from agent.core.rbuffer import RingBuffer
 
 #
 # The rate at which gNMI sends updates
-GNMI_SAMPLING_RATE=int(1e9)*10
+GNMI_SAMPLING_PERIOD=int(1e9)*10
 #
 # gNMI client max consecutive retries
 MAX_RETRIES=3
@@ -186,7 +186,7 @@ class VPPGNMIClient(threading.Thread):
 
       try:
          for response in self.client.subscribe_xpaths(xpath,
-                         sample_interval=GNMI_SAMPLING_RATE):
+                         sample_interval=GNMI_SAMPLING_PERIOD):
             if self._exit:
                break
             if response.sync_response:
