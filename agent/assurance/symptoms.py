@@ -61,7 +61,6 @@ class Symptom():
                    raise RuleException("Unsafe rule {} contains {}".format(self._raw_rule, subnode.id))
            if subnode_name not in _safe_nodes:
                raise RuleException("Unsafe rule {} contains {}".format(self._raw_rule, subnode_name))
-
        return True     
 
    def _compile_rule(self):
@@ -186,10 +185,16 @@ class Symptom():
             # double list
             ret=[]
             for dev,b in data[prefix2].items():
+               if path not in b:
+                  continue
                ret += [(dev+":"+dev2,rb[var]) for dev2,rb in b[path].items()]
             return IndexedVariable(ret)
          
          if not metric.islist:
+            # exception for net/if
+            if self.node.name in data[path]:
+               return IndexedVariable(data[path][self.node.name][var])
+            
             return IndexedVariable(data[path][var])
          return IndexedVariable([(dev, b[var]) for dev,b in data[path].items()])
          
@@ -212,8 +217,10 @@ class Symptom():
             if isinstance(ret, IndexedVariable):
                # XXX
                if self.path.endswith("if"):
-                  self.args = ["{}/if[name={}]".format(self.node.fullname,index) for index in ret.indexes()]
-               elif ret.islist:
+                  info(ret.indexes())
+                  info(self.node.fullname)
+#                  self.args = ["{}/if[name={}]".format(self.node.fullname,index) for index in ret.indexes()]
+               if ret.islist:
                   self.args = ["{}[name={}]".format(self.node.fullname,index) for index in ret.indexes()]
                else:
                   self.args = ["{}{}".format(self.node.fullname,index) for index in ret.indexes()]
@@ -227,4 +234,6 @@ class Symptom():
       
    def __str__(self):
       return "{} {} {}".format(self.name, self.severity, self.rule)
+   def __repr__(self):
+      return str(self)
       

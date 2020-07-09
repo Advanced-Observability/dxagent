@@ -89,8 +89,8 @@ class DXTop(IOManager):
       if self._data:
          self._format_top_pad()
       
-      self.info("resized {}".format(str(self.col_sizes)))
-      self.info("width: {}".format(self.width))
+      #self.info("resized {}".format(str(self.col_sizes)))
+      #self.info("width: {}".format(self.width))
 
    def _center_text(self, s, width=None):
       """
@@ -100,7 +100,7 @@ class DXTop(IOManager):
       if not width:
          width = self.pad_width
       lpad,rpad = self._center_padding(s, width=width)
-      return (lpad+s+rpad)[:width]
+      return (lpad+s[:width-1]+rpad)[:width]
 
    def _center_padding(self, s, width=None):
       """
@@ -232,15 +232,17 @@ class DXTop(IOManager):
             if not args:
                s=name
                lpad,rpad=self._center_padding(s)
-               flags = [(len(lpad),curses.color_pair(int(severity))),(len(s)+len(lpad),0)]
-               self._append_content(self._center_text(s), 6, flags=flags)
+               s=self._center_text(s)
+               flags = [(len(lpad),curses.color_pair(int(severity))),(len(s)-len(rpad),0)]
+               self._append_content(s, 6, flags=flags)
             else:
                s="{}: {}".format(name,args)
                lpad,rpad=self._center_padding(s)
-               flags = [(len(lpad),curses.color_pair(int(severity))),(len(s)+len(lpad),0)]
-               self._append_content(self._center_text(s), 6, flags=flags)              
+               s = self._center_text(s)
+               flags = [(len(lpad),curses.color_pair(int(severity))),(len(s)-len(rpad),0)]
+               self._append_content(s, 6, flags=flags)            
          self._append_content(self._center_text(" "), 6)
-      
+
       self._append_content(self._center_text("Metrics"), 6, curses.A_REVERSE)
       self._format_attrs_list_rb_percpu("/node/bm/cpus", 6, health=True)
       self._format_attrs_list_rb("/node/bm/net/if", 6, health=True)
@@ -609,6 +611,7 @@ class DXTop(IOManager):
          self.top_pad.addstr(self._center_text(s))         
          s = "symptoms-count: {}".format(len(self._data["symptoms"]))
          self.top_pad.addstr(self._center_text(s))
+         pass
 
    def _fill_pad(self):
       """

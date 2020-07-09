@@ -80,7 +80,7 @@ class HealthEngine():
       symptoms = []
       for args in self._symptoms_args:
          # XXX: remove /if bit when adding single if nodes
-         if args[1] == node.path or args[1] == node.path+"/if":
+         if args[1] == node.path:#.rstrip("/if") or args[1] == node.path+"/if":
             symptoms.append(Symptom(*args, node=node))
       return symptoms
       
@@ -93,10 +93,11 @@ class HealthEngine():
                  
             key = (r["subservice"],)
             rec = self.metrics_lookup.setdefault(key,
-                     {"types":[],"units":[],"names":[]})
+                     {"types":[],"units":[],"names":[], "counters":[]})
             rec["names"].append(r["name"])
             rec["types"].append(getattr(builtins, r["type"]))
             rec["units"].append(r["unit"])
+            rec["counters"].append(r["counter"])
             metric = Metric(r["name"], r["subservice"],
                             getattr(builtins, r["type"]),
                             r["unit"], r["is_list"], r["counter"])
@@ -158,14 +159,12 @@ class HealthEngine():
       # 2.b vm interfaces
       for vm in vms:
          parent = self.get_node(root_path+"/vm[name={}]".format(vm))
-         #self.info(parent)
          vm_ifs = set()
          monitored_vm_ifs = set()
       
       # 2.c kb interfaces
       for kb in kbs:
          parent = self.get_node(root_path+"/kb[name={}]".format(kb))
-         #self.info(parent)
          kb_ifs = set()
          monitored_kb_ifs = set()
       
@@ -262,7 +261,8 @@ class HealthEngine():
       rec = self.metrics_lookup[key]
       return init_rb_dict(rec["names"], metric=True,
                           types=rec["types"],
-                          units=rec["units"])
+                          units=rec["units"],
+                          counters=rec["counters"])
    
    def get_node(self, path):
       return self.root.get_node(path)
@@ -373,11 +373,10 @@ class Subservice():
       subpath = self._type
       if self.name:
          subpath = "{}[name={}]".format(subpath,self.name)
-      #self.engine.info("{} in {}".format(subpath, path))
+         
       if subpath == path_elements[0]:
          if len(path_elements) == 1:
             return self
-            
          child_type, child_name = self.parse_element(path_elements[1])
          child = self.get_child(child_name, child_type)
          if child:
@@ -816,8 +815,8 @@ class Subservice():
       """
       vm_name=self.parent.name
       hypervisor=self.parent.hypervisor
-      # init metric rbs if needed
       cpu_label = "cpu"
+      
       if "/node/vm/cpus" not in self._data["/node/vm"][vm_name]:
          self._data["/node/vm"][vm_name]["/node/vm/cpus"] = {}
          self._data["/node/vm"][vm_name]["/node/vm/cpus"][cpu_label] = self._init_metrics_rb("cpu")
@@ -1009,7 +1008,6 @@ class VM(Subservice):
       """
       vm_name=self.name
       hypervisor=self.hypervisor
-      
       self.active = self._data[hypervisor+"/vms"][vm_name]["state"]._top() == "Running"
       self._data["/node/vm"][vm_name]["/node/vm"]["active"].append(self.active)
 
