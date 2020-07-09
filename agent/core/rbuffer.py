@@ -252,7 +252,7 @@ class RingBuffer(collections.deque):
       if len(self) == 0 or len(self) < count:
          return False
          
-      return self._tops(count).count(self.__getitem__(-1)) == count
+      return self._tops(count).count(self.__getitem__(-1)) != count
 
    def _dynamicity(self, count=0):
       """

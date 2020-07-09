@@ -119,7 +119,6 @@ class BMWatcher():
             attr_list.extend([prefix+attr for attr in attrs[1:]])
       self._data["snmp"] = init_rb_dict(attr_list, counter=True)
 
-
       # stat and stat/cpu
       attr_list = []
       attr_list_cpu = [
@@ -451,7 +450,9 @@ class BMWatcher():
                for tname,pname,percname in zip(time_names, 
                                                period_names, 
                                                perc_names):
+
                   v = self._data["stat/cpu"][cpu_label][tname].delta(count=1)
+                  #self.info("{}:{}: {} / {} = {}".format(cpu_label, percname, v,totalperiod, ratio(v,totalperiod)))
                   self._data["stat/cpu"][cpu_label][pname].append(v)
                   self._data["stat/cpu"][cpu_label][percname].append(
                                                    ratio(v,totalperiod))

@@ -82,7 +82,6 @@ class ShareableBuffer(shared_memory.ShareableList):
       self[self.index] = ""
       self.index = 0
 
-
    def dict(self,info=None):
       """
       parse data into a new list

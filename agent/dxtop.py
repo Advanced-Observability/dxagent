@@ -242,7 +242,7 @@ class DXTop(IOManager):
          self._append_content(self._center_text(" "), 6)
       
       self._append_content(self._center_text("Metrics"), 6, curses.A_REVERSE)
-      self._format_attrs_list_rb_percpu("/node/bm/cpu", 6, health=True)
+      self._format_attrs_list_rb_percpu("/node/bm/cpus", 6, health=True)
       self._format_attrs_list_rb("/node/bm/net/if", 6, health=True)
       self._format_attrs_list_rb("/node/bm/sensors", 6, health=True)
       self._format_attrs_rb("/node/bm/mem", 6, health=True)
@@ -253,13 +253,13 @@ class DXTop(IOManager):
       if "/node/vm" in self._data:
          for vm_name in self._data["/node/vm"]:
             vm_dict = self._data["/node/vm"][vm_name]
-            skip = ["/node/vm/net/if", "/node/vm/cpu"]
+            skip = ["/node/vm/net/if", "/node/vm/cpus"]
             for subservice in vm_dict:
                if subservice in skip:
                   continue
                self._format_attrs_rb(subservice, 6, subdict=vm_dict,
                                      health=True, health_index=vm_name)
-            self._format_attrs_list_rb("/node/vm/cpu", 6, subdict=vm_dict,
+            self._format_attrs_list_rb("/node/vm/cpus", 6, subdict=vm_dict,
                                               health=True, health_index=vm_name)
             self._format_attrs_list_rb("/node/vm/net/if", 6, subdict=vm_dict,
                                         health=True, health_index=vm_name)
