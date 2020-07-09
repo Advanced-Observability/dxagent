@@ -21,16 +21,17 @@
    var dxedges = {{ dxedges|tojson }};
    
    socket.on('dxgraph', function(dxgraph) {
+   
       // do not add collapsed compound nodes
       var api = cy.expandCollapse('get');
       dxgraph["nodes"].forEach(function (item, index) {
-         //console.log(item.data.id);
          var node = cy.nodes('[id ="'+item.data.id+'"]');
          if (!api.isExpandable(node)) { 
             cy.json([item]);
             node.json(item);
          };
       });
+      
       dxgraph["edges"].forEach(function (item, index) {
          var edge = cy.edges('[id ="'+item.data.id+'"]');
          cy.json([item]);

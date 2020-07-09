@@ -39,6 +39,7 @@ class HealthEngine():
       self._data["symptoms"] = []
       self._data["health_scores"] = {}
       self.sample_per_min = int(60/AGENT_INPUT_PERIOD)
+      self.types_map = { "vm": VM, "kb": KBNet}
       
       self._read_metrics_file()
       self._read_rule_file()
@@ -124,32 +125,42 @@ class HealthEngine():
       monitored_kbs = set(self._data["vpp/gnmi"].keys())
       # remove expired nodes
       for vm in vms - monitored_vms:
-         self.remove_vm(vm)
+         self.remove_node(self.root, vm, "vm")
+         #self.remove_vm(vm)
       for kb in kbs - monitored_kbs:
-         self.remove_kbnet(kb)
+         #self.remove_kbnet(kb)
+         self.remove_node(self.root, kb, "kb")
       # add new nodes
       for vm in monitored_vms - vms:
-         self.add_vm(vm)
+         #self.add_vm(vm)
+         self.add_node(self.root, vm, "vm", hypervisor="virtualbox")
       for kb in monitored_kbs - kbs:
-         self.add_kbnet(kb)      
-
-   def add_vm(self, name, hypervisor="virtualbox"):
-      self.root.add_vm(name, hypervisor)
-      self._update_graph_changed_timestamp()
-   def add_kbnet(self, name, framework="vpp"):
-      self.root.add_kbnet(name, framework)
+         #self.add_kbnet(kb)
+         self.add_node(self.root, kb, "kb", framework="vpp")
+         
+   def get_node_type(self, _type):
+      """
+      @return node type from string 
+      """
+      return self.types_map.get(_type, Subservice)
+         
+   def add_node(self, parent, name, _type, **kwargs):
+      """
+      Add a node the deps graph
+      
+      @param parent the subservice of which added node will be a dep
+      @param name the key/name of the added subservice
+      @param _type the type of subservice (see self.get_node_type)
+      @param kwargs extra special args 
+             (hypervisor for vm, framework for kb)
+      
+      """
+      parent.add_node(name, self.get_node_type(_type), **kwargs)
       self._update_graph_changed_timestamp()
       
-   def remove_vm(self, name):
-      self.root.remove_vm(name)
+   def remove_node(self, parent, name, _type):
+      parent.remove_node(name, self.get_node_type(_type))
       self._update_graph_changed_timestamp()
-      # do not remove, keep monitoring
-      #pass
-   def remove_kbnet(self, name):
-      self.root.remove_kbnet(name)
-      self._update_graph_changed_timestamp()
-      # do not remove, keep monitoring
-      #pass
       
    def update_health(self):
       self._update_dependency_graph()
@@ -202,6 +213,16 @@ class Subservice():
       self.health_score = 100
       self.symptoms = self.engine.get_symptoms(self)
       self._update_graph_changed_timestamp()
+      
+   def add_node(self, name, _type, **kwargs):
+      self.dependencies.append(_type(name, self.engine, parent=self, **kwargs))
+      
+   def remove_node(self, name, _type):
+      for i, subservice in enumerate(self.dependencies):
+         if isinstance(subservice, _type) and subservice.name == name:
+            subservice.del_metrics()
+            del self.dependencies[i]
+            break      
       
    def _update_graph_changed_timestamp(self):
       self.dependency_graph_changed = str(time.time())
@@ -777,23 +798,6 @@ class Node(Subservice):
    def __init__(self, name, engine, parent=None):
       super(Node, self).__init__("node", name, engine, parent=parent)
       self.dependencies = [Baremetal("", self.engine, parent=self)]
-      
-   def add_vm(self, name, hypervisor):
-      self.dependencies.append(VM(name, self.engine, hypervisor, parent=self))
-   def add_kbnet(self, name, framework):
-      self.dependencies.append(KBNet(name, self.engine, framework, parent=self))
-   def remove_vm(self, name):
-      for i, subservice in enumerate(self.dependencies):
-         if isinstance(subservice, VM) and subservice.name == name:
-            subservice.del_metrics()
-            del self.dependencies[i]
-            break
-   def remove_kbnet(self, name):
-      for i, subservice in enumerate(self.dependencies):
-         if isinstance(subservice, KBNet) and subservice.name == name:
-            subservice.del_metrics()
-            del self.dependencies[i]
-            break
 
    def _update_metrics(self):
       """

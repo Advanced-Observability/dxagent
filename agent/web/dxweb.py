@@ -103,7 +103,7 @@ class DXWeb(IOManager):
             node_data["data"]["grey"] = 10
          self.json_nodes.append(node_data)    
       
-      self.info(self.health_scores)
+      #self.info(self.health_scores)
       for fullpath in self.health_scores:
          path = fullpath.lstrip("/").split('/')
          insert_node(fullpath, path, nodes)   
@@ -111,7 +111,7 @@ class DXWeb(IOManager):
          path = self.path_to_nodes(fullpath.lstrip("/"))#fullpath.lstrip("/").split('/')
          fullpath = "/"+"/".join(path)
          insert_node(fullpath, path, nodes)     
-       #compound nodes
+      #compound nodes
       for cnode in compound_nodes:
          if not cnode:
             continue
@@ -188,6 +188,8 @@ class DXWeb(IOManager):
             self.actives[path_str.replace("/active","")] = val
          else:
             self.nodes.add("/".join(path_str.split('/')[:-1]))
+      self.info(self.symptoms)
+      self.info(self.health_scores)
             
    def fetch_data(self):
       for response in self.gnmi_client.subscribe(xpath=["/health", "/symptoms", "/metrics"]):
