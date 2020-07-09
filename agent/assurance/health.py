@@ -141,21 +141,10 @@ class HealthEngine():
       # 2. interfaces
       # 2.a bm interfaces
       parent = self.get_node(root_path+"/bm/net")
-      monitored_bm_ifs=set(self._data["net/dev"].keys())
-      bm_ifs=set(self._data["/node/bm/net/if"].keys())
-      
-      for net in monitored_bm_ifs-bm_ifs:
-         node = self.get_node(root_path+"/bm/net/if[name={}]".format(net))
-         if node: # node is back active
-            node.active = True
-         else: # node not found, create it
-            self._data["/node/bm/net/if"][net] = self._init_metrics_rb("if")
-            self.add_node(parent, net, "if")
-      for net in bm_ifs-monitored_bm_ifs:
-         #del self._data["/node/bm/net/if"][net]
-         node = self.get_node(root_path+"/bm/net/if[name={}]".format(net))
-         node.active = False
-      
+      current=set(self._data["net/dev"].keys())
+      previous=set(self._data["/node/bm/net/if"].keys())
+      self._update_childs(previous, current, parent, "if")
+
       # 2.b vm interfaces
       for vm in vms:
          parent = self.get_node(root_path+"/vm[name={}]".format(vm))
@@ -176,19 +165,7 @@ class HealthEngine():
       previous=set(self._data["/node/bm/disks"].keys())
       current=set(list(self._data["diskstats"].keys())
                   +list(self._data["swaps"].keys()))
-      # add new disks
-      for disk in current-previous:
-         node = self.get_node(root_path+"/bm/disks/disk[name={}]".format(disk))
-         if node: # node is back active
-            node.active = True
-         else: # node not found, create it
-            self._data["/node/bm/disks"][disk] = self._init_metrics_rb("disk")
-            self.add_node(parent, disk, "disk")
-      # remove unmounted disks
-      for disk in previous-current:
-         #del self._data["/node/bm/disks"][disk]
-         node = self.get_node(root_path+"/bm/disks/disk[name={}]".format(disk))
-         node.active = False
+      self._update_childs(previous, current, parent, "disk")
             
       # 4. sensors
       parent = self.get_node(root_path+"/bm/sensors")
@@ -200,19 +177,7 @@ class HealthEngine():
        + [k+":"+d["label"]._top() for k,d in self._data["sensors/fans"].items()]
        + [k+":"+d["label"]._top() for k,d in self._data["sensors/coretemp"].items()]
       )
-      # add new sensor
-      for sensor in current-previous:
-         node = self.get_node(root_path+"/bm/sensors/sensor[name={}]".format(sensor))
-         if node: 
-            node.active = True
-         else: 
-            self._data["/node/bm/sensors"][sensor] = self._init_metrics_rb("sensor")
-            self.add_node(parent, sensor, "sensor")
-      # remove unmounted sensor
-      for sensor in previous-current:
-         #del self._data["/node/bm/sensors"][sensor]
-         node = self.get_node(root_path+"/bm/sensors/sensor[name={}]".format(sensor))
-         node.active = False      
+      self._update_childs(previous, current, parent, "sensor")
       
       # 5. cpus (they are dynamic if agent is ran in vm)
       parent = self.get_node(root_path+"/bm/cpus")
@@ -221,30 +186,24 @@ class HealthEngine():
       
       previous=set(self._data["/node/bm/cpus"].keys())
       current=set(self._data["stat/cpu"].keys())
-      #self._update_childs(previous, current, parent+"/bm/cpus", "cpu")
-      for cpu in current-previous:
-         node = self.get_node(root_path+"/bm/cpus/cpu[name={}]".format(cpu))
-         if node: 
-            node.active = True
-         else: 
-            self._data["/node/bm/cpus"][cpu] = self._init_metrics_rb("cpu")
-            self.add_node(parent, cpu, "cpu")
-      for cpu in previous-current:
-         #del self._data["/node/bm/cpus"][cpu]
-         node = self.get_node(root_path+"/bm/cpus/cpu[name={}]".format(cpu))
-         node.active = False
+      self._update_childs(previous, current, parent, "cpu")
 
-   def _update_childs(self, previous, current, parent_path, _type):
+   def _update_childs(self, previous, current, parent, _type):
+      """
+      Compute difference between previous and current childs of type _type
+      of node parent, and modify dependencies accordingly
+      """
       for label in current-previous:
-         node = self.get_node(parent_path+"/"+_type+"[name={}]".format(label))
+         node = self.get_node(parent.path+"/"+_type+"[name={}]".format(label))
          if node: 
             node.active = True
          else: 
-            self._data[parent_path][label] = self._init_metrics_rb(_type)
+            path = parent.path+"/if" if _type == "if" else parent.path
+            self._data[path][label] = self._init_metrics_rb(_type)
             self.add_node(parent, label, _type)
       for label in previous-current:
          #del self._data[parent_path][cpu]
-         node = self.get_node(parent_path+"/"+_type+"[name={}]".format(label))
+         node = self.get_node(parent.path+"/"+_type+"[name={}]".format(label))
          node.active = False
          
    def _init_metrics_rb(self, subservice):
