@@ -187,7 +187,7 @@ class DXAgentExporter():
       @return True if node comes before an indexed node
       
       """
-      _before_indexed = ["vm", "kb", "cpu", "if", "sensors", "disks"]
+      _before_indexed = ["vm", "kb", "cpus", "if", "sensors", "disks"]
       if node in _before_indexed:
          return True
       for before_indexed in _before_indexed:
