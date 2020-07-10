@@ -793,9 +793,11 @@ class Subservice():
       """
       # non interface-related fields
       for field, rb in self._data["snmp"].items():
-         self._data["/node/bm/net"]["snmp_"+field].append(rb._top())
+         metric_name = "snmp_"+field
+         if metric_name not in self._data["/node/bm/net"]:
+            continue
+         self._data["/node/bm/net"][metric_name].append(rb._top())
          
-
    def _update_metrics_linux_vm_cpus(self):
       """Update metrics for linux VM cpu subservice
 
