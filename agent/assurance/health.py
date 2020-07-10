@@ -14,6 +14,8 @@ import itertools
 import time
 import json
 import re
+import statistics
+import math
 
 from agent.core.rbuffer import init_rb_dict, Severity
 from agent.input.sysinfo import SysInfo
@@ -195,7 +197,7 @@ class HealthEngine():
          if node: 
             node.active = True
          else: 
-            path = "{}/{}".format(parent.path,_type)#parent.path+"/if" if _type == "if" else parent.path
+            path = "{}/{}".format(parent.path,_type)
             self._data[path][label] = self._init_metrics_rb(_type)
             self.add_node(parent, label, _type)
       for label in previous-current:
@@ -255,7 +257,6 @@ class HealthEngine():
    def walk(self, current):
       self.info("path: {} fullname: {} score:{}".format(
                current.path, current.fullname, current.health_score))
-      #self.info("+".join([s.name for s in current.symptoms]))
       for dep in current.dependencies:
          self.walk(dep)
          
@@ -272,7 +273,8 @@ class HealthEngine():
       
 class Subservice():
    """
-   
+   Base class that represents a subservice in the dependency graph.
+   It is responsible of dependencies, symptoms and health scores.
    """
    def __init__(self, _type, name, engine,
                 parent=None, impacting=True):
@@ -452,6 +454,28 @@ class Subservice():
       subservice cleanup, overload in child if needed.
       """
       pass
+   def propagate_scores(self, deps_scores, method="quadratic-mean"):
+      """
+      propagate scores from dependencies to parent node
+      """
+      score = 100
+      if not deps_scores:
+         return score
+      if method == "malus":
+         for dep_score in deps_scores:
+            malus = 100-dep_score
+            score -= malus
+      elif method == "mean":
+         score = round(statistics.mean(deps_scores))
+      elif method == "geometric-mean":
+         score = round(statistics.geometric_mean(deps_scores))
+      elif method == "harmonic-mean":
+         score = round(statistics.harmonic_mean(deps_scores))
+      elif method == "quadratic-mean":
+         squares = [dep_score*dep_score for dep_score in deps_scores]
+         score = round(math.sqrt(statistics.mean(squares)))
+      return max(score, 0)
+      
    def update_symptoms(self):
       """
       bottom-up check of symptoms and update of health score
@@ -463,15 +487,17 @@ class Subservice():
       self.health_score = 100
       self.positive_symptoms = []
       positives, health_scores = [], {}
+      
       # update symptoms&health_score from deps
+      deps_scores = []
       for subservice in self.dependencies:
          p, hs = subservice.update_symptoms()
          positives.extend(p)
          health_scores.update(hs)
-         if subservice.impacting:
-            subservice_malus = 100-subservice.health_score
-            self.health_score = max(0,self.health_score-subservice_malus)
-         
+         if subservice.impacting and subservice.active:
+            deps_scores.append(subservice.health_score)
+      self.health_score = self.propagate_scores(deps_scores)
+      
       # update for node
       for symptom in self.symptoms:
          result = symptom.check(self._data)

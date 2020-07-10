@@ -9,11 +9,11 @@ var graph_data = {
         'content': "data(name)",    
         'pie-size': '80%',
         'pie-1-background-color': '#E8747C',
-        'pie-1-background-size': 'mapData(red, 0, 10, 0, 100)',
+        'pie-1-background-size': 'data(red)',//'mapData(red, 0, 10, 0, 100)',
         'pie-2-background-color': '#74E883',
-        'pie-2-background-size': 'mapData(green, 0, 10, 0, 100)',
+        'pie-2-background-size': 'data(green)',//'mapData(green, 0, 10, 0, 100)',
         'pie-3-background-color': '#808080',
-        'pie-3-background-size': 'mapData(grey, 0, 10, 0, 100)',
+        'pie-3-background-size': 'data(grey)',//'mapData(grey, 0, 10, 0, 100)',
         'text-wrap': 'wrap',
       })
     .selector('edge')

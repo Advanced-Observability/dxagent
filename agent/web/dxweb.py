@@ -96,10 +96,10 @@ class DXWeb(IOManager):
          if is_active:
             health = self.health_scores.get(fullpath,100)
             node_data["data"]["name"] += " \nhealth: {}%".format(health)
-            node_data["data"]["red"] = int((100-health)/10)
-            node_data["data"]["green"] = int(health/10)
+            node_data["data"]["red"] = 100-health#int((100-health)/10)
+            node_data["data"]["green"] = health#int(health/10)
          else:
-            node_data["data"]["grey"] = 10
+            node_data["data"]["grey"] = 100
          self.json_nodes.append(node_data)    
 
       for fullpath in self.health_scores:
