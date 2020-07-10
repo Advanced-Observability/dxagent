@@ -51,7 +51,6 @@ class DXWeb(IOManager):
          """
          insert node in graph
          """
-         #self.info(fullpath)
          prev=None
          path = []
          for node in node_list:
@@ -107,7 +106,7 @@ class DXWeb(IOManager):
          path = fullpath.lstrip("/").split('/')
          insert_node(fullpath, path, nodes)   
       for fullpath in self.nodes:
-         path = self.path_to_nodes(fullpath.lstrip("/"))#fullpath.lstrip("/").split('/')
+         path = self.path_to_nodes(fullpath.lstrip("/"))
          fullpath = "/"+"/".join(path)
          insert_node(fullpath, path, nodes)     
       #compound nodes
@@ -125,7 +124,6 @@ class DXWeb(IOManager):
       """
       a node is active if itself and all its parents/ancestors are active
       """
-      self.info(fullpath)
       elements = fullpath.lstrip("/").split('/')
       for i in range(len(elements)):
          subpath = "/".join(elements[:i+1])

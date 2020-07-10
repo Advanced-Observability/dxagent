@@ -288,7 +288,7 @@ class DXTop(IOManager):
       path = path.replace("node","node[name={}]".format(self.sysinfo.node))
       path = path.replace("vm","vm[name={}]".format(index))
       path = path.replace("kb","kb[name={}]".format(index))
-      self.info(path)
+      #self.info(path)
       return path      
       
    def _root_health_score(self, path):      
@@ -403,8 +403,21 @@ class DXTop(IOManager):
 
          s = " "*self.col_sizes[0]+VLINE_CHAR
          flags = [(len(s), curses.A_DIM)]
-         substitle = k
-         s +=  (substitle+" "*self.col_sizes[1])[:self.col_sizes[1]]
+         subtitle = k
+         if health:
+            subs = subtitle[:self.col_sizes[1]]
+            if len(subs) <= self.col_sizes[1]:
+               flags.append((len(s)+len(subs), 0))
+            subs += " health:"
+            if len(subs) <= self.col_sizes[1]:
+               flags.append((len(s)+len(subs),
+                           curses.A_BOLD|curses.color_pair(self.health_colors[score])))
+            ipath = self._indexed_path(category)
+            key = "{}[name={}]".format(ipath, k)
+            score = self._data["health_scores"][key]
+            subs += str(score)
+            subtitle = subs
+         s +=  (subtitle+" "*self.col_sizes[1])[:self.col_sizes[1]]
          flags.append((len(s), 0))
          s += VLINE_CHAR
          self._append_content(s, pad_index, fill=True, flags=flags)
