@@ -93,7 +93,7 @@ class DXWeb(IOManager):
 #         
 #         self.info("id: {} parent: {}".format(node_data["data"]["id"],
 #                                             node_data["data"]["parent"]))
-         is_active = self.actives.get(fullpath, True)
+         is_active = self.is_active(fullpath)
          if is_active:
             health = self.health_scores.get(fullpath,100)
             node_data["data"]["name"] += " \nhealth: {}%".format(health)
@@ -120,6 +120,18 @@ class DXWeb(IOManager):
                                    "green":0,
                                    "grey":0,
                                     }})
+                                    
+   def is_active(self, fullpath):
+      """
+      a node is active if itself and all its parents/ancestors are active
+      """
+      self.info(fullpath)
+      elements = fullpath.lstrip("/").split('/')
+      for i in range(len(elements)):
+         subpath = "/".join(elements[:i+1])
+         if not self.actives.get("/"+subpath, True):
+            return False
+      return True
           
    def path_to_nodes(self, path):
    
@@ -186,14 +198,14 @@ class DXWeb(IOManager):
             self.symptoms[path_str] = symptoms
          elif "active" in path_str and "/bm/mem" not in path_str:
             self.actives[path_str.replace("/active","")] = val
-         else:
-            self.nodes.add("/".join(path_str.split('/')[:-1]))
+         #else:
+         #   self.nodes.add("/".join(path_str.split('/')[:-1]))
             
    def fetch_data(self):
       """
       Fetch data from dxagent through gNMI
       """
-      for response in self.gnmi_client.subscribe(xpath=["/health", "/symptoms"]):
+      for response in self.gnmi_client.subscribe(xpath=["/health", "/symptoms", "/metrics"]):
          self.parse_subscribe_response(response)
          
    def gnmi_read_loop(self):
