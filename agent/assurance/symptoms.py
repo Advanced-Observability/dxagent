@@ -11,6 +11,7 @@ import ast
 import operator
 import hashlib
 import time
+import sys
 
 class RuleException(Exception):
    """
@@ -75,9 +76,15 @@ class Symptom():
             # only if parent is not a func
             if node.id.startswith("_"):
                return node
-            return ast.Call(func=ast.Name(id="access", ctx=node.ctx),
-                            args=[ast.Constant(value=node.id)],
-                            keywords=[])
+            if sys.version_info.minor >= 8:
+               return ast.Call(func=ast.Name(id="access", ctx=node.ctx),
+                               args=[ast.Constant(value=node.id)],
+                               keywords=[])
+            else:
+               return ast.Call(func=ast.Name(id="access", ctx=node.ctx),
+                               args=[ast.NameConstant(value=node.id)],
+                               keywords=[])
+             
 
       # 1. string-level replacement
       self._raw_rule = self.rule
