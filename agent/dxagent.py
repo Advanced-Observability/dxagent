@@ -103,9 +103,9 @@ class DXAgent(Daemon, IOManager):
 
       self.vm_watcher.exit()
       self.vpp_watcher.exit()
-
-      self.sbuffer.unlink()
-      del self.sbuffer
+      if not self.args.disable_shm:
+         self.sbuffer.unlink()
+         del self.sbuffer
 
    def run(self):
       """

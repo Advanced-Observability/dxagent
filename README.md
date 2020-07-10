@@ -79,7 +79,7 @@ symptoms from DxAgent.
 
 ### Python
 
-- python >= 3.8
+python >= 3.8 to have dxtop available, otherwise python >= 3.5.
 
 ### Libs
 

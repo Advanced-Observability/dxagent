@@ -50,10 +50,11 @@ class DXAgentServicer(gNMIServicer):
    def _capabilitiesResponse(self):
       response = gnmi_pb2.CapabilityResponse()
       supModel = gnmi_pb2.ModelData(name="ietf-service-assurance",
-                  organization="My Company Inc", version="1.0")
-      response.supported_models.extend([supModel])
-      response.supported_encodings.extend(gnmi_pb2.JSON)
-      response.gNMI_version = "GNMI Version 1.0"
+                  organization="IETF", version="1.0")
+      supModel2 = gnmi_pb2.ModelData(name="dxagent-internal",
+                  organization="uliege", version="1.0")
+      response.supported_models.extend([supModel, supModel2])
+      response.gNMI_version = "0.7.0"
        
       return response
     

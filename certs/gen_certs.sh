@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Derived from https://www.cisco.com/c/en/us/td/docs/ios-xml/ios/prog/configuration/1612/b_1612_programmability_cg/grpc_network_management_interface.html#id_89031
 
-CERT_BASE="certs"
+CERT_BASE="."
 
 if [ -z $1 ] || [ -z $2 ]; then
     echo "Usage: gen_certs.sh <server_hostname> <ip> [<password>]"

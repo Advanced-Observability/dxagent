@@ -60,6 +60,8 @@ class IOManager():
                          help='configuration file location')
       parser.add_argument('-l' , '--log-file', type=str, default="dxweb.log",
                          help='log file location (default: dxweb.log)')
+      parser.add_argument('-t' , '--target', type=str, default=None,
+                         help='gNMI target(default from dxagent.ini)')
       parser.add_argument('-k' , '--certs-dir', type=str,
                          default="./certs/",
                          help='certificate/key files location')    
@@ -135,7 +137,10 @@ class IOManager():
          sys.exit(1)
          
       # parse gnmi target url
-      self.gnmi_target = self.config["gnmi"].get("target")    
+      if self.args.target:
+         self.gnmi_target = self.args.target
+      else:
+         self.gnmi_target = self.config["gnmi"].get("target")    
       return self.config     
          
    def configuration_dxagent(self):
