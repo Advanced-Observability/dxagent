@@ -77,12 +77,9 @@ class HealthEngine():
       Return a list of newly instantiated symptoms for given node
       
       """
-      symptoms = []
-      for args in self._symptoms_args:
-         # XXX: remove /if bit when adding single if nodes
-         if args[1] == node.path:#.rstrip("/if") or args[1] == node.path+"/if":
-            symptoms.append(Symptom(*args, node=node))
-      return symptoms
+      return [Symptom(*args, node=node) for args
+              in self._symptoms_args 
+              if args[1] == node.path]
       
    def _read_metrics_file(self):
       self.metrics_lookup = {}
@@ -160,18 +157,18 @@ class HealthEngine():
       # 3. disks
       parent = self.get_node(root_path+"/bm/disks")
       # init metric rbs if needed
-      if "/node/bm/disks" not in self._data:
-         self._data["/node/bm/disks"] = {}
-      previous=set(self._data["/node/bm/disks"].keys())
+      if "/node/bm/disks/disk" not in self._data:
+         self._data["/node/bm/disks/disk"] = {}
+      previous=set(self._data["/node/bm/disks/disk"].keys())
       current=set(list(self._data["diskstats"].keys())
                   +list(self._data["swaps"].keys()))
       self._update_childs(previous, current, parent, "disk")
             
       # 4. sensors
       parent = self.get_node(root_path+"/bm/sensors")
-      if "/node/bm/sensors" not in self._data:
-         self._data["/node/bm/sensors"] = {}
-      previous=set(self._data["/node/bm/sensors"].keys())
+      if "/node/bm/sensors/sensor" not in self._data:
+         self._data["/node/bm/sensors/sensor"] = {}
+      previous=set(self._data["/node/bm/sensors/sensor"].keys())
       current=set(
          [k+":"+d["type"]._top() for k,d in self._data["sensors/thermal"].items()]
        + [k+":"+d["label"]._top() for k,d in self._data["sensors/fans"].items()]
@@ -181,10 +178,10 @@ class HealthEngine():
       
       # 5. cpus (they are dynamic if agent is ran in vm)
       parent = self.get_node(root_path+"/bm/cpus")
-      if "/node/bm/cpus" not in self._data:
-         self._data["/node/bm/cpus"] = {}
+      if "/node/bm/cpus/cpu" not in self._data:
+         self._data["/node/bm/cpus/cpu"] = {}
       
-      previous=set(self._data["/node/bm/cpus"].keys())
+      previous=set(self._data["/node/bm/cpus/cpu"].keys())
       current=set(self._data["stat/cpu"].keys())
       self._update_childs(previous, current, parent, "cpu")
 
@@ -198,7 +195,7 @@ class HealthEngine():
          if node: 
             node.active = True
          else: 
-            path = parent.path+"/if" if _type == "if" else parent.path
+            path = "{}/{}".format(parent.path,_type)#parent.path+"/if" if _type == "if" else parent.path
             self._data[path][label] = self._init_metrics_rb(_type)
             self.add_node(parent, label, _type)
       for label in previous-current:
@@ -554,13 +551,13 @@ class Subservice():
       cpu_label = self.name
       rbs = self._data["stat/cpu"].get(cpu_label)
       if rbs:
-         self._data["/node/bm/cpus"][cpu_label]["idle_time"].append(
+         self._data["/node/bm/cpus/cpu"][cpu_label]["idle_time"].append(
             rbs["idle_all_perc"]._top())
-         self._data["/node/bm/cpus"][cpu_label]["system_time"].append(
+         self._data["/node/bm/cpus/cpu"][cpu_label]["system_time"].append(
             rbs["system_all_perc"]._top())
-         self._data["/node/bm/cpus"][cpu_label]["user_time"].append(
+         self._data["/node/bm/cpus/cpu"][cpu_label]["user_time"].append(
             rbs["user_perc"]._top())
-         self._data["/node/bm/cpus"][cpu_label]["guest_time"].append(
+         self._data["/node/bm/cpus/cpu"][cpu_label]["guest_time"].append(
             rbs["guest_all_perc"]._top())      
 
    def _update_metrics_linux_bm_cpus(self):
@@ -578,34 +575,34 @@ class Subservice():
       # thermal zones
       rbs = self._data["sensors/thermal"].get(sensor_label)
       if rbs:
-         self._data["/node/bm/sensors"][sensor_label]["type"].append("zone")
+         self._data["/node/bm/sensors/sensor"][sensor_label]["type"].append("zone")
          attr_mapping = {"temperature": "input_temp",}
          for attr,metric in attr_mapping.items():
             if attr in rbs:
-               self._data["/node/bm/sensors"][sensor_label][metric].append(
+               self._data["/node/bm/sensors/sensor"][sensor_label][metric].append(
                  rbs[attr]._top())
         
       # fan sensors
       rbs = self._data["sensors/fans"].get(sensor_label)
       if rbs:
-         self._data["/node/bm/sensors"][sensor_label]["type"].append("fan")
+         self._data["/node/bm/sensors/sensor"][sensor_label]["type"].append("fan")
          attr_mapping = {"input": "input_fanspeed",
                          "temperature": "input_temp",}
          for attr,metric in attr_mapping.items():
             if attr in rbs:
-               self._data["/node/bm/sensors"][sensor_label][metric].append(
+               self._data["/node/bm/sensors/sensor"][sensor_label][metric].append(
                  rbs[attr]._top())
                  
       # core sensors
       rbs = self._data["sensors/coretemp"].get(sensor_label)
       if rbs:
-         self._data["/node/bm/sensors"][sensor_label]["type"].append("cpu")
+         self._data["/node/bm/sensors/sensor"][sensor_label]["type"].append("cpu")
          attr_mapping = {"input": "input_temp",
                          "max": "max_temp",
                          "critical": "critical_temp",}
          for attr,metric in attr_mapping.items():
             if attr in rbs:
-               self._data["/node/bm/sensors"][sensor_label][metric].append(
+               self._data["/node/bm/sensors/sensor"][sensor_label][metric].append(
                  rbs[attr]._top())
 
    def _update_metrics_linux_bm_sensors(self):
@@ -621,28 +618,28 @@ class Subservice():
       disk = self.name
       rbs  = self._data["diskstats"].get(disk)
       if rbs:
-         self._data["/node/bm/disks"][disk]["type"].append(
+         self._data["/node/bm/disks/disk"][disk]["type"].append(
             rbs["fs_vfstype"]._top())
-         self._data["/node/bm/disks"][disk]["total_user"].append(
+         self._data["/node/bm/disks/disk"][disk]["total_user"].append(
             rbs["total"]._top()/1000.0)
-         self._data["/node/bm/disks"][disk]["free_user"].append(
+         self._data["/node/bm/disks/disk"][disk]["free_user"].append(
             rbs["free_user"]._top()/1000.0)
-         self._data["/node/bm/disks"][disk]["read_time"].append(
+         self._data["/node/bm/disks/disk"][disk]["read_time"].append(
             rbs["perc_reading"]._top())
-         self._data["/node/bm/disks"][disk]["write_time"].append(
+         self._data["/node/bm/disks/disk"][disk]["write_time"].append(
             rbs["perc_writting"]._top())
-         self._data["/node/bm/disks"][disk]["io_time"].append(
+         self._data["/node/bm/disks/disk"][disk]["io_time"].append(
             rbs["perc_io"]._top())
-         self._data["/node/bm/disks"][disk]["discard_time"].append(
+         self._data["/node/bm/disks/disk"][disk]["discard_time"].append(
             rbs["perc_discarding"]._top())
 
       rbs = self._data["swaps"].get(disk)
       if rbs:
-         self._data["/node/bm/disks"][disk]["type"].append(
+         self._data["/node/bm/disks/disk"][disk]["type"].append(
             "swap")#rbs["type"]._top()
-         self._data["/node/bm/disks"][disk]["total_user"].append(
+         self._data["/node/bm/disks/disk"][disk]["total_user"].append(
             rbs["size"]._top()/1000.0)
-         self._data["/node/bm/disks"][disk]["swap_used"].append(
+         self._data["/node/bm/disks/disk"][disk]["swap_used"].append(
             rbs["used"]._top())
    def _update_metrics_linux_bm_disks(self):
       """Update metrics for linux BM disks subservice

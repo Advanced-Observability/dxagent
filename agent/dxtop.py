@@ -14,6 +14,7 @@ import datetime
 import os
 
 from agent.constants import *
+from agent.core.utils import remove_suffix
 from agent.core.ios import IOManager
 from agent.core.shareablebuffer import ShareableBuffer
 from agent.core.shareablebuffer import ShareableBufferException
@@ -244,12 +245,12 @@ class DXTop(IOManager):
          self._append_content(self._center_text(" "), 6)
 
       self._append_content(self._center_text("Metrics"), 6, curses.A_REVERSE)
-      self._format_attrs_list_rb_percpu("/node/bm/cpus", 6, health=True)
+      self._format_attrs_list_rb_percpu("/node/bm/cpus/cpu", 6, health=True)
       self._format_attrs_list_rb("/node/bm/net/if", 6, health=True)
-      self._format_attrs_list_rb("/node/bm/sensors", 6, health=True)
+      self._format_attrs_list_rb("/node/bm/sensors/sensor", 6, health=True)
       self._format_attrs_rb("/node/bm/mem", 6, health=True)
       self._format_attrs_rb("/node/bm/proc", 6, health=True)
-      self._format_attrs_list_rb("/node/bm/disks", 6, health=True)
+      self._format_attrs_list_rb("/node/bm/disks/disk", 6, health=True)
       self._format_attrs_rb("/node/bm/net", 6, health=True)
       
       if "/node/vm" in self._data:
@@ -281,14 +282,24 @@ class DXTop(IOManager):
       self.resize_columns()
       
    def _indexed_path(self, path, index=""):
+      """
+      add name missing from data path
+      """
       path = path.replace("node","node[name={}]".format(self.sysinfo.node))
       path = path.replace("vm","vm[name={}]".format(index))
       path = path.replace("kb","kb[name={}]".format(index))
+      self.info(path)
       return path      
       
    def _root_health_score(self, path):      
-      # XXX: 
-      path = path.replace("/if","")
+      # XXX:
+      #self.info(self._data["health_scores"]) 
+      #self.info(path)
+      
+      suffixes = ["/if", "/cpu", "/sensor", "/disk"]
+      for suffix in suffixes:
+         path = remove_suffix(path, suffix)
+      
       return self._data["health_scores"][path]
 
    def _format_attrs_rb(self, category, pad_index, extend_name=False,

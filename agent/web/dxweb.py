@@ -8,9 +8,9 @@ dxweb.py
 """
 
 from agent.constants import DXWEB_EMIT_PERIOD
+from agent.core.utils import remove_suffix
 from agent.core.ios import IOManager
 from agent.gnmi.client import DXAgentGNMIClient
-
 
 import threading
 import time
@@ -181,7 +181,7 @@ class DXWeb(IOManager):
          elif "symptoms" in path_str:
             split = path_str.split("/symptoms[name=")
             path_str = split[0]
-            name = split[1].rstrip("]/severity")
+            name = remove_suffix(split[1], "]/severity")
             symptoms = self.symptoms.get(path_str, "") +"<br>{} ({})".format(name, val)
             self.symptoms[path_str] = symptoms
          elif "active" in path_str and "/bm/mem" not in path_str:
@@ -193,7 +193,7 @@ class DXWeb(IOManager):
       """
       Fetch data from dxagent through gNMI
       """
-      for response in self.gnmi_client.subscribe(xpath=["/health", "/symptoms", "/metrics"]):
+      for response in self.gnmi_client.subscribe(xpath=["/health", "/symptoms"]):
          self.parse_subscribe_response(response)
          
    def gnmi_read_loop(self):
