@@ -7,10 +7,10 @@ dxweb.py
 
 """
 
-from agent.constants import DXWEB_EMIT_PERIOD
-from agent.core.utils import remove_suffix
-from agent.core.ios import IOManager
-from agent.gnmi.client import DXAgentGNMIClient
+from ..constants import DXWEB_EMIT_PERIOD
+from ..core.utils import remove_suffix
+from ..core.ios import IOManager
+from ..gnmi.client import DXAgentGNMIClient
 
 import threading
 import time

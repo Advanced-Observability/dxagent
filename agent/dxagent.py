@@ -10,18 +10,17 @@ dxagent.py
 import sched
 import time
 import signal
+import importlib
 
-import agent
-from agent.constants import AGENT_INPUT_PERIOD
-from agent.core.ios import IOManager
-from agent.core.daemon import Daemon
-from agent.core.shareablebuffer import ShareableBuffer
-from agent.input.sysinfo import SysInfo
-from agent.input.bm_input import BMWatcher
-from agent.input.vm_input import VMWatcher
-from agent.input.vpp_input import VPPWatcher
-from agent.assurance.health import HealthEngine
-from agent.gnmi.exporter import DXAgentExporter
+from .constants import AGENT_INPUT_PERIOD
+from .core.ios import IOManager
+from .core.daemon import Daemon
+from .input.sysinfo import SysInfo
+from .input.bm_input import BMWatcher
+from .input.vm_input import VMWatcher
+from .input.vpp_input import VPPWatcher
+from .assurance.health import HealthEngine
+from .gnmi.exporter import DXAgentExporter
 
 class DXAgent(Daemon, IOManager):
    """
@@ -52,8 +51,9 @@ class DXAgent(Daemon, IOManager):
       # SharedMemory with dxtop.
       # Drop privileges to avoid dxtop root requirements
       if not self.args.disable_shm:
+         mod = importlib.import_module("agent.core.shareablebuffer")     
          with self.drop():
-            self.sbuffer = ShareableBuffer(create=True)
+            self.sbuffer = getattr(mod, "ShareableBuffer")(create=True)
 
       # watchers.
       self.bm_watcher = BMWatcher(self._data, self.info, self)

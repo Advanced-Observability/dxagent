@@ -13,15 +13,15 @@ import time
 import datetime
 import os
 
-from agent.constants import *
-from agent.core.utils import remove_suffix
-from agent.core.ios import IOManager
-from agent.core.shareablebuffer import ShareableBuffer
-from agent.core.shareablebuffer import ShareableBufferException
-from agent.core.rbuffer import RingBuffer, Severity
-from agent.input.sysinfo import SysInfo
-from agent.input.vpp_input import vpp_support
-from agent.input.vm_input import hypervisors_support
+from .constants import *
+from .core.utils import remove_suffix
+from .core.ios import IOManager
+from .core.shareablebuffer import ShareableBuffer
+from .core.shareablebuffer import ShareableBufferException
+from .core.rbuffer import RingBuffer, Severity
+from .input.sysinfo import SysInfo
+from .input.vpp_input import vpp_support
+from .input.vm_input import hypervisors_support
 
 ESCAPE_CHAR=27
 ENTER_CHAR=10

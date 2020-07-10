@@ -92,10 +92,6 @@ symptoms from DxAgent.
 - [pyroute2](https://pypi.org/project/pyroute2/)
    - `python3 -m pip install pyroute2`
    
-- [yangson](https://pypi.org/project/yangson/)
-   - `python3 -m pip install yangson`
-   
-
 ### Optional Libs
 
 - [pyvbox](https://pypi.org/project/pyvbox/)

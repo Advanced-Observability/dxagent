@@ -17,10 +17,10 @@ import re
 import statistics
 import math
 
-from agent.core.rbuffer import init_rb_dict, Severity
-from agent.input.sysinfo import SysInfo
-from agent.constants import AGENT_INPUT_PERIOD
-from agent.assurance.symptoms import Symptom, RuleException
+from ..core.rbuffer import init_rb_dict, Severity
+from ..input.sysinfo import SysInfo
+from ..constants import AGENT_INPUT_PERIOD
+from .symptoms import Symptom, RuleException
 
 class Metric():
    def __init__(self, name, node, _type, unit, islist, counter):
