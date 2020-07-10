@@ -76,14 +76,10 @@ class Symptom():
             # only if parent is not a func
             if node.id.startswith("_"):
                return node
-            if sys.version_info.minor >= 8:
-               return ast.Call(func=ast.Name(id="access", ctx=node.ctx),
-                               args=[ast.Constant(value=node.id)],
-                               keywords=[])
-            else:
-               return ast.Call(func=ast.Name(id="access", ctx=node.ctx),
-                               args=[ast.NameConstant(value=node.id)],
-                               keywords=[])
+            # backward-compatible with <3.8
+            return ast.Call(func=ast.Name(id="access", ctx=node.ctx),
+                            args=[ast.Str(s=node.id)],
+                            keywords=[])
              
 
       # 1. string-level replacement

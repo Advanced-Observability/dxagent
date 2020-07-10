@@ -47,10 +47,11 @@ def vpp_support(api_sock='/run/vpp/api.sock',
    """
    indicates local support for VPP api&stats   
 
-   @return (vpp_api_supported, vpp_stats_supported)
+   @return (vpp_api_supported, vpp_stats_supported, vpp_gnmi_import_supported)
    """
    return ("vpp" in vpp_libs and os.path.exists(api_sock),
-           "vpp" in vpp_libs and os.path.exists(stats_sock))
+           "vpp" in vpp_libs and os.path.exists(stats_sock),
+           "gnmi" in vpp_libs)
 
 class VPPGNMIClient(threading.Thread):
    def __init__(self, node, info, data, user='a', password='a'):

@@ -836,12 +836,13 @@ class BMWatcher():
          "rx-vlan-stag-filter","l2-fwd-offload","hw-tc-offload",
          "esp-hw-offload","esp-tx-csum-hw-offload","rx-udp_tunnel-port-offload",
          "tls-hw-tx-offload","tls-hw-rx-offload","rx-gro-hw","tls-hw-record",
+         "tx-udp-fragmentation",
          
          # counters
          "carrier_down_count", "carrier_up_count", "carrier_changes",
       ] + attr_list_netdev
-      type_list = 37*[str] + 70*[int] + 27*[int]
-      counter_list = 107*[False] + 27*[True]
+      type_list = 37*[str] + 71*[int] + 27*[int]
+      counter_list = 108*[False] + 27*[True]
 
       gws = netifaces.gateways()
       active_ifs = []
@@ -1052,7 +1053,6 @@ class BMWatcher():
 
       @see ethtool.c from python3-ethtool
       """
-      #self._ethtool = pyroute2.Ethtool()
       getters = [("driver", ethtool.get_module), 
                  ("bus_info", ethtool.get_businfo),
                 # ("ufo", ethtool.get_ufo),
@@ -1106,8 +1106,6 @@ class BMWatcher():
       if_dict["portselect"].append((flags & ethtool.IFF_PORTSEL) != 0)
       if_dict["automedia"].append((flags & ethtool.IFF_AUTOMEDIA) != 0)
       if_dict["dynamic"].append((flags & ethtool.IFF_DYNAMIC) != 0)
-      
-      #self._ethtool.close()
 
    def _process_net_settings(self):
       """

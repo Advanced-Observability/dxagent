@@ -110,6 +110,7 @@ net/dev,tx-gso-partial,str,0,,if_name
 net/dev,tx-sctp-segmentation,str,0,,if_name
 net/dev,tx-esp-segmentation,str,0,,if_name
 net/dev,tx-udp-segmentation,str,0,,if_name
+net/dev,tx-udp-fragmentation,str,0,,if_name
 net/dev,tx-checksum-fcoe-crc,str,0,,if_name
 net/dev,tx-checksum-sctp,str,0,,if_name
 net/dev,fcoe-mtu,str,0,,if_name

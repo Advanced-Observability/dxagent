@@ -20,6 +20,8 @@ import math
 from ..core.rbuffer import init_rb_dict, Severity
 from ..input.sysinfo import SysInfo
 from ..constants import AGENT_INPUT_PERIOD
+from ..input.vpp_input import vpp_support
+from ..input.vm_input import hypervisors_support
 from .symptoms import Symptom, RuleException
 
 class Metric():
@@ -119,21 +121,23 @@ class HealthEngine():
       root_path = self.root.fullname
       
       # 1. update vms&kbs
-      vms = set(s.name for s in self.root.dependencies if isinstance(s, VM))
-      kbs = set(s.name for s in self.root.dependencies if isinstance(s, KBNet))
-      monitored_vms = set(self._data["virtualbox/vms"].keys())
-      monitored_kbs = set(self._data["vpp/gnmi"].keys())
-      # remove expired nodes
-      for vm in vms - monitored_vms:
-         #self.remove_node(self.root, vm, "vm")
-         # do not remove, keep it as inactive
-         pass
+      if hypervisors_support():
+         vms = set(s.name for s in self.root.dependencies if isinstance(s, VM))
+         monitored_vms = set(self._data["virtualbox/vms"].keys())
+         # remove expired nodes
+         for vm in vms - monitored_vms:
+            #self.remove_node(self.root, vm, "vm")
+            # do not remove, keep it as inactive
+            pass
+         for vm in monitored_vms - vms:
+            self.add_node(self.root, vm, "vm", hypervisor="virtualbox")
+         
+      kbs = set(s.name for s in self.root.dependencies if isinstance(s, KBNet))       
+      monitored_kbs = set(self._data["vpp/gnmi"].keys())       
       for kb in kbs - monitored_kbs:
          #self.remove_node(self.root, kb, "kb")
          # do not remove, keep it as inactive
          pass
-      for vm in monitored_vms - vms:
-         self.add_node(self.root, vm, "vm", hypervisor="virtualbox")
       for kb in monitored_kbs - kbs:
          self.add_node(self.root, kb, "kb", framework="vpp")
          
@@ -145,10 +149,11 @@ class HealthEngine():
       self._update_childs(previous, current, parent, "if")
 
       # 2.b vm interfaces
-      for vm in vms:
-         parent = self.get_node(root_path+"/vm[name={}]".format(vm))
-         vm_ifs = set()
-         monitored_vm_ifs = set()
+      if hypervisors_support():
+         for vm in vms:
+            parent = self.get_node(root_path+"/vm[name={}]".format(vm))
+            vm_ifs = set()
+            monitored_vm_ifs = set()
       
       # 2.c kb interfaces
       for kb in kbs:

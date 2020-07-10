@@ -64,7 +64,7 @@ class DXTop(IOManager):
          raise ShareableBufferException("ShareableBuffer not found")
 
       self.vbox_supported = hypervisors_support()
-      self.vpp_api_supported, self.vpp_stats_supported=vpp_support()
+      self.vpp_api_supported, self.vpp_stats_supported, self.vpp_gnmi_supported=vpp_support()
       
    def resize_columns(self):
       """
