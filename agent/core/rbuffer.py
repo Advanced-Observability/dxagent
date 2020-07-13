@@ -6,7 +6,7 @@ rbuffer.py
 @author: K.Edeline
 """
 
-import numpy as np
+import statistics
 import collections
 import threading
 from contextlib import contextmanager
@@ -194,9 +194,9 @@ class RingBuffer(collections.deque):
       
       try:
          if self.type == float:
-            return round(np.mean(self._tops(count)), 2)
+            return round(statistics.mean(self._tops(count)), 2)
          elif self.type == int:
-            return int(np.mean(self._tops(count)))
+            return int(statistics.mean(self._tops(count)))
          else:
             return 0
 
