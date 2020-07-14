@@ -522,10 +522,7 @@ class DXTop(IOManager):
 
             self._append_content(s, pad_index, flags, fill=True)
 
-         if cpu_count-i <= cpu_slice:
-            self._append_content(self.hline_bottom(self.col_sizes_cpu), pad_index)
-         else:
-            self._append_content(self.hline_x(self.col_sizes_cpu), pad_index)
+         self._append_content(self.hline_bottom(self.col_sizes_cpu), pad_index)
 
    def _format_colname_pad(self):
       self.colname_pad.clear()
