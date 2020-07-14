@@ -182,9 +182,17 @@ class Symptom():
          path = self.path
          
          if self.prefix:
-            prefix2=self.prefix
+            prefix2=self.prefix            
             if not metric.islist:
-               return IndexedVariable([(dev, b[path][var]) for dev,b in data[prefix2].items()])
+               ret = []
+               for dev,b in data[prefix2].items():
+                  # exception for double list in vm/kb
+                  if var in b[path]:
+                     ret.append((dev, b[path][var]))
+                  else:   
+                     ret.append((dev, b[path][self.node.name][var]))
+                  info("path:{} var:{} prefix:{} prefix2:{}".format(path,var,self.prefix,prefix2))
+               return IndexedVariable(ret)
             # double list
             ret=[]
             for dev,b in data[prefix2].items():

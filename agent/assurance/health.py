@@ -134,7 +134,7 @@ class HealthEngine():
          for vm in monitored_vms - vms:
             self.add_node(self.root, vm, "vm", hypervisor="virtualbox")
          
-      kbs = set(s.name for s in self.root.dependencies if isinstance(s, KBNet))       
+      kbs = set(s.name for s in self.root.dependencies if isinstance(s, KBNet))
       monitored_kbs = set(self._data["vpp/gnmi"].keys())
       # local vpp 
       if self.vpp_api_supported and "vpp/system" in self._data:
@@ -155,16 +155,41 @@ class HealthEngine():
 
       # 2.b vm interfaces
       if self.vbox_supported:
+         vms = set(s.name for s in self.root.dependencies if isinstance(s, VM))
          for vm in vms:
-            parent = self.get_node(root_path+"/vm[name={}]".format(vm))
-            vm_ifs = set()
-            monitored_vm_ifs = set()
-      
+            parent = self.get_node(root_path+"/vm[name={}]/net".format(vm))
+            previous = set(s.name for s in parent.dependencies) 
+            current = set()
+            prefixes = {}
+            net_count=(self._data["virtualbox/vms"][vm]
+                    ["/VirtualBox/GuestInfo/Net/Count"])._top()     
+            for net_index in range(net_count):
+               attr="/VirtualBox/GuestInfo/Net/{}/Name".format(net_index)
+               if_name=self._data["virtualbox/vms"][vm][attr]._top()
+               current.add(if_name)
+               prefixes[if_name] = ttr="/VirtualBox/GuestInfo/Net/{}".format(net_index)
+            
+            self._update_childs(previous, current, parent, "if",
+                                subdict=self._data["/node/vm"][vm])                    
+            # set internal prefixes
+            for if_name in current:
+               if if_name in previous:
+                  continue
+               if_node = self.get_node(root_path+"/vm[name={}]/net/if[name={}]".format(
+                              vm, if_name))
+               if_node._vbox_api_prefix = prefixes[if_name]
+            
       # 2.c kb interfaces
+      kbs = set(s.name for s in self.root.dependencies if isinstance(s, KBNet))       
       for kb in kbs:
-         parent = self.get_node(root_path+"/kb[name={}]".format(kb))
-         kb_ifs = set()
-         monitored_kb_ifs = set()
+         parent = self.get_node(root_path+"/kb[name={}]/net".format(kb))
+         previous = set(s.name for s in parent.dependencies) 
+         if kb == "localhost":
+            current = set(self._data["vpp/stats/if"].keys())
+         else:
+            current = set(self._data["vpp/gnmi"][kb]["net_if"])
+         self._update_childs(previous, current, parent, "if",
+                             subdict=self._data["/node/kb"][kb])
       
       # 3. disks
       parent = self.get_node(root_path+"/bm/disks")
@@ -196,22 +221,39 @@ class HealthEngine():
       previous=set(self._data["/node/bm/cpus/cpu"].keys())
       current=set(self._data["stat/cpu"].keys())
       self._update_childs(previous, current, parent, "cpu")
+      
+      # 5.a vm cpus
+      if self.vbox_supported:
+         for vm in vms:
+            parent = self.get_node(root_path+"/vm[name={}]/cpus".format(vm))
+            previous = set(s.name for s in parent.dependencies)
+            current = set()
+            if parent.parent.hypervisor == "virtualbox":
+               # the 'total' cpu
+               current.add("cpu") 
+            self._update_childs(previous, current, parent, "cpu",
+                                subdict=self._data["/node/vm"][vm])
 
-   def _update_childs(self, previous, current, parent, _type):
+   def _update_childs(self, previous, current, parent, _type, subdict=None):
       """
       Compute difference between previous and current childs of type _type
       of node parent, and modify dependencies accordingly
       """
+      if subdict:
+         data=subdict
+      else:
+         data=self._data
+      
       for label in current-previous:
          node = self.get_node(parent.path+"/"+_type+"[name={}]".format(label))
          if node: 
             node.active = True
          else: 
             path = "{}/{}".format(parent.path,_type)
-            self._data[path][label] = self._init_metrics_rb(_type)
+            data[path][label] = self._init_metrics_rb(_type)
             self.add_node(parent, label, _type)
       for label in previous-current:
-         #del self._data[parent_path][cpu]
+         #del data[parent_path][cpu]
          node = self.get_node(parent.path+"/"+_type+"[name={}]".format(label))
          node.active = False
          
@@ -263,12 +305,8 @@ class HealthEngine():
       self._update_dependency_graph()
       self.root.update_metrics()
       self._data["symptoms"], self._data["health_scores"] = self.root.update_symptoms()
-      
-   def walk(self, current):
-      self.info("path: {} fullname: {} score:{}".format(
-               current.path, current.fullname, current.health_score))
-      for dep in current.dependencies:
-         self.walk(dep)
+      #for node in self:
+      #   self.info(node)
          
    def __iter__(self, current=None):
       """
@@ -569,15 +607,6 @@ class Subservice():
       }
       return funcs[key]()
       
-   def _update_metrics_linux_vm_cpus_cpu(self):
-      pass
-
-   def _update_metrics_linux_vm_net_if(self):
-      pass
-      
-   def _update_metrics_linux_kb_net_if(self):
-      pass
-      
    def _update_metrics_linux_bm_cpus_cpu(self):
       """Update metrics for linux a BM cpu subservice
       
@@ -807,21 +836,21 @@ class Subservice():
       """
       vm_name=self.parent.name
       hypervisor=self.parent.hypervisor
-      cpu_label = "cpu"
-      
-      if "/node/vm/cpus" not in self._data["/node/vm"][vm_name]:
-         self._data["/node/vm"][vm_name]["/node/vm/cpus"] = {}
-         self._data["/node/vm"][vm_name]["/node/vm/cpus"][cpu_label] = self._init_metrics_rb("cpu")
-      
-      self._data["/node/vm"][vm_name]["/node/vm/cpus"][cpu_label]["cpu_count"].append(
-         self._data[hypervisor+"/vms"][vm_name]["cpu"]._top())
-      self._data["/node/vm"][vm_name]["/node/vm/cpus"][cpu_label]["user_time"].append(
-         self._data[hypervisor+"/vms"][vm_name]["Guest/CPU/Load/User"]._top())
-      self._data["/node/vm"][vm_name]["/node/vm/cpus"][cpu_label]["system_time"].append(
-         self._data[hypervisor+"/vms"][vm_name]["Guest/CPU/Load/Kernel"]._top())
-      self._data["/node/vm"][vm_name]["/node/vm/cpus"][cpu_label]["idle_time"].append(
-         self._data[hypervisor+"/vms"][vm_name]["Guest/CPU/Load/Idle"]._top())
    
+   def _update_metrics_linux_vm_cpus_cpu(self):
+      vm_name=self.parent.parent.name
+      hypervisor=self.parent.parent.hypervisor
+      cpu_label = self.name
+      
+      self._data["/node/vm"][vm_name]["/node/vm/cpus/cpu"][cpu_label]["cpu_count"].append(
+         self._data[hypervisor+"/vms"][vm_name]["cpu"]._top())
+      self._data["/node/vm"][vm_name]["/node/vm/cpus/cpu"][cpu_label]["user_time"].append(
+         self._data[hypervisor+"/vms"][vm_name]["Guest/CPU/Load/User"]._top())
+      self._data["/node/vm"][vm_name]["/node/vm/cpus/cpu"][cpu_label]["system_time"].append(
+         self._data[hypervisor+"/vms"][vm_name]["Guest/CPU/Load/Kernel"]._top())
+      self._data["/node/vm"][vm_name]["/node/vm/cpus/cpu"][cpu_label]["idle_time"].append(
+         self._data[hypervisor+"/vms"][vm_name]["Guest/CPU/Load/Idle"]._top())
+
    def _update_metrics_linux_vm_mem(self):
       """Update metrics for linux VM mem subservice
 
@@ -841,37 +870,32 @@ class Subservice():
       """
       vm_name=self.parent.name
       hypervisor=self.parent.hypervisor
-
-      # per-interface metrics
-      prefix="/VirtualBox/GuestInfo/Net/"
-      attrs_suffix = ["MAC", "V4/IP", "V4/Broadcast",
-                    "V4/Netmask", "Status"]
-      net_count=(self._data["virtualbox/vms"][vm_name]
-                          ["/VirtualBox/GuestInfo/Net/Count"])._top()
-      for net_index in range(net_count):
-         # add if if needed
-         attr="{}{}/Name".format(prefix, net_index)
-         if_name=self._data[hypervisor+"/vms"][vm_name][attr]._top()
-         if if_name not in self._data["/node/vm"][vm_name]["/node/vm/net/if"]:
-            self._data["/node/vm"][vm_name]["/node/vm/net/if"][if_name] = self._init_metrics_rb("if")
-         # translate data
-         for suffix in attrs_suffix:
-            # if status
-            attr="{}{}/Status".format(prefix, net_index)
-            self._data["/node/vm"][vm_name]["/node/vm/net/if"][if_name]["state"].append(
-               self._data[hypervisor+"/vms"][vm_name][attr]._top().lower())
-            # XXX: per-interface instead of total rate
-            attr="Net/Rate/Rx"
-            self._data["/node/vm"][vm_name]["/node/vm/net/if"][if_name]["rx_bytes"].append(
-               self._data[hypervisor+"/vms"][vm_name][attr]._top()/1000.0)
-            attr="Net/Rate/Tx"
-            self._data["/node/vm"][vm_name]["/node/vm/net/if"][if_name]["tx_bytes"].append(
-               self._data[hypervisor+"/vms"][vm_name][attr]._top()/1000.0)
             
       # global metrics
       self._data["/node/vm"][vm_name]["/node/vm/net"]["ssh"].append(
           self._data[hypervisor+"/vms"][vm_name]["accessible"]._top())
           
+   def _update_metrics_linux_vm_net_if(self):
+      vm_name=self.parent.parent.name
+      hypervisor=self.parent.parent.hypervisor
+      if_name=self.name
+   
+      # per-interface metrics
+      prefix=self._vbox_api_prefix
+      attrs_suffix = ["MAC", "V4/IP", "V4/Broadcast",
+                    "V4/Netmask", "Status"]
+      # translate data
+      for suffix in attrs_suffix:
+         attr="{}/Status".format(prefix)
+         self._data["/node/vm"][vm_name]["/node/vm/net/if"][if_name]["state"].append(
+            self._data[hypervisor+"/vms"][vm_name][attr]._top().lower())
+         # XXX: per-interface instead of total rate
+         attr="Net/Rate/Rx"
+         self._data["/node/vm"][vm_name]["/node/vm/net/if"][if_name]["rx_bytes"].append(
+            self._data[hypervisor+"/vms"][vm_name][attr]._top()/1000.0)
+         attr="Net/Rate/Tx"
+         self._data["/node/vm"][vm_name]["/node/vm/net/if"][if_name]["tx_bytes"].append(
+            self._data[hypervisor+"/vms"][vm_name][attr]._top()/1000.0)        
    def _update_metrics_linux_vm_proc(self):
       """Update metrics for linux VM proc subservice
 
@@ -934,50 +958,47 @@ class Subservice():
       self._data["/node/kb"][kb_name]["/node/kb/mem"]["buffer_cache"].append(buffer_cache)
       
    def _update_metrics_linux_kb_net(self):
+      pass
+      
+   def _update_metrics_linux_kb_net_if(self):
       """Update metrics for linux KB net subservice
 
       """
-      kb_name=self.parent.name
-      framework=self.parent.framework
+      kb_name=self.parent.parent.name
+      framework=self.parent.parent.framework
+      if_name=self.name
       
       # vpp/local
       if kb_name == "localhost":
-         for if_name, d in self._data["vpp/stats/if"].items():
-            # create interface entry if needed
-            if if_name not in self._data["/node/kb"][kb_name]["/node/kb/net/if"]:
-               self._data["/node/kb"][kb_name]["/node/kb/net/if"][if_name] = self._init_metrics_rb("if")    
-            metric_dict = self._data["/node/kb"][kb_name]["/node/kb/net/if"][if_name]
-            md_dict = self._data["vpp/stats/if"][if_name]
+  
+         metric_dict = self._data["/node/kb"][kb_name]["/node/kb/net/if"][if_name]
+         md_dict = self._data["vpp/stats/if"][if_name]
 
-            metric_dict["vector_rate"].append(
-               self._data["vpp/stats/sys"][kb_name]["/sys/vector_rate"]._top())
-            metric_dict["rx_packets"].append(md_dict["/if/rx-packets"]._top())
-            metric_dict["rx_bytes"].append(md_dict["/if/rx-bytes"]._top()/1000000.0)
-            metric_dict["rx_error"].append(md_dict["/if/rx-error"]._top())
-            metric_dict["rx_drop"].append(md_dict["/if/rx-miss"]._top())
-            metric_dict["tx_packets"].append(md_dict["/if/tx-packets"]._top())
-            metric_dict["tx_bytes"].append(md_dict["/if/tx-bytes"]._top()/1000000.0)
-            metric_dict["tx_error"].append(md_dict["/if/tx-error"]._top())
+         metric_dict["vector_rate"].append(
+            self._data["vpp/stats/sys"]["/sys/vector_rate"]._top())
+         metric_dict["rx_packets"].append(md_dict["/if/rx-packets"]._top())
+         metric_dict["rx_bytes"].append(md_dict["/if/rx-bytes"]._top()/1000000.0)
+         metric_dict["rx_error"].append(md_dict["/if/rx-error"]._top())
+         metric_dict["rx_drop"].append(md_dict["/if/rx-miss"]._top())
+         metric_dict["tx_packets"].append(md_dict["/if/tx-packets"]._top())
+         metric_dict["tx_bytes"].append(md_dict["/if/tx-bytes"]._top()/1000000.0)
+         metric_dict["tx_error"].append(md_dict["/if/tx-error"]._top())
                     
       # vpp/gNMI
       else: 
-         for if_name, d in self._data[framework+"/gnmi"][kb_name]["net_if"].items():
-            # create interface entry if needed
-            if if_name not in self._data["/node/kb"][kb_name]["/node/kb/net/if"]:
-               self._data["/node/kb"][kb_name]["/node/kb/net/if"][if_name] = self._init_metrics_rb("if")
-            metric_dict = self._data["/node/kb"][kb_name]["/node/kb/net/if"][if_name]
-            md_dict = self._data[framework+"/gnmi"][kb_name]["net_if"][if_name]
-            
-            metric_dict["vector_rate"].append(
-               self._data[framework+"/gnmi"][kb_name]["/sys/vector_rate"]._top())
-            metric_dict["rx_packets"].append(md_dict["/if/rx/T0/packets"]._top())
-            metric_dict["rx_bytes"].append(md_dict["/if/rx/T0/bytes"]._top()/1000000.0)
-            metric_dict["rx_error"].append(md_dict["/if/rx-error/T0"]._top())
-            metric_dict["rx_drop"].append(md_dict["/if/rx-miss/T0"]._top())  
-            metric_dict["tx_packets"].append(md_dict["/if/tx/T0/packets"]._top())
-            metric_dict["tx_bytes"].append(md_dict["/if/tx/T0/bytes"]._top()/1000000.0)
-            metric_dict["tx_error"].append(md_dict["/if/tx-error/T0"]._top())
-            #metric_dict["tx_drop"].append(md_dict["/if/tx/T0/packets"]._top())
+         metric_dict = self._data["/node/kb"][kb_name]["/node/kb/net/if"][if_name]
+         md_dict = self._data[framework+"/gnmi"][kb_name]["net_if"][if_name]
+         
+         metric_dict["vector_rate"].append(
+            self._data[framework+"/gnmi"][kb_name]["/sys/vector_rate"]._top())
+         metric_dict["rx_packets"].append(md_dict["/if/rx/T0/packets"]._top())
+         metric_dict["rx_bytes"].append(md_dict["/if/rx/T0/bytes"]._top()/1000000.0)
+         metric_dict["rx_error"].append(md_dict["/if/rx-error/T0"]._top())
+         metric_dict["rx_drop"].append(md_dict["/if/rx-miss/T0"]._top())  
+         metric_dict["tx_packets"].append(md_dict["/if/tx/T0/packets"]._top())
+         metric_dict["tx_bytes"].append(md_dict["/if/tx/T0/bytes"]._top()/1000000.0)
+         metric_dict["tx_error"].append(md_dict["/if/tx-error/T0"]._top())
+         #metric_dict["tx_drop"].append(md_dict["/if/tx/T0/packets"]._top())
          
    def _update_metrics_macos_bm_cpu(self):
       pass
@@ -1035,6 +1056,7 @@ class VM(Subservice):
       # init metrics for non-list RBs
       self._data["/node/vm"][self.name] = {}
       self._data["/node/vm"][self.name]["/node/vm"] = self._init_metrics_rb("vm")
+      self._data["/node/vm"][self.name]["/node/vm/cpus/cpu"] = {}
       self._data["/node/vm"][self.name]["/node/vm/net/if"] = {}
       self._data["/node/vm"][self.name]["/node/vm/proc"] = self._init_metrics_rb("proc")
       self._data["/node/vm"][self.name]["/node/vm/net"] = self._init_metrics_rb("net")
@@ -1081,7 +1103,10 @@ class KBNet(Subservice):
       kb_name=self.name
       framework=self.framework
       
-      self.active = self._data[framework+"/gnmi"][kb_name]["status"]._top() == "synced"
+      if kb_name == "localhost":
+         self.active = True
+      else:
+         self.active = self._data[framework+"/gnmi"][kb_name]["status"]._top() == "synced"
       self._data["/node/kb"][kb_name]["/node/kb"]["active"].append(self.active)
 
    def del_metrics(self):

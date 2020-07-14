@@ -384,7 +384,6 @@ class VPPWatcher():
       """  
 
       attr_names = ['cached', 'used', 'available']
-
       # init system stats
       for k,d in self.stats.dump(self._dir_sys).items():         
          self._data["vpp/stats/sys"][k].append(d)
@@ -392,7 +391,6 @@ class VPPWatcher():
       # numa stats (per numa node ?)
       attr_names = ['cached', 'used', 'available']
       for k,d in self.stats.dump(self._dir_buffer_pool).items():
-
          # create entry if needed
          numa_node, field_name = k.split('/')[2:4]
          self._data["vpp/stats/buffer-pool"].setdefault(numa_node, 
@@ -411,7 +409,6 @@ class VPPWatcher():
          # create entry if needed
          self._data["vpp/stats/workers"].setdefault(i, 
                   init_rb_dict(attr_names, types=attr_types))
-
          for k,d in self.stats.dump(self._dir_workers).items():
             self._data["vpp/stats/workers"][i][k].append(d)
 

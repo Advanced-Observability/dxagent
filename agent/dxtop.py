@@ -256,13 +256,13 @@ class DXTop(IOManager):
       if "/node/vm" in self._data:
          for vm_name in self._data["/node/vm"]:
             vm_dict = self._data["/node/vm"][vm_name]
-            skip = ["/node/vm/net/if", "/node/vm/cpus"]
+            skip = ["/node/vm/net/if", "/node/vm/cpus/cpu"]
             for subservice in vm_dict:
                if subservice in skip:
                   continue
                self._format_attrs_rb(subservice, 6, subdict=vm_dict,
                                      health=True, health_index=vm_name)
-            self._format_attrs_list_rb("/node/vm/cpus", 6, subdict=vm_dict,
+            self._format_attrs_list_rb("/node/vm/cpus/cpu", 6, subdict=vm_dict,
                                               health=True, health_index=vm_name)
             self._format_attrs_list_rb("/node/vm/net/if", 6, subdict=vm_dict,
                                         health=True, health_index=vm_name)
@@ -410,7 +410,7 @@ class DXTop(IOManager):
                flags.append((len(s)+len(subs), 0))
             subs += " health:"
 
-            ipath = self._indexed_path(category)
+            ipath = self._indexed_path(category, index=health_index)
             key = "{}[name={}]".format(ipath, k)
             score = self._data["health_scores"][key]
             if len(subs) <= self.col_sizes[1]:
