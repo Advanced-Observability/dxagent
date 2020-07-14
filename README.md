@@ -45,6 +45,8 @@ See agent/gnmi/README.md
 
 DxTop is a console app that displays data collected by DxAgent.
 
+![DxTop screenshot](res/dxtop.png "DxTop Example")
+
 ### DxTop Commands
 
 * q or ESC: **quit**
@@ -64,6 +66,8 @@ DxTop is a console app that displays data collected by DxAgent.
 
 DxWeb is a web interface that display dependency graph, health metrics and
 symptoms from DxAgent.
+
+![DxWeb screenshot](res/dxweb.png "DxWeb Example")
 
 ### DxWeb Important Files
 
