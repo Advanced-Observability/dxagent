@@ -409,12 +409,14 @@ class DXTop(IOManager):
             if len(subs) <= self.col_sizes[1]:
                flags.append((len(s)+len(subs), 0))
             subs += " health:"
-            if len(subs) <= self.col_sizes[1]:
-               flags.append((len(s)+len(subs),
-                           curses.A_BOLD|curses.color_pair(self.health_colors[score])))
+
             ipath = self._indexed_path(category)
             key = "{}[name={}]".format(ipath, k)
             score = self._data["health_scores"][key]
+            if len(subs) <= self.col_sizes[1]:
+               flags.append((len(s)+len(subs),
+                              curses.A_BOLD |
+                              curses.color_pair(self.health_colors[score]))) 
             subs += str(score)
             subtitle = subs
          s +=  (subtitle+" "*self.col_sizes[1])[:self.col_sizes[1]]

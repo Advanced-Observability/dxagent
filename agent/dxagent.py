@@ -64,9 +64,10 @@ class DXAgent(Daemon, IOManager):
       self.engine = HealthEngine(self._data, self.info, self)
 
       # exporter
-      self.exporter = DXAgentExporter(self._data, self.info, self,
-                                      target_url=self.gnmi_target)
-      self.exporter.run()
+      if self.gnmi_target:
+         self.exporter = DXAgentExporter(self._data, self.info, self,
+                                         target_url=self.gnmi_target)
+         self.exporter.run()
 
       # catch signal for cleanup
       signal.signal(signal.SIGTERM, self.exit)
