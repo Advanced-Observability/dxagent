@@ -8,11 +8,11 @@ DxAgent is the diagnostic agent daemon. First, it gather baremetal, VM and VPP
 data via multiple means. Second, it normalizes collected data and discovers the
 active subservices and their dependencies, and build a graph of it. Third, it checks
 for symptoms based on user-defined rules applied to normalized metrics,
-compute subservices healths score, and propagate health scores along the subservices
-dependencies graph. 
+computes subservices health scores, and propagates health scores along the subservice
+dependency graph. 
 
 An optional gNMI exporter can be used to connect multiple instances of dxagent,
-or to enable visualization of a node susbervices health scores and dependencies
+or to enable visualization of a node susbervices health scores and dependency
 graph via dxweb. gNMI exported data is formatted according to 
 [YANG Modules for Service Assurance draft](https://tools.ietf.org/html/draft-claise-opsawg-service-assurance-yang-04).
 Locally, shared memory can be used to display similar information in the dxtop
@@ -46,7 +46,7 @@ console app.
    
 ### gNMI exporter
 
-See agent/gnmi/README.md
+See [agent/gnmi/README.md](https://github.com/ekorian/dxagent/tree/master/agent/gnmi).
 
 ## DxTop
 

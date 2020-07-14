@@ -45,9 +45,8 @@ class HealthEngine():
       self._data["health_scores"] = {}
       self.sample_per_min = int(60/AGENT_INPUT_PERIOD)
       self.types_map = { "vm": VM, "kb": KBNet}
-      
       self.vbox_supported = hypervisors_support()
-      self.
+      self.vpp_api_supported, self.vpp_stats_supported, self.vpp_gnmi_supported=vpp_support()
       
       self._read_metrics_file()
       self._read_rule_file()
@@ -138,7 +137,8 @@ class HealthEngine():
       kbs = set(s.name for s in self.root.dependencies if isinstance(s, KBNet))       
       monitored_kbs = set(self._data["vpp/gnmi"].keys())
       # local vpp 
-      if self.vpp_api_supported:
+      if self.vpp_api_supported and "vpp/system" in self._data:
+         monitored_kbs.add("localhost")
       for kb in kbs - monitored_kbs:
          #self.remove_node(self.root, kb, "kb")
          # do not remove, keep it as inactive
@@ -569,8 +569,6 @@ class Subservice():
       }
       return funcs[key]()
       
-
-   
    def _update_metrics_linux_vm_cpus_cpu(self):
       pass
 
@@ -887,28 +885,53 @@ class Subservice():
       """
       kb_name=self.parent.name
       framework=self.parent.framework
-      self._data["/node/kb"][kb_name]["/node/kb/proc"]["worker_count"].append(
-         self._data[framework+"/gnmi"][kb_name]["/sys/num_worker_threads"]._top())
       
+      # vpp/local
+      if kb_name == "localhost":
+         worker_count = self._data["vpp/stats/sys"]["/sys/num_worker_threads"]._top() 
+      # vpp/gNMI
+      else:
+         worker_count = self._data[framework+"/gnmi"][kb_name]["/sys/num_worker_threads"]._top()
+      
+      self._data["/node/kb"][kb_name]["/node/kb/proc"]["worker_count"].append(
+         worker_count)
+
    def _update_metrics_linux_kb_mem(self):
       """Update metrics for linux KB mem subservice
 
       """
       kb_name=self.parent.name
       framework=self.parent.framework
-      # stats-segment
-      mem_total = self._data[framework+"/gnmi"][kb_name]["/mem/statseg/total"]._top()/1000000.0
-      mem_used = self._data[framework+"/gnmi"][kb_name]["/mem/statseg/used"]._top()/1000000.0
-      mem_free = mem_total-mem_used
+      
+      # vpp/local
+      if kb_name == "localhost":
+         # stats-segment
+         mem_total = self._data["vpp/stats/sys"]["/mem/statseg/total"]._top()/1000000.0
+         mem_used = self._data["vpp/stats/sys"]["/mem/statseg/used"]._top()/1000000.0
+         mem_free = mem_total-mem_used
+         # buffers
+         numa_node = "default-numa-0"
+         buffer_free = self._data["vpp/stats/buffer-pool"][numa_node]["available"]._top()
+         buffer_used = self._data["vpp/stats/buffer-pool"][numa_node]["used"]._top()
+         buffer_total = buffer_free + buffer_used
+         buffer_cache = self._data["vpp/stats/buffer-pool"][numa_node]["cached"]._top()         
+      # vpp/gNMI
+      else:
+         # stats-segment
+         mem_total = self._data[framework+"/gnmi"][kb_name]["/mem/statseg/total"]._top()/1000000.0
+         mem_used = self._data[framework+"/gnmi"][kb_name]["/mem/statseg/used"]._top()/1000000.0
+         mem_free = mem_total-mem_used
+         # buffers
+         buffer_free = self._data[framework+"/gnmi"][kb_name]["/buffer-pools/default-numa-0/available"]._top()
+         buffer_used = self._data[framework+"/gnmi"][kb_name]["/buffer-pools/default-numa-0/used"]._top()
+         buffer_total = buffer_free + buffer_used
+         buffer_cache = self._data[framework+"/gnmi"][kb_name]["/buffer-pools/default-numa-0/cached"]._top()
+      
       self._data["/node/kb"][kb_name]["/node/kb/mem"]["total"].append(mem_total)
       self._data["/node/kb"][kb_name]["/node/kb/mem"]["free"].append(mem_free)
-      # buffers
-      buffer_free = self._data[framework+"/gnmi"][kb_name]["/buffer-pools/default-numa-0/available"]._top()
-      buffer_used = self._data[framework+"/gnmi"][kb_name]["/buffer-pools/default-numa-0/used"]._top()
-      buffer_total = buffer_free + buffer_used
       self._data["/node/kb"][kb_name]["/node/kb/mem"]["buffer_total"].append(buffer_total)
       self._data["/node/kb"][kb_name]["/node/kb/mem"]["buffer_free"].append(buffer_free)
-      self._data["/node/kb"][kb_name]["/node/kb/mem"]["buffer_cache"].append(self._data[framework+"/gnmi"][kb_name]["/buffer-pools/default-numa-0/cached"]._top())
+      self._data["/node/kb"][kb_name]["/node/kb/mem"]["buffer_cache"].append(buffer_cache)
       
    def _update_metrics_linux_kb_net(self):
       """Update metrics for linux KB net subservice
@@ -916,24 +939,46 @@ class Subservice():
       """
       kb_name=self.parent.name
       framework=self.parent.framework
-      for if_name, d in self._data[framework+"/gnmi"][kb_name]["net_if"].items():
-         # create interface entry if needed
-         if if_name not in self._data["/node/kb"][kb_name]["/node/kb/net/if"]:
-            self._data["/node/kb"][kb_name]["/node/kb/net/if"][if_name] = self._init_metrics_rb("if")
-         
-         metric_dict = self._data["/node/kb"][kb_name]["/node/kb/net/if"][if_name]
-         md_dict = self._data[framework+"/gnmi"][kb_name]["net_if"][if_name]
-         metric_dict["vector_rate"].append(
-            self._data[framework+"/gnmi"][kb_name]["/sys/vector_rate"]._top())
-         metric_dict["rx_packets"].append(md_dict["/if/rx/T0/packets"]._top())
-         metric_dict["rx_bytes"].append(md_dict["/if/rx/T0/bytes"]._top()/1000000.0)
-         metric_dict["rx_error"].append(md_dict["/if/rx-error/T0"]._top())
-         metric_dict["rx_drop"].append(md_dict["/if/rx-miss/T0"]._top())  
-         metric_dict["tx_packets"].append(md_dict["/if/tx/T0/packets"]._top())
-         metric_dict["tx_bytes"].append(md_dict["/if/tx/T0/bytes"]._top()/1000000.0)
-         metric_dict["tx_error"].append(md_dict["/if/tx-error/T0"]._top())
-         #metric_dict["tx_drop"].append(md_dict["/if/tx/T0/packets"]._top())
       
+      # vpp/local
+      if kb_name == "localhost":
+         for if_name, d in self._data["vpp/stats/if"].items():
+            # create interface entry if needed
+            if if_name not in self._data["/node/kb"][kb_name]["/node/kb/net/if"]:
+               self._data["/node/kb"][kb_name]["/node/kb/net/if"][if_name] = self._init_metrics_rb("if")    
+            metric_dict = self._data["/node/kb"][kb_name]["/node/kb/net/if"][if_name]
+            md_dict = self._data["vpp/stats/if"][if_name]
+
+            metric_dict["vector_rate"].append(
+               self._data["vpp/stats/sys"][kb_name]["/sys/vector_rate"]._top())
+            metric_dict["rx_packets"].append(md_dict["/if/rx-packets"]._top())
+            metric_dict["rx_bytes"].append(md_dict["/if/rx-bytes"]._top()/1000000.0)
+            metric_dict["rx_error"].append(md_dict["/if/rx-error"]._top())
+            metric_dict["rx_drop"].append(md_dict["/if/rx-miss"]._top())
+            metric_dict["tx_packets"].append(md_dict["/if/tx-packets"]._top())
+            metric_dict["tx_bytes"].append(md_dict["/if/tx-bytes"]._top()/1000000.0)
+            metric_dict["tx_error"].append(md_dict["/if/tx-error"]._top())
+                    
+      # vpp/gNMI
+      else: 
+         for if_name, d in self._data[framework+"/gnmi"][kb_name]["net_if"].items():
+            # create interface entry if needed
+            if if_name not in self._data["/node/kb"][kb_name]["/node/kb/net/if"]:
+               self._data["/node/kb"][kb_name]["/node/kb/net/if"][if_name] = self._init_metrics_rb("if")
+            metric_dict = self._data["/node/kb"][kb_name]["/node/kb/net/if"][if_name]
+            md_dict = self._data[framework+"/gnmi"][kb_name]["net_if"][if_name]
+            
+            metric_dict["vector_rate"].append(
+               self._data[framework+"/gnmi"][kb_name]["/sys/vector_rate"]._top())
+            metric_dict["rx_packets"].append(md_dict["/if/rx/T0/packets"]._top())
+            metric_dict["rx_bytes"].append(md_dict["/if/rx/T0/bytes"]._top()/1000000.0)
+            metric_dict["rx_error"].append(md_dict["/if/rx-error/T0"]._top())
+            metric_dict["rx_drop"].append(md_dict["/if/rx-miss/T0"]._top())  
+            metric_dict["tx_packets"].append(md_dict["/if/tx/T0/packets"]._top())
+            metric_dict["tx_bytes"].append(md_dict["/if/tx/T0/bytes"]._top()/1000000.0)
+            metric_dict["tx_error"].append(md_dict["/if/tx-error/T0"]._top())
+            #metric_dict["tx_drop"].append(md_dict["/if/tx/T0/packets"]._top())
+         
    def _update_metrics_macos_bm_cpu(self):
       pass
    def _update_metrics_win_bm_cpu(self):

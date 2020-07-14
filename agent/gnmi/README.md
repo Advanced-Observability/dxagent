@@ -5,8 +5,8 @@ The available path for gNMI subscribe are:
 
 * `/subservices`
 
-   json bags, formatted as defined in yang/ietf-service-assurance.yang,
-   per subservice. The actual json string be base64-encoded by gRPC
+   json bags, formatted as defined in [ietf-service-assurance.yang](https://github.com/ekorian/dxagent/blob/master/yang/ietf-service-assurance.yang),
+   per subservice. The actual json string is base64-encoded by gRPC
    (see: base64.b64decode).
    See [YANG Modules for Service Assurance draft](https://tools.ietf.org/html/draft-claise-opsawg-service-assurance-yang-04).
    
