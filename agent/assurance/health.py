@@ -46,6 +46,9 @@ class HealthEngine():
       self.sample_per_min = int(60/AGENT_INPUT_PERIOD)
       self.types_map = { "vm": VM, "kb": KBNet}
       
+      self.vbox_supported = hypervisors_support()
+      self.
+      
       self._read_metrics_file()
       self._read_rule_file()
       self._build_dependency_graph()
@@ -121,7 +124,7 @@ class HealthEngine():
       root_path = self.root.fullname
       
       # 1. update vms&kbs
-      if hypervisors_support():
+      if self.vbox_supported:
          vms = set(s.name for s in self.root.dependencies if isinstance(s, VM))
          monitored_vms = set(self._data["virtualbox/vms"].keys())
          # remove expired nodes
@@ -133,7 +136,9 @@ class HealthEngine():
             self.add_node(self.root, vm, "vm", hypervisor="virtualbox")
          
       kbs = set(s.name for s in self.root.dependencies if isinstance(s, KBNet))       
-      monitored_kbs = set(self._data["vpp/gnmi"].keys())       
+      monitored_kbs = set(self._data["vpp/gnmi"].keys())
+      # local vpp 
+      if self.vpp_api_supported:
       for kb in kbs - monitored_kbs:
          #self.remove_node(self.root, kb, "kb")
          # do not remove, keep it as inactive
@@ -149,7 +154,7 @@ class HealthEngine():
       self._update_childs(previous, current, parent, "if")
 
       # 2.b vm interfaces
-      if hypervisors_support():
+      if self.vbox_supported:
          for vm in vms:
             parent = self.get_node(root_path+"/vm[name={}]".format(vm))
             vm_ifs = set()

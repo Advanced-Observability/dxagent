@@ -519,9 +519,8 @@ class DXTop(IOManager):
                   flags.append((len(s),0))
                if cpu_index < i+cpu_slice-1:
                   s += VLINE_CHAR
-
             self._append_content(s, pad_index, flags, fill=True)
-
+            
          self._append_content(self.hline_bottom(self.col_sizes_cpu), pad_index)
 
    def _format_colname_pad(self):

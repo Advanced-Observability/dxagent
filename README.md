@@ -1,17 +1,24 @@
 # Diagnostic Agent
 
-Medical diagnosis (abbreviated Dx or DS) is the process of determining which disease
-or condition explains a person's symptoms and signs. It is most often referred to as diagnosis.
-
 ![DxAgent Software Architecture](res/dxagent-sw.png "Architecture")
 
 ## DxAgent
 
-DxAgent is the diagnostic agent daemon. It collects baremetal, VM and VPP
-diagnostic data, and compute health metrics. It makes it available via an optional GNMI
-exporter, and via shared memory for displaying DxTop.
+DxAgent is the diagnostic agent daemon. First, it gather baremetal, VM and VPP
+data via multiple means. Second, it normalizes collected data and discovers the
+active subservices and their dependencies, and build a graph of it. Third, it checks
+for symptoms based on user-defined rules applied to normalized metrics,
+compute subservices healths score, and propagate health scores along the subservices
+dependencies graph. 
 
-### DxAgent Commands DxTop
+An optional gNMI exporter can be used to connect multiple instances of dxagent,
+or to enable visualization of a node susbervices health scores and dependencies
+graph via dxweb. gNMI exported data is formatted according to 
+[YANG Modules for Service Assurance draft](https://tools.ietf.org/html/draft-claise-opsawg-service-assurance-yang-04).
+Locally, shared memory can be used to display similar information in the dxtop
+console app.
+
+### DxAgent Commands
 
 * `dxagent [-h] [-l LOG_FILE] [-c CONFIG] [-s] [-v] {start,stop,restart,status}`
    * `LOG_FILE` defaults to `/var/log/dxagent.log`
@@ -48,6 +55,13 @@ DxTop is a console app that displays data collected by DxAgent.
 ![DxTop screenshot](res/dxtop.png "DxTop Example")
 
 ### DxTop Commands
+
+* `dxweb [-h] [-c CONFIG] [-l LOG_FILE] [-t TARGET] [-k CERTS_DIR]`
+   * `LOG_FILE` defaults to `/var/log/dxagent.log`
+   * `CONFIG` defaults to `./dxagent.ini`
+   * `TARGET` defaults to the gnmi target entry in config file. 
+      Use the command line argument to specify another target.
+   * `CERTS_DIR` certificate/key files location
 
 * q or ESC: **quit**
 
@@ -110,9 +124,9 @@ python >= 3.8 to have dxtop available, otherwise python >= 3.5.
 - [cisco-gNMI python](https://pypi.org/project/cisco-gnmi/)
    - `python3 -m pip install cisco-gnmi`
    
+### About
 
+Medical diagnosis (abbreviated Dx or DS) is the process of determining which disease
+or condition explains a person's symptoms and signs. It is most often referred to as diagnosis.
 
-## Author
-
-Korian Edeline
 
