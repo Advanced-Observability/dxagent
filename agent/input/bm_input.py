@@ -859,14 +859,16 @@ class BMWatcher():
       # post-2018 systems use systemd based resolution
       # 127.0.0.53 indicates such behavior
       if not nameserver or nameserver == "127.0.0.53":
-         res=subprocess.run(["systemd-resolve","--no-pager","--status"],
-                        capture_output=True)
-         this_if = "global"
-         for l in res.stdout.split(b'\n'):
-            if b"Link" in l:
-               this_if=l.split()[-1][1:-1].decode()
-            elif b"Current DNS Server" in l:
-               nameservers[this_if]=l.split()[-1].decode()
+         try:
+            res=subprocess.run(["systemd-resolve","--no-pager","--status"],
+                                capture_output=True)
+          except:
+            this_if = "global"
+            for l in res.stdout.split(b'\n'):
+               if b"Link" in l:
+                  this_if=l.split()[-1][1:-1].decode()
+               elif b"Current DNS Server" in l:
+                  nameservers[this_if]=l.split()[-1].decode()
       
       # DHCP
       # parse dhcp lease files
