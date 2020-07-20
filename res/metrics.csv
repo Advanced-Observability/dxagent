@@ -205,3 +205,11 @@ snmp_UdpLiteInCsumErrors,net,int,0,,1,
 snmp_UdpLiteIgnoredMulti,net,int,0,,1,
 active,vm,int,0,,0,
 active,kb,int,0,,0,
+ip4_input_out_of_buffers,if,int,0,,1,
+ip4_input_destination_lookup_miss,if,int,0,,1,
+ip4_input_fragment_chain_too_long,if,int,0,,1,
+if_down,if,int,0,,1,
+if_deleted,if,int,0,,1,
+gso_no_buffers,if,int,0,,1,
+rx_no_buffer,if,int,0,,1
+

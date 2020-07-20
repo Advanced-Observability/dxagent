@@ -958,8 +958,14 @@ class Subservice():
       self._data["/node/kb"][kb_name]["/node/kb/mem"]["buffer_cache"].append(buffer_cache)
       
    def _update_metrics_linux_kb_net(self):
-      pass
-      
+      kb_name=self.parent.name
+      framework=self.parent.framework
+      metric_dict = self._data["/node/kb"][kb_name]["/node/kb/net"]
+      if kb_name == "localhost":
+         pass
+      else:
+         pass
+  
    def _update_metrics_linux_kb_net_if(self):
       """Update metrics for linux KB net subservice
 
@@ -994,12 +1000,37 @@ class Subservice():
          metric_dict["rx_packets"].append(md_dict["/if/rx/T0/packets"]._top())
          metric_dict["rx_bytes"].append(md_dict["/if/rx/T0/bytes"]._top()/1000000.0)
          metric_dict["rx_error"].append(md_dict["/if/rx-error/T0"]._top())
+         metric_dict["rx_no_buffer"].append(md_dict["/if/rx-no-buf/T0"]._top())
          metric_dict["rx_drop"].append(md_dict["/if/rx-miss/T0"]._top())  
          metric_dict["tx_packets"].append(md_dict["/if/tx/T0/packets"]._top())
          metric_dict["tx_bytes"].append(md_dict["/if/tx/T0/bytes"]._top()/1000000.0)
          metric_dict["tx_error"].append(md_dict["/if/tx-error/T0"]._top())
          #metric_dict["tx_drop"].append(md_dict["/if/tx/T0/packets"]._top())
          
+         err_dict = self._data["vpp/gnmi"][kb_name]
+         direct_mapping = { 
+            "/err/ip4-input/out of buffers (drop)/"
+               :"ip4_input_out_of_buffers",
+            "/err/ip4-input/ip4 destination lookup miss/"
+               :"ip4_input_destination_lookup_miss",
+            "/err/ip4-input/fragment chain too long (drop)/"
+               :"ip4_input_fragment_chain_too_long",
+            "/err/{}-output/interface is down/".format(if_name)
+               :"if_down",
+            "/err/{}-output/interface is deleted/".format(if_name)
+               :"if_deleted",
+            "/err/{}-output/no buffers to segment GSO/".format(if_name)
+               :"gso_no_buffers",
+            }
+         for i,o in direct_mapping.items():
+            input_name = i+if_name
+            if input_name in err_dict:
+               metric_dict[o].append(err_dict[input_name]._top())
+#         self.engine.info(metric_dict)
+#         self.engine.info(self._data["/node/kb"][kb_name]["/node/kb/net/if"])
+#         self.engine.info(self._data["/node/kb"][kb_name])
+               
+
    def _update_metrics_macos_bm_cpu(self):
       pass
    def _update_metrics_win_bm_cpu(self):
@@ -1091,6 +1122,7 @@ class KBNet(Subservice):
       # init metrics for non-list RBs
       self._data["/node/kb"][self.name] = {}
       self._data["/node/kb"][self.name]["/node/kb"] = self._init_metrics_rb("kb")
+      self._data["/node/kb"][self.name]["/node/kb/net"] = self._init_metrics_rb("net")
       self._data["/node/kb"][self.name]["/node/kb/net/if"] = {}
       self._data["/node/kb"][self.name]["/node/kb/mem"] = self._init_metrics_rb("mem")
       self._data["/node/kb"][self.name]["/node/kb/proc"] = self._init_metrics_rb("proc")

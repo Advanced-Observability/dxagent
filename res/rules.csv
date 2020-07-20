@@ -20,3 +20,17 @@ name,path,severity,rule,
 "No ARP Entry For Default Gateway",/node/bm/net/if,Red,(state=="up") and (gw_in_arp==0)
 "Non-standard Ethernet MTU",/node/bm/net/if,Red,(mtu!=1500) and (type=="ether")
 "Interface Flapping",/node/bm/net/if,Red,1min(dynamicity(changes_count))>=6
+"Interface Flapping",/node/bm/net/if,Red,1min(dynamicity(changes_count))>=6
+"Receive Errors Peak",/node/bm/net/if,Orange,1min(dynamicity(rx_error))>100
+"Receive Drops Peak",/node/bm/net/if,Orange,1min(dynamicity(rx_drop))>10000
+"Transmit Errors Peak",/node/bm/net/if,Orange,1min(dynamicity(tx_error))>100
+"Transmit Drops Peak",/node/bm/net/if,Orange,1min(dynamicity(tx_drop))>100
+"No Buffers available for GSO",/node/kb/net/if,Orange,dynamicity(gso_no_buffers)>0
+"Packet dropped due to missing mbuf",/node/kb/net/if,Orange,dynamicity(rx_no_buffer)>0
+"Missing buffer in ip4-input",/node/kb/net/if,Orange,dynamicity(ip4_input_out_of_buffers)>0
+"Fragment chain too long",/node/kb/net/if,Orange,dynamicity(ip4_input_fragment_chain_too_long)>0
+"Destination lookup miss",/node/kb/net/if,Orange,dynamicity(ip4_input_destination_lookup_miss)>0
+"Receive Errors Peak",/node/kb/net/if,Orange,1min(dynamicity(rx_error))>100
+"Receive Drops Peak",/node/kb/net/if,Orange,1min(dynamicity(rx_drop))>10000
+"Transmit Errors Peak",/node/kb/net/if,Orange,1min(dynamicity(tx_error))>100
+"Transmit Drops Peak",/node/kb/net/if,Orange,1min(dynamicity(tx_drop))>100

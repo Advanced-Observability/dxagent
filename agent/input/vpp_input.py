@@ -89,10 +89,6 @@ class VPPGNMIClient(threading.Thread):
       elif root == "err":
          
          if path not in self._data["vpp/gnmi"][self.node]:
-            # There are lots of /err/ counters, so we drop data
-            # if it's zero.
-            if val == "0":
-               return
             # Lock the dict to make sure that main thread is not
             # iterating.
             with self._data["vpp/gnmi"][self.node].lock():
@@ -445,7 +441,6 @@ class VPPWatcher():
       for k,d in self.stats.dump(self._dir_err).items():
          
          node_name = k.split('/')[2]
-         # skip ip6 nodes because nobody uses ip6
          if "6" in node_name:
             continue
          # add node entry if needed

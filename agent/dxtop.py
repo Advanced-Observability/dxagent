@@ -221,7 +221,7 @@ class DXTop(IOManager):
          for kb_name in self._data["vpp/gnmi"]:
             self._append_content(self._center_text(kb_name), 5, curses.A_DIM)
             self._format_attrs_rb(kb_name, 5, subdict=self._data["vpp/gnmi"], title=False)
-            self._format_attrs_list_rb("kb_net_if", 5, 
+            self._format_attrs_list_rb("net_if", 5, 
                                        subdict=self._data["vpp/gnmi"][kb_name],
                                        title=False)
 

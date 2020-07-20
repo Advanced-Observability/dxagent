@@ -189,7 +189,7 @@ class Symptom():
                   # exception for double list in vm/kb
                   if var in b[path]:
                      ret.append((dev, b[path][var]))
-                  else:   
+                  elif self.node.name in b[path]:
                      ret.append((dev, b[path][self.node.name][var]))
                return IndexedVariable(ret)
                
