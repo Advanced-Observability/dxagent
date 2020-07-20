@@ -191,8 +191,8 @@ class Symptom():
                      ret.append((dev, b[path][var]))
                   else:   
                      ret.append((dev, b[path][self.node.name][var]))
-                  info("path:{} var:{} prefix:{} prefix2:{}".format(path,var,self.prefix,prefix2))
                return IndexedVariable(ret)
+               
             # double list
             ret=[]
             for dev,b in data[prefix2].items():
@@ -205,7 +205,6 @@ class Symptom():
             # exception for net/if
             if self.node.name in data[path]:
                return IndexedVariable(data[path][self.node.name][var])
-            
             return IndexedVariable(data[path][var])
          return IndexedVariable([(dev, b[var]) for dev,b in data[path].items()])
          

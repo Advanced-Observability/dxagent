@@ -862,7 +862,7 @@ class BMWatcher():
          try:
             res=subprocess.run(["systemd-resolve","--no-pager","--status"],
                                 capture_output=True)
-          except:
+         except:
             this_if = "global"
             for l in res.stdout.split(b'\n'):
                if b"Link" in l:
