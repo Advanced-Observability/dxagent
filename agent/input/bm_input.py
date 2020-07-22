@@ -862,14 +862,15 @@ class BMWatcher():
          try:
             res=subprocess.run(["systemd-resolve","--no-pager","--status"],
                                 capture_output=True)
-         except:
             this_if = "global"
             for l in res.stdout.split(b'\n'):
                if b"Link" in l:
                   this_if=l.split()[-1][1:-1].decode()
                elif b"Current DNS Server" in l:
                   nameservers[this_if]=l.split()[-1].decode()
-      
+         except:
+            self.info("systemd probe failed")
+
       # DHCP
       # parse dhcp lease files
       dhcp_servers={}
