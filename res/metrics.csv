@@ -212,4 +212,5 @@ if_down,if,int,0,,1,
 if_deleted,if,int,0,,1,
 gso_no_buffers,if,int,0,,1,
 rx_no_buffer,if,int,0,,1
+dpdk_alloc_errors,if,int,0,,1
 

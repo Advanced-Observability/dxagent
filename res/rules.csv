@@ -18,7 +18,7 @@ name,path,severity,rule,
 "Zombie Threads",/node/bm/proc,Orange,zombie_count>0
 "No SSH access to VM",/node/vm/net,Orange,ssh==0
 "No ARP Entry For Default Gateway",/node/bm/net/if,Red,(state=="up") and (gw_in_arp==0)
-"Non-standard Ethernet MTU",/node/bm/net/if,Red,(mtu!=1500) and (type=="ether")
+"Non-standard Ethernet MTU",/nodei/bm/net/if,Red,(mtu!=1500) and (type=="ether")
 "Interface Flapping",/node/bm/net/if,Red,1min(dynamicity(changes_count))>=6
 "Interface Flapping",/node/bm/net/if,Red,1min(dynamicity(changes_count))>=6
 "Receive Errors Peak",/node/bm/net/if,Orange,1min(dynamicity(rx_error))>100
@@ -34,3 +34,5 @@ name,path,severity,rule,
 "Receive Drops Peak",/node/kb/net/if,Orange,1min(dynamicity(rx_drop))>10000
 "Transmit Errors Peak",/node/kb/net/if,Orange,1min(dynamicity(tx_error))>100
 "Transmit Drops Peak",/node/kb/net/if,Orange,1min(dynamicity(tx_drop))>100
+"Low Buffer Availability",/node/kb/mem,Orange,(buffer_free/buffer_total)<0.1
+"DPDK Buffer Alloc Errors",/node/kb/net/if,Orange,dynamicity(dpdk_alloc_errors)>0

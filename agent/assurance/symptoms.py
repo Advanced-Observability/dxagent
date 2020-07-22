@@ -13,6 +13,8 @@ import hashlib
 import time
 import sys
 
+from ..core.rbuffer import RingBuffer
+
 class RuleException(Exception):
    """
    RuleException(Exception)
@@ -53,7 +55,7 @@ class Symptom():
            'Gt', 'GtE', 'Is', 'In', 'IsNot', 'LShift', 'List',
            'Load', 'Lt', 'LtE', 'Mod', 'Name', 'Not', 'NotEq', 'NotIn',
            'Num', 'Or', 'RShift', 'Set', 'Slice', 'Str', 'Sub', 'Constant',
-           'Tuple', 'UAdd', 'USub', 'UnaryOp', 'boolop', 'cmpop',
+           'Tuple', 'UAdd', 'USub', 'UnaryOp', 'boolop', 'cmpop', 'Div',
            'expr', 'expr_context', 'operator', 'slice', 'unaryop']
        for subnode in ast.walk(self.tree):
            subnode_name = type(subnode).__name__
@@ -125,6 +127,19 @@ class Symptom():
                   return all(_operator(v,other) for v in self.rb._tops(self.count))
                else:
                   return _operator(self.rb._dynamicity(self.count),other)
+                  
+            if len(self.rb)>0 and not isinstance(self.rb[0][1], RingBuffer):
+               ret = []
+               if not isinstance(other,IndexedVariable):
+                  ret = [(dev,True) for dev,val in self.rb if _operator(val,other)]        
+               else:
+                  ret = [(d1,True) for (d1,v1),(d2,v2) in zip(self.rb,other.rb) if _operator(v1,v2) and d1 == d2]
+               #info("compare: {}".format(ret))
+               if not ret:
+                  return False
+               self.rb = ret
+               return self                  
+                  
             ret=[]
             for index, rb in self.rb:
                if len(rb) < self.count:
@@ -153,6 +168,32 @@ class Symptom():
             return self.compare(other, operator.__gt__)
          def __ge__(self, other):
             return self.compare(other, operator.__ge__)
+            
+         def __add__(self, other):
+            return self.rb._top() + other.rb._top()
+         def __sub__(self, other):
+            return self.rb._top() - other.rb._top()
+         def __mul__(self, other):
+            return self.rb._top() * other.rb._top()
+         def __floordiv__(self, other):
+            div = other.rb._top()
+            if div == 0:
+               return 0
+            return self.rb._top() // div
+         def __truediv__(self, other):
+            ret = []
+            for a,b in zip(self.rb,other.rb):
+               if a[0] != b[0]:
+                  continue
+               div = b[1]._top()
+               if div == 0:
+                  ret.append((a[0], 0))
+               else:
+                  ret.append((a[0], a[1]._top()/div))
+            if not ret:
+               return False
+            self.rb = ret
+            return self
             
          def __and__(self, other):
             if (not self.islist 
@@ -187,10 +228,12 @@ class Symptom():
                ret = []
                for dev,b in data[prefix2].items():
                   # exception for double list in vm/kb
-                  if var in b[path]:
+                  if var in b[path] and dev in self.node.fullname:
                      ret.append((dev, b[path][var]))
                   elif self.node.name in b[path]:
                      ret.append((dev, b[path][self.node.name][var]))
+                  #info("node:{} dev:{}".format(self.node, dev))
+               #info("node:{} access:{}".format(self.node, ret))
                return IndexedVariable(ret)
                
             # double list
@@ -217,6 +260,10 @@ class Symptom():
       def _5min(indexed_var):
          indexed_var.count = engine.sample_per_min*5
          return indexed_var
+      
+      # skip symptoms for subservices of inactive vm/kb
+      if not self.node.active or not (self.node.parent and self.node.parent.active):
+         return False
          
       ret=eval(self._o, globals(), locals())
       try:
@@ -225,13 +272,8 @@ class Symptom():
          if ret:
             self.timestamp = str(time.time())
             if isinstance(ret, IndexedVariable):
-               # XXX
-               if self.path.endswith("if"):
-                  info(ret.indexes())
-                  info(self.node.fullname)
-#                  self.args = ["{}/if[name={}]".format(self.node.fullname,index) for index in ret.indexes()]
                if ret.islist:
-                  self.args = ["{}[name={}]".format(self.node.fullname,index) for index in ret.indexes()]
+                  self.args = ["{}[name={}]".format(self.node.fullname,index) if index not in self.node.fullname else self.node.fullname for index in ret.indexes()]
                else:
                   self.args = ["{}{}".format(self.node.fullname,index) for index in ret.indexes()]
             else:

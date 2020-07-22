@@ -1026,10 +1026,15 @@ class Subservice():
             input_name = i+if_name
             if input_name in err_dict:
                metric_dict[o].append(err_dict[input_name]._top())
-#         self.engine.info(metric_dict)
-#         self.engine.info(self._data["/node/kb"][kb_name]["/node/kb/net/if"])
-#         self.engine.info(self._data["/node/kb"][kb_name])
-               
+
+         alloc_errors = 0
+         if "/err/dpdk-input/rx buf alloc from free list failed/" in err_dict:
+            alloc_errors += err_dict["/err/dpdk-input/rx buf alloc from free list failed/"]._top()
+         if "/err/dpdk-input/rx buf alloc failed no physmem/" in err_dict:
+            alloc_errors += err_dict["/err/dpdk-input/rx buf alloc failed no physmem/"]._top()           
+         if "/err/dpdk-input/rx packets dropped due to alloc error/" in err_dict:
+            alloc_errors += err_dict["/err/dpdk-input/rx packets dropped due to alloc error/"]._top()
+         metric_dict["dpdk_alloc_errors"].append(alloc_errors)
 
    def _update_metrics_macos_bm_cpu(self):
       pass
