@@ -51,6 +51,7 @@ class HealthEngine():
       self._read_metrics_file()
       self._read_rule_file()
       self._build_dependency_graph()
+      self.dependency_graph_version = 0
       self._update_graph_changed_timestamp()
       
    def _read_rule_file(self):
@@ -78,6 +79,16 @@ class HealthEngine():
             
             self._symptoms_args.append((name, path, severity, rule, self))
             
+   def json_bag(self):
+      # call list() to avoid race condition with timestamp (?)
+      subservices = list([subservice.bag() for subservice in self])
+      bag = {
+         "assurance-graph-version": self.dependency_graph_version,
+         "assurance-graph-last-change": self.dependency_graph_changed,
+         "subservices" :subservices,
+      }
+      return json.dumps(bag)
+         
    def get_symptoms(self, node):
       """
       Return a list of newly instantiated symptoms for given node
@@ -108,6 +119,7 @@ class HealthEngine():
             
    def _update_graph_changed_timestamp(self):
       self.dependency_graph_changed = str(time.time())
+      self.dependency_graph_version += 1
 
    def _build_dependency_graph(self):
       """
@@ -167,7 +179,7 @@ class HealthEngine():
                attr="/VirtualBox/GuestInfo/Net/{}/Name".format(net_index)
                if_name=self._data["virtualbox/vms"][vm][attr]._top()
                current.add(if_name)
-               prefixes[if_name] = ttr="/VirtualBox/GuestInfo/Net/{}".format(net_index)
+               prefixes[if_name] = "/VirtualBox/GuestInfo/Net/{}".format(net_index)
             
             self._update_childs(previous, current, parent, "if",
                                 subdict=self._data["/node/vm"][vm])                    
@@ -255,7 +267,8 @@ class HealthEngine():
       for label in previous-current:
          #del data[parent_path][cpu]
          node = self.get_node(parent.path+"/"+_type+"[name={}]".format(label))
-         node.active = False
+         if node:
+            node.active = False
          
    def _init_metrics_rb(self, subservice):
       """
@@ -426,6 +439,37 @@ class Subservice():
          path = "{}{}".format(self.parent.path,path)
       return path
       
+   def bag(self):
+       bag =  { "type": "subservice-idty",
+               "id": self.fullname,
+               "subservice-parameters": {
+                 "service": self.path, 
+                 "instance-name": self.name
+                },
+               "last-change":self.dependency_graph_changed,
+               "label": self.fullname,
+               "health-score": self.health_score,
+            
+               "symptoms": [ 
+                  {
+                     "id": s.id,
+                     "health-score-weight": s.severity.weight(),
+                     "label": s.name,
+                     "start-date-time":s.timestamp
+                  
+                  } for s in self.positive_symptoms
+               ],
+               "dependencies" : [ 
+                  { 
+                     "type": "subservice-idty",
+                     "id" : dep.fullname,
+                     "dependency-type": "impacting-dependency" if dep.impacting
+                                        else "informational-dependency"
+                  } for dep in self.dependencies
+               ] 
+            }
+       return bag
+      
    def json_bag(self):
       """
       @return a json string that describes this subservice, formatted as
@@ -463,36 +507,7 @@ class Subservice():
       }          
               
       """
-      bag =  { "type": "subservice-idty",
-               "id": self.fullname,
-               "subservice-parameters": {
-                 "service": self.path, 
-                 "instance-name": self.name
-                },
-               "last-change":self.dependency_graph_changed,
-               "label": self.fullname,
-               "health-score": self.health_score,
-            
-               "symptoms": [ 
-                  {
-                     "id": s.id,
-                     "health-score-weight": s.severity.weight(),
-                     "label": s.name,
-                     "start-date-time":s.timestamp
-                  
-                  } for s in self.positive_symptoms
-               ],
-               "dependencies" : [ 
-                  { 
-                     "type": "subservice-idty",
-                     "id" : dep.fullname,
-                     "dependency-type": "impacting-dependency" if dep.impacting
-                                        else "informational-dependency"
-                  } for dep in self.dependencies
-               ] 
-            }
-      
-      return json.dumps(bag)
+      return json.dumps(self.bag())
 
    def __contains__(self, item):
       return any(subservice._type == item for subservice in self.dependencies)

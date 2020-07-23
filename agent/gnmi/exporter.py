@@ -229,6 +229,7 @@ class DXAgentExporter():
             
       @param subscribed the list of subscribed paths
              /subservices
+             /subservices/subservice
              /metrics 
              /symptoms
              /health
@@ -255,8 +256,11 @@ class DXAgentExporter():
          for path,score in self.data["health_scores"].items():
             yield path+"/health", score, int 
             
-      if "/" in subscribed or "/subservices" in subscribed:
+      if "/" in subscribed or "/subservices/subservice" in subscribed:
          for subservice in self.agent.engine:
             yield subservice.fullname, subservice.json_bag(), "json"
+            
+      if "/" in subscribed or "/subservices" in subscribed:
+            yield "/subservices", self.agent.engine.json_bag(), "json" 
             
       
