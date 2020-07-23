@@ -83,15 +83,17 @@ class DXAgentServicer(gNMIServicer):
          paths.append(path_str)
       return paths
       
-   def _subscribeResponse(self, requests):
+   def _subscribeResponse(self, request):
       """
       build SubscribeResponse
       
       only allows for subscription to root
       """
-      for request in requests:
-         request_json = json.loads(json_format.MessageToJson(request))
-         paths=self._validate_subscriptions(request_json)
+      request_json = json.loads(json_format.MessageToJson(request))
+      paths=self._validate_subscriptions(request_json)
+      
+      while True:
+
          #self.exporter.info(request.subscribe.prefix)
          
          # build reponse
@@ -114,6 +116,7 @@ class DXAgentServicer(gNMIServicer):
             elif _type == "json": # grpc will base64 encode
                added.val.json_val = val.encode("utf-8")
          yield response
+         time.sleep(10)
       
    # gNMI Services Capabilities Routine
    def Capabilities(self, request, context):
@@ -124,8 +127,43 @@ class DXAgentServicer(gNMIServicer):
       return self._getResponse(request)
       
    # gNMI Services Subscribe Routine
-   def Subscribe(self, request, context):
-      return self._subscribeResponse(request)
+   def Subscribe(self, requests, context):
+
+      for request in requests:
+         self.exporter.info(request)
+         self.exporter.info(type(request)) 
+         #yield from self._subscribeResponse(request)
+         request_json = json.loads(json_format.MessageToJson(request))
+         paths=self._validate_subscriptions(request_json)
+         
+         while True:
+
+            #self.exporter.info(request.subscribe.prefix)
+            
+            # build reponse
+            response = gnmi_pb2.SubscribeResponse()
+            response.update.timestamp = int(time.time())
+            response.sync_response = True
+            
+            for path_string, val, _type in self.exporter._iterate_data(paths):
+               #self.exporter.engine.info(path_string)
+               path = path_from_string(path_string)
+               # add an update message for path
+               added = response.update.update.add()
+               added.path.CopyFrom(path)
+               if _type == int:
+                  added.val.int_val = val
+               elif _type == str:
+                  added.val.string_val = val
+               elif _type == float:
+                  added.val.float_val = val
+               elif _type == "json": # grpc will base64 encode
+                  added.val.json_val = val.encode("utf-8")
+            yield response
+            self.exporter.info("yield once")
+            time.sleep(10)
+         
+      self.exporter.info("after")
         
         
 class DXAgentExporter():
@@ -244,8 +282,7 @@ class DXAgentExporter():
             if k in skip:
                continue
             yield from self._iterate_data_rec(d, k)
-         # special entry: symptom
-      
+      # special entry: symptom
       if "/" in subscribed or "/symptoms" in subscribed:
          for s in self.data["symptoms"]:
             for path in s.args:
