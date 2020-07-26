@@ -139,10 +139,9 @@ class DXAgentServicer(gNMIServicer):
          while True:
 
             #self.exporter.info(request.subscribe.prefix)
-            
             # build reponse
             response = gnmi_pb2.SubscribeResponse()
-            response.update.timestamp = int(time.time())
+            response.update.timestamp = int(time.time())*1000000000
             response.sync_response = True
             
             for path_string, val, _type in self.exporter._iterate_data(paths):
@@ -160,10 +159,7 @@ class DXAgentServicer(gNMIServicer):
                elif _type == "json": # grpc will base64 encode
                   added.val.json_val = val.encode("utf-8")
             yield response
-            self.exporter.info("yield once")
             time.sleep(10)
-         
-      self.exporter.info("after")
         
         
 class DXAgentExporter():
@@ -291,7 +287,8 @@ class DXAgentExporter():
             
       if "/" in subscribed or "/health" in subscribed:
          for path,score in self.data["health_scores"].items():
-            yield path+"/health", score, int 
+            #yield path+"/health", score, int 
+            yield "/health"+path, score, int 
             
       if "/" in subscribed or "/subservices/subservice" in subscribed:
          for subservice in self.agent.engine:

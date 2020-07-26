@@ -37,8 +37,7 @@ class DXAgentGNMIClient:
       response = self.client.get_xpaths(paths)
       return response
    def subscribe(self, xpath=["/"]):
-      return [json_format.MessageToJson(response) 
-               for response in self.client.subscribe_xpaths(xpath)]
+      return self.client.subscribe_xpaths(xpath)
      
 import json
 import base64
@@ -49,6 +48,7 @@ if __name__ == "__main__":
    print(cli.capabilities())
    responses = cli.subscribe(xpath=["/subservices"])
    for response in responses:
+      response = json_format.MessageToJson(response) 
       response_json = json.loads(response)
       print(response_json)
       for i in response_json["update"]["update"]:
