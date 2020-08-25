@@ -141,7 +141,8 @@ class DXAgentServicer(gNMIServicer):
             #self.exporter.info(request.subscribe.prefix)
             # build reponse
             response = gnmi_pb2.SubscribeResponse()
-            response.update.timestamp = int(time.time())*1000000000
+            response.update.timestamp = time.time_ns()#int(time.time())*1000000000
+            self.exporter.info(response.update.timestamp)
             response.sync_response = True
             
             for path_string, val, _type in self.exporter._iterate_data(paths):
@@ -158,6 +159,8 @@ class DXAgentServicer(gNMIServicer):
                   added.val.float_val = val
                elif _type == "json": # grpc will base64 encode
                   added.val.json_val = val.encode("utf-8")
+            response.update.timestamp = time.time_ns()#int(time.time())*1000000000
+            self.exporter.info(response.update.timestamp)
             yield response
             time.sleep(10)
         

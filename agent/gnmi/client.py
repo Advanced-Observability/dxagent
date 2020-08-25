@@ -46,14 +46,14 @@ if __name__ == "__main__":
    target = "0.0.0.0:50051"
    cli = DXAgentGNMIClient(target, None)
    print(cli.capabilities())
-   responses = cli.subscribe(xpath=["/subservices"])
+   responses = cli.subscribe(xpath=["/symptoms"])
    for response in responses:
-      response = json_format.MessageToJson(response) 
-      response_json = json.loads(response)
+      response_json = json.loads(json_format.MessageToJson(response))
       print(response_json)
-      for i in response_json["update"]["update"]:
-         print(base64.b64decode(i["val"]["jsonVal"]))
-      print(base64.b64decode(response_json["update"]["update"][0]["val"]["jsonVal"]))
+      print(response.update.timestamp)
+#      for i in response_json["update"]["update"]:
+#         print(base64.b64decode(i["val"]["jsonVal"]))
+#      print(base64.b64decode(response_json["update"]["update"][0]["val"]["jsonVal"]))
       
       
       
