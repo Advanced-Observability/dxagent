@@ -632,7 +632,7 @@ class DXTop(IOManager):
          kb_count=len(self._data["/node/vm"]) if "/node/vm" in self._data else 0
          s = "vm-count: {} kb-count:{}".format(vm_count, kb_count)
          self.top_pad.addstr(self._center_text(s))         
-         s = "symptoms-count: {}".format(len(self._data["symptoms"]))
+         s = "symptoms-count: {}".format(len(self._data["symptoms"]) if "symptoms" in self._data else 0)
          self.top_pad.addstr(self._center_text(s))
          pass
 
