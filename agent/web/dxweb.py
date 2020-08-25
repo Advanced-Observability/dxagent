@@ -18,7 +18,7 @@ import json
 from flask import Flask
 from flask import render_template
 from flask_socketio import SocketIO
-
+from google.protobuf import json_format
 
 class DXWeb(IOManager):
    def __init__(self):
@@ -159,7 +159,7 @@ class DXWeb(IOManager):
       return nodes
       
    def parse_subscribe_response(self, response):
-      msg = json.loads(response)
+      msg = json.loads(json_format.MessageToJson(response))
       if "update" not in msg or "update" not in msg["update"]:
          return
       

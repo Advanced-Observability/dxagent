@@ -68,7 +68,7 @@ class DXAgentServicer(gNMIServicer):
       
       
       """
-      paths = []
+      paths, sample_intervals = [], []
       if "subscribe" not in request or "subscription" not in request["subscribe"]:
          return paths
       subscriptions = request["subscribe"]["subscription"]
@@ -81,42 +81,33 @@ class DXAgentServicer(gNMIServicer):
             else:
                path_str += "/"
          paths.append(path_str)
-      return paths
+         sample_intervals.append(subscription["sampleInterval"])
+      return paths, int(sample_intervals[0])/1e9
       
-   def _subscribeResponse(self, request):
+   def _subscribeResponse(self, paths):
       """
       build SubscribeResponse
       
-      only allows for subscription to root
       """
-      request_json = json.loads(json_format.MessageToJson(request))
-      paths=self._validate_subscriptions(request_json)
+      response = gnmi_pb2.SubscribeResponse()
+      response.sync_response = True
       
-      while True:
-
-         #self.exporter.info(request.subscribe.prefix)
-         
-         # build reponse
-         response = gnmi_pb2.SubscribeResponse()
-         response.update.timestamp = int(time.time())
-         response.sync_response = True
-         
-         for path_string, val, _type in self.exporter._iterate_data(paths):
-            #self.exporter.engine.info(path_string)
-            path = path_from_string(path_string)
-            # add an update message for path
-            added = response.update.update.add()
-            added.path.CopyFrom(path)
-            if _type == int:
-               added.val.int_val = val
-            elif _type == str:
-               added.val.string_val = val
-            elif _type == float:
-               added.val.float_val = val
-            elif _type == "json": # grpc will base64 encode
-               added.val.json_val = val.encode("utf-8")
-         yield response
-         time.sleep(10)
+      for path_string, val, _type in self.exporter._iterate_data(paths):
+         #self.exporter.engine.info(path_string)
+         path = path_from_string(path_string)
+         # add an update message for path
+         added = response.update.update.add()
+         added.path.CopyFrom(path)
+         if _type == int:
+            added.val.int_val = val
+         elif _type == str:
+            added.val.string_val = val
+         elif _type == float:
+            added.val.float_val = val
+         elif _type == "json": # grpc will base64 encode
+            added.val.json_val = val.encode("utf-8")
+      response.update.timestamp = time.time_ns()
+      return response
       
    # gNMI Services Capabilities Routine
    def Capabilities(self, request, context):
@@ -130,40 +121,13 @@ class DXAgentServicer(gNMIServicer):
    def Subscribe(self, requests, context):
 
       for request in requests:
-         self.exporter.info(request)
-         self.exporter.info(type(request)) 
-         #yield from self._subscribeResponse(request)
          request_json = json.loads(json_format.MessageToJson(request))
-         paths=self._validate_subscriptions(request_json)
-         
-         while True:
+         paths,sample_interval = self._validate_subscriptions(request_json)
 
-            #self.exporter.info(request.subscribe.prefix)
-            # build reponse
-            response = gnmi_pb2.SubscribeResponse()
-            response.update.timestamp = time.time_ns()#int(time.time())*1000000000
-            self.exporter.info(response.update.timestamp)
-            response.sync_response = True
-            
-            for path_string, val, _type in self.exporter._iterate_data(paths):
-               #self.exporter.engine.info(path_string)
-               path = path_from_string(path_string)
-               # add an update message for path
-               added = response.update.update.add()
-               added.path.CopyFrom(path)
-               if _type == int:
-                  added.val.int_val = val
-               elif _type == str:
-                  added.val.string_val = val
-               elif _type == float:
-                  added.val.float_val = val
-               elif _type == "json": # grpc will base64 encode
-                  added.val.json_val = val.encode("utf-8")
-            response.update.timestamp = time.time_ns()#int(time.time())*1000000000
-            self.exporter.info(response.update.timestamp)
+         while True:
+            response = self._subscribeResponse(paths)
             yield response
-            time.sleep(10)
-        
+            time.sleep(sample_interval)
         
 class DXAgentExporter():
    def __init__(self, data, info, agent,

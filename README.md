@@ -1,6 +1,6 @@
 # Diagnostic Agent
 
-![DxAgent Software Architecture](res/dxagent-sw.png "Architecture")
+![DxAgent Software Architecture](res/dxagent-ietf.png "Architecture")
 
 ## DxAgent
 
