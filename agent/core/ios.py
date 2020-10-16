@@ -167,10 +167,16 @@ class IOManager():
       self.gnmi_target = self.config["gnmi"].get("target")
 
       # parse VPP gNMI nodes
-      self.gnmi_nodes = []
-      gnmi_nodes = self.config["vpp"].get("gnmi_nodes")
-      if gnmi_nodes:
-         self.gnmi_nodes = [node.rstrip().lstrip() for node in gnmi_nodes.split(",")]
+      self.vpp_gnmi_nodes = []
+      vpp_gnmi_nodes = self.config["vpp"].get("gnmi_nodes")
+      if vpp_gnmi_nodes:
+         self.vpp_gnmi_nodes = [node.rstrip().lstrip() for node in vpp_gnmi_nodes.split(",")]
+         
+      # parse ioam gNMI nodes
+      self.ioam_gnmi_nodes = []
+      ioam_gnmi_nodes = self.config["ioam"].get("gnmi_nodes")
+      if ioam_gnmi_nodes:
+         self.ioam_gnmi_nodes = [node.rstrip().lstrip() for node in ioam_gnmi_nodes.split(",")]
       
       return self.config
 

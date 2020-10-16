@@ -10,7 +10,6 @@ import re
 import time
 from concurrent import futures
 import grpc
-from cisco_gnmi import ClientBuilder
 from google.protobuf import json_format
 from cisco_gnmi.proto import gnmi_pb2, gnmi_pb2_grpc
 from cisco_gnmi.proto.gnmi_pb2_grpc import gNMIServicer 
@@ -222,11 +221,7 @@ class DXAgentExporter():
 
    def _iterate_data(self, subscribed, skip=[]):
       """
-      write dict to ShareableMemory
-
-      only write fields that changed
-           if total datafield changed, rewrite all
-            otherwise skip all if not has_changed()
+      iterate data for export
             
       @param subscribed the list of subscribed paths
              /subservices

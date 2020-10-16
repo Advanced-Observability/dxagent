@@ -67,7 +67,6 @@ class VPPGNMIClient(threading.Thread):
       self.retry=0
       self._exit=False
       self.synced = False
-      #self._lock = threading.Lock()
       
    def append_value(self, path, root, val):
       """
@@ -205,14 +204,13 @@ class VPPWatcher():
       self._data=data
       self.info=info
       self.parent=parent
-      self.gnmi_nodes = self.parent.gnmi_nodes
-      self.gnmi_timer = time.time()
+      self.vpp_gnmi_nodes = self.parent.vpp_gnmi_nodes
       self.gnmi_clients = []
       self.use_api=(use_api and os.path.exists(api_sock)
                     and "vpp" in vpp_libs)
       self.use_stats=(use_stats and os.path.exists(stats_sock)
                       and "vpp" in vpp_libs)
-      self.use_gnmi=(not not self.gnmi_nodes
+      self.use_gnmi=(not not self.vpp_gnmi_nodes
                      and "gnmi" in vpp_libs)
 
       # connect to VPP process (baremetal)
@@ -230,7 +228,7 @@ class VPPWatcher():
       """
       self._data["vpp/gnmi"] = {}
       attr_names = ["status"]
-      for node in self.gnmi_nodes:
+      for node in self.vpp_gnmi_nodes:
          self._data["vpp/gnmi"][node] = init_rb_dict(attr_names, type=str,
                                                      thread_safe=True)
          self._data["vpp/gnmi"][node].update({"net_if":{}})

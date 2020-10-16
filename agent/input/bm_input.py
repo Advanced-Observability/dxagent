@@ -22,6 +22,7 @@ from pyroute2.netlink.rtnl import rt_scope
 from pyroute2.netlink.rtnl import rt_proto
 
 from ..core.rbuffer import init_rb_dict
+from ..gnmi.client import BaseGNMIClient
 
 # linux/include/linux/if_arp.h
 _linux_if_types = { "0":"netrom", "1":"ether", "2":"eether", "3":"ax25",
@@ -44,6 +45,61 @@ def ratio(v, total):
       return round(v/total*100.0)
    except:
       return 0
+      
+class IOAMGNMIClient(BaseGNMIClient):
+
+   def append_value(self, path, root, val):
+      """
+      append value to data dict
+      
+      """
+      return
+      if root == "if": # per interface
+         split = path.split('/')
+         interface = split.pop(3)
+         path = "/".join(split)
+         if not self.synced:
+            if interface not in self._data["vpp/gnmi"][self.node]["net_if"]:
+               with self._data["vpp/gnmi"][self.node].lock():
+                  self._data["vpp/gnmi"][self.node]["net_if"][interface] = {}
+            if path not in self._data["vpp/gnmi"][self.node]["net_if"][interface]:
+               with self._data["vpp/gnmi"][self.node].lock():
+                  self._data["vpp/gnmi"][self.node]["net_if"][interface][path] = RingBuffer(path, counter=True)
+         self._data["vpp/gnmi"][self.node]["net_if"][interface][path].append(val)
+      elif root == "err":
+         
+         if path not in self._data["vpp/gnmi"][self.node]:
+            # Lock the dict to make sure that main thread is not
+            # iterating.
+            with self._data["vpp/gnmi"][self.node].lock():
+               self._data["vpp/gnmi"][self.node][path] = RingBuffer(path, counter=True)
+         self._data["vpp/gnmi"][self.node][path].append(val)          
+      else:
+         if (root == "nat44") or (root == "nat64"):
+            return
+         if not self.synced:
+            if path not in self._data["vpp/gnmi"][self.node]:
+               # drop wierdly named /err/ 
+               with self._data["vpp/gnmi"][self.node].lock():
+                  self._data["vpp/gnmi"][self.node][path] = RingBuffer(path, counter=True)
+         self._data["vpp/gnmi"][self.node][path].append(val)
+         
+   def parse_json(self, response):
+      """
+      parse response and fill data dict
+
+      """
+      msg = json.loads(response)
+      if "update" not in msg or "update" not in msg["update"]:
+         return
+      for e in msg["update"]["update"]:
+         path_json, val = e["path"]["elem"], e["val"]["intVal"]
+         root, node = path_json[0]["name"], path_json[1]["name"]
+         path = "/"+root+"/"+node
+         # building path
+         for name in path_json[2:]:
+            path += "/{}".format(name["name"])
+         self.append_value(path, root, val) 
 
 class BMWatcher():
 
@@ -52,10 +108,54 @@ class BMWatcher():
       self._data=data
       self.info=info
       self.parent=parent
+      self.ioam_gnmi_nodes = self.parent.ioam_gnmi_nodes
+      self.gnmi_clients = []
       self._init_dicts()
       self.diskstats_timestamp=None
       self._ethtool = pyroute2.Ethtool()
       self._route = pyroute2.IPRoute()
+      if self.ioam_gnmi_nodes:
+         self._init_gnmi_clients()
+         
+   def _init_gnmi_clients(self):
+      """
+      instantiate gNMI clients and try connecting nodes
+
+      """
+      self._data["ioam/gnmi"] = {}
+      attr_names = ["status"]
+      for node in self.ioam_gnmi_nodes:
+         self._data["ioam/gnmi"][node] = init_rb_dict(attr_names, type=str,
+                                                     thread_safe=True)
+         #self._data["ioam/gnmi"][node].update({"net_if":{}})
+         self.gnmi_clients.append(IOAMGNMIClient(node, self.info, self._data))
+      self._connect_gnmi_clients()
+
+   def _connect_gnmi_clients(self):
+      """
+      connect gNMI clients
+
+      """
+      for client in self.gnmi_clients:
+         if client.is_alive():
+            continue
+         if client.connect():
+            client.start()
+
+   def _input_gnmi(self):
+      """
+      input from gNMI client
+
+      NOTE: actual input is done in VPPGNMIClient instances
+      Here we only connect/reconnect if needed
+
+      """
+      self._connect_gnmi_clients()
+      # update status
+      for client in self.gnmi_clients:
+         node = client.node
+         status = client.status()
+         self._data["ioam/gnmi"][node]["status"].append(status)
 
    def _init_dicts(self):
 
@@ -225,6 +325,8 @@ class BMWatcher():
       self._process_sensors()
       self._process_interfaces()
       self._process_routes()
+      if self.ioam_gnmi_nodes:
+         self._input_gnmi()
 
    def _process_sensors(self):
       dev_cooling_path = "/sys/class/thermal/"
@@ -836,13 +938,13 @@ class BMWatcher():
          "rx-vlan-stag-filter","l2-fwd-offload","hw-tc-offload",
          "esp-hw-offload","esp-tx-csum-hw-offload","rx-udp_tunnel-port-offload",
          "tls-hw-tx-offload","tls-hw-rx-offload","rx-gro-hw","tls-hw-record",
-         "tx-udp-fragmentation",
+         "tx-udp-fragmentation", "rx-gro-list",
          
          # counters
          "carrier_down_count", "carrier_up_count", "carrier_changes",
       ] + attr_list_netdev
-      type_list = 37*[str] + 71*[int] + 27*[int]
-      counter_list = 108*[False] + 27*[True]
+      type_list = 37*[str] + 72*[int] + 27*[int]
+      counter_list = 109*[False] + 27*[True]
 
       gws = netifaces.gateways()
       active_ifs = []
@@ -1190,3 +1292,9 @@ class BMWatcher():
          self._data[category]["net.ipv4.ip_forward"].append(f.read().rstrip())
       with open("/proc/sys/net/ipv4/ip_no_pmtu_disc") as f:
          self._data[category]["net.ipv4.ip_no_pmtu_disc"].append(f.read().rstrip())
+         
+         
+   def exit(self):
+      for c in self.gnmi_clients:
+         c.disconnect()
+         

@@ -198,6 +198,7 @@ class DXTop(IOManager):
       self._format_attrs_rb("netstat", 3)
       self._format_attrs_rb("snmp", 3)
       self._format_attrs_list_rb("net/arp", 3)
+      self._format_attrs_list_rb("ioam/gnmi", 3)
 
       # VM
       # virtualbox
@@ -224,7 +225,6 @@ class DXTop(IOManager):
                                        subdict=self._data["vpp/gnmi"][kb_name],
                                        title=False)
             self._format_attrs_rb(kb_name, 5, subdict=self._data["vpp/gnmi"], title=False)
-
 
       # Health metrics Pad
       self._append_content(self._center_text("Symptoms"), 6, curses.A_REVERSE)

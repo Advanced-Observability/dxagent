@@ -158,6 +158,17 @@ class HealthEngine():
       for kb in monitored_kbs - kbs:
          self.add_node(self.root, kb, "kb", framework="vpp")
          
+      # ioam nodes
+      ioam_nodes = set(self._data["/node/bm/net/ioam"].keys())
+      monitored_ioam_nodes = set(self._data["ioam/gnmi"].keys())
+      for node in ioam_nodes - monitored_ioam_nodes:
+         #self.remove_node(self.root, kb, "kb")
+         # do not remove, keep it as inactive
+         pass
+      for node in monitored_ioam_nodes - ioam_nodes:
+         parent = self.get_node(root_path+"/bm/net")
+         self.add_node(parent, node, "ioam")     
+         
       # 2. interfaces
       # 2.a bm interfaces
       parent = self.get_node(root_path+"/bm/net")
@@ -606,17 +617,19 @@ class Subservice():
    ("Linux","/node/bm/proc")       : self._update_metrics_linux_bm_proc,
    ("Linux","/node/bm/net")        : self._update_metrics_linux_bm_net,
    ("Linux","/node/bm/net/if")     : self._update_metrics_linux_bm_net_if,
+   ("Linux","/node/bm/net/ioam")   : self._update_metrics_linux_bm_net_ioam,
    ("Linux","/node/vm/cpus")       : self._update_metrics_linux_vm_cpus,
    ("Linux","/node/vm/cpus/cpu")   : self._update_metrics_linux_vm_cpus_cpu,
    ("Linux","/node/vm/mem")        : self._update_metrics_linux_vm_mem,
    ("Linux","/node/vm/net")        : self._update_metrics_linux_vm_net,
-   ("Linux","/node/vm/net/if")        : self._update_metrics_linux_vm_net_if,
+   ("Linux","/node/vm/net/if")     : self._update_metrics_linux_vm_net_if,
    ("Linux","/node/vm/proc")       : self._update_metrics_linux_vm_proc,
    ("Linux","/node/kb/proc")       : self._update_metrics_linux_kb_proc,
    ("Linux","/node/kb/mem")        : self._update_metrics_linux_kb_mem,
    ("Linux","/node/kb/net")        : self._update_metrics_linux_kb_net,
-   ("Linux","/node/kb/net/if")        : self._update_metrics_linux_kb_net_if,
+   ("Linux","/node/kb/net/if")     : self._update_metrics_linux_kb_net_if,
    
+    
    ("Windows","/node/bm/cpus") : self._update_metrics_win_bm_cpu,
    ("MacOS","/node/bm/cpus")   : self._update_metrics_macos_bm_cpu,
       }
@@ -832,7 +845,12 @@ class Subservice():
       # other fields
       if "ip4_gw_addr" in rbs:
          self._data["/node/bm/net/if"][self.name]["gw_in_arp"].append(
-            rbs["ip4_gw_addr"]._top() in self._data["net/arp"])      
+            rbs["ip4_gw_addr"]._top() in self._data["net/arp"])
+            
+   def _update_metrics_linux_bm_net_ioam(self):
+      rbs = self._data["ioam/gnmi"][self.name]
+      self.engine.info(self.name)
+      self.engine.info(rbs)
 
    def _update_metrics_linux_bm_net(self):
       """Update metrics for linux BM net subservice
@@ -1083,6 +1101,7 @@ class Baremetal(Subservice):
       self.dependencies = [Subservice(dep, None, self.engine, parent=self) for dep in deps]
       # init metrics for non-list RBs
       self._data["/node/bm/net/if"] = {}
+      self._data["/node/bm/net/ioam"] = {}
       self._data["/node/bm/net"] = self._init_metrics_rb("net")
       self._data["/node/bm/mem"] = self._init_metrics_rb("mem")
       self._data["/node/bm/proc"] = self._init_metrics_rb("proc")
