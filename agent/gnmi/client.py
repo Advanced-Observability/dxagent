@@ -25,13 +25,16 @@ MAX_RETRIES=3
 GNMI_RETRY_INTERVAL=30
 
 class BaseGNMIClient(threading.Thread):
-   def __init__(self, node, info, data, user='a', password='a'):
+   def __init__(self, node, info, data, sync_mode=True,
+                user='a', password='a'):
       super().__init__()
       self.node = node
       self.info = info
       self._data = data
       self.user = user
       self.password = password
+      # if set to True, client does not parse before it is synced
+      self.sync_mode = sync_mode
       self.client = None
       self.connected = False
       self.last_attempt = None
@@ -104,11 +107,11 @@ class BaseGNMIClient(threading.Thread):
                          sample_interval=GNMI_SAMPLING_PERIOD):
             if self._exit:
                break
-            if response.sync_response:
-               _synced = True
-            elif _synced:
+            if not self.sync_mode or _synced:
                self.parse_json(json_format.MessageToJson(response))
                self.synced = True
+            elif response.sync_response:
+               _synced = True
       except Exception as e:
          self.info(e)
       finally:

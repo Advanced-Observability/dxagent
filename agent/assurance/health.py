@@ -134,7 +134,7 @@ class HealthEngine():
       """
       root_path = self.root.fullname
       
-      # 1. update vms&kbs
+      # . update vms&kbs
       if self.vbox_supported:
          vms = set(s.name for s in self.root.dependencies if isinstance(s, VM))
          monitored_vms = set(self._data["virtualbox/vms"].keys())
@@ -167,16 +167,27 @@ class HealthEngine():
          pass
       for node in monitored_ioam_nodes - ioam_nodes:
          parent = self.get_node(root_path+"/bm/net")
-         self.add_node(parent, node, "ioam")     
+         self._data["/node/bm/net/ioam"][node] = {}
+         self._data["/node/bm/net/ioam"][node]["/node/bm/net/ioam"] = self._init_metrics_rb("ioam")
+         self._data["/node/bm/net/ioam"][node]["/node/bm/net/ioam/namespace"] = {}
+         self.add_node(parent, node, "ioam")
          
-      # 2. interfaces
-      # 2.a bm interfaces
+      # ioam namespaces:nodes
+      for ioam_node in ioam_nodes:
+         parent = self.get_node(root_path+"/bm/net/ioam[name={}]".format(ioam_node))
+         previous = set(s.name for s in parent.dependencies)
+         current = set(self._data["ioam/gnmi"][ioam_node]["namespace"].keys())
+         self._update_childs(previous, current, parent, "namespace",
+                             subdict=self._data["/node/bm/net/ioam"][ioam_node])
+         
+      # interfaces
+      # .a bm interfaces
       parent = self.get_node(root_path+"/bm/net")
       current=set(self._data["net/dev"].keys())
       previous=set(self._data["/node/bm/net/if"].keys())
       self._update_childs(previous, current, parent, "if")
 
-      # 2.b vm interfaces
+      # .b vm interfaces
       if self.vbox_supported:
          vms = set(s.name for s in self.root.dependencies if isinstance(s, VM))
          for vm in vms:
@@ -202,7 +213,7 @@ class HealthEngine():
                               vm, if_name))
                if_node._vbox_api_prefix = prefixes[if_name]
             
-      # 2.c kb interfaces
+      # .c kb interfaces
       kbs = set(s.name for s in self.root.dependencies if isinstance(s, KBNet))       
       for kb in kbs:
          parent = self.get_node(root_path+"/kb[name={}]/net".format(kb))
@@ -214,7 +225,7 @@ class HealthEngine():
          self._update_childs(previous, current, parent, "if",
                              subdict=self._data["/node/kb"][kb])
       
-      # 3. disks
+      # disks
       parent = self.get_node(root_path+"/bm/disks")
       # init metric rbs if needed
       if "/node/bm/disks/disk" not in self._data:
@@ -224,7 +235,7 @@ class HealthEngine():
                   +list(self._data["swaps"].keys()))
       self._update_childs(previous, current, parent, "disk")
             
-      # 4. sensors
+      # sensors
       parent = self.get_node(root_path+"/bm/sensors")
       if "/node/bm/sensors/sensor" not in self._data:
          self._data["/node/bm/sensors/sensor"] = {}
@@ -236,7 +247,7 @@ class HealthEngine():
       )
       self._update_childs(previous, current, parent, "sensor")
       
-      # 5. cpus (they are dynamic if agent is ran in vm)
+      # cpus (they are dynamic if agent is ran in vm)
       parent = self.get_node(root_path+"/bm/cpus")
       if "/node/bm/cpus/cpu" not in self._data:
          self._data["/node/bm/cpus/cpu"] = {}
@@ -245,7 +256,7 @@ class HealthEngine():
       current=set(self._data["stat/cpu"].keys())
       self._update_childs(previous, current, parent, "cpu")
       
-      # 5.a vm cpus
+      #.a vm cpus
       if self.vbox_supported:
          for vm in vms:
             parent = self.get_node(root_path+"/vm[name={}]/cpus".format(vm))
@@ -618,6 +629,7 @@ class Subservice():
    ("Linux","/node/bm/net")        : self._update_metrics_linux_bm_net,
    ("Linux","/node/bm/net/if")     : self._update_metrics_linux_bm_net_if,
    ("Linux","/node/bm/net/ioam")   : self._update_metrics_linux_bm_net_ioam,
+   ("Linux","/node/bm/net/ioam/namespace") : self._update_metrics_linux_bm_net_ioam_ns,
    ("Linux","/node/vm/cpus")       : self._update_metrics_linux_vm_cpus,
    ("Linux","/node/vm/cpus/cpu")   : self._update_metrics_linux_vm_cpus_cpu,
    ("Linux","/node/vm/mem")        : self._update_metrics_linux_vm_mem,
@@ -847,10 +859,29 @@ class Subservice():
          self._data["/node/bm/net/if"][self.name]["gw_in_arp"].append(
             rbs["ip4_gw_addr"]._top() in self._data["net/arp"])
             
+   def _update_metrics_linux_bm_net_ioam_ns(self):
+      self.ioam_node = self.parent.name
+      attr_mapping = {
+         #"BitField": "bit_field", 
+         "HopLimit": "hop_limit", 
+         "IngressId": "ingress_id",
+         "EgressId": "egress_id",
+         "Timestamp": "timestamp",
+         "TimestampSub": "timestamp_sub"
+      }
+      # direct mapping
+      rbs = self._data["ioam/gnmi"][self.ioam_node]["namespace"][self.name]
+      this_dict = self._data["/node/bm/net/ioam"][self.ioam_node]["/node/bm/net/ioam/namespace"][self.name]
+
+      for attr,metric in attr_mapping.items():
+         if attr in rbs and not rbs[attr].is_empty():
+            this_dict[metric].append(
+              rbs[attr]._top())
+                    
    def _update_metrics_linux_bm_net_ioam(self):
-      rbs = self._data["ioam/gnmi"][self.name]
-      self.engine.info(self.name)
-      self.engine.info(rbs)
+
+      self.active = self._data["ioam/gnmi"][self.name]["status"]._top() == "synced"
+      self._data["/node/bm/net/ioam"][self.name]["/node/bm/net/ioam"]["active"].append(self.active)
 
    def _update_metrics_linux_bm_net(self):
       """Update metrics for linux BM net subservice

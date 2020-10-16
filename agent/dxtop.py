@@ -198,8 +198,16 @@ class DXTop(IOManager):
       self._format_attrs_rb("netstat", 3)
       self._format_attrs_rb("snmp", 3)
       self._format_attrs_list_rb("net/arp", 3)
-      self._format_attrs_list_rb("ioam/gnmi", 3)
-
+      if "ioam/gnmi" in self._data:
+         self._append_content(self._center_text("ioam/gnmi"), 3, curses.A_BOLD)
+         for ioam_name in self._data["ioam/gnmi"]:
+            self._append_content(self._center_text(ioam_name), 3, curses.A_DIM)
+            self._format_attrs_rb(ioam_name, 3, subdict=self._data["ioam/gnmi"],
+                                  title=False)
+            self._format_attrs_list_rb("namespace", 3, 
+                                       subdict=self._data["ioam/gnmi"][ioam_name],
+                                       title=False)
+            
       # VM
       # virtualbox
       self._format_attrs_list_rb("virtualbox/vms", 4)
@@ -248,6 +256,20 @@ class DXTop(IOManager):
       self._append_content(self._center_text("Metrics"), 6, curses.A_REVERSE)
       self._format_attrs_list_rb_percpu("/node/bm/cpus/cpu", 6, health=True)
       self._format_attrs_list_rb("/node/bm/net/if", 6, health=True)
+      
+      for ioam_name in self._data["/node/bm/net/ioam"]:
+         ioam_dict = self._data["/node/bm/net/ioam"][ioam_name]
+         self.info(ioam_dict)
+         skip = ["/node/bm/net/ioam/namespace"]
+         for subservice in ioam_dict:
+            if subservice in skip:
+               continue
+            self._format_attrs_rb(subservice, 6, subdict=ioam_dict,
+                                  health=True, health_index=ioam_name)
+                                  
+         self._format_attrs_list_rb("/node/bm/net/ioam/namespace", 6, subdict=ioam_dict,
+                                   health=True, health_index=ioam_name)
+      
       self._format_attrs_list_rb("/node/bm/sensors/sensor", 6, health=True)
       self._format_attrs_rb("/node/bm/mem", 6, health=True)
       self._format_attrs_rb("/node/bm/proc", 6, health=True)
@@ -286,9 +308,10 @@ class DXTop(IOManager):
       """
       add name missing from data path
       """
-      path = path.replace("node","node[name={}]".format(self.sysinfo.node))
+      path = path.replace("/node","/node[name={}]".format(self.sysinfo.node))
       path = path.replace("vm","vm[name={}]".format(index))
       path = path.replace("kb","kb[name={}]".format(index))
+      path = path.replace("ioam","ioam[name={}]".format(index))
       #self.info(path)
       return path      
       
@@ -297,7 +320,7 @@ class DXTop(IOManager):
       #self.info(self._data["health_scores"]) 
       #self.info(path)
       
-      suffixes = ["/if", "/cpu", "/sensor", "/disk"]
+      suffixes = ["/if", "/cpu", "/sensor", "/disk", "/namespace"]
       for suffix in suffixes:
          path = remove_suffix(path, suffix)
       
@@ -322,6 +345,9 @@ class DXTop(IOManager):
          flags = curses.A_BOLD
          if health:
             title_str = self._indexed_path(category, index=health_index)
+            
+            self.info("title str {} h index {} cat {}".format(
+                     title_str,health_index,category))
             score = self._root_health_score(title_str)
             title_str += " health:"
             category_len = len(title_str)

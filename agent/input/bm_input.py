@@ -13,6 +13,7 @@ import time
 import subprocess
 import socket
 
+import json
 import ethtool
 import logging
 import pyroute2
@@ -21,6 +22,7 @@ from pyroute2.netlink.rtnl import rt_type
 from pyroute2.netlink.rtnl import rt_scope
 from pyroute2.netlink.rtnl import rt_proto
 
+from ..core.rbuffer import RingBuffer
 from ..core.rbuffer import init_rb_dict
 from ..gnmi.client import BaseGNMIClient
 
@@ -48,42 +50,26 @@ def ratio(v, total):
       
 class IOAMGNMIClient(BaseGNMIClient):
 
-   def append_value(self, path, root, val):
+   def append_value(self, path, root, val, ns_id, node_id):
       """
       append value to data dict
       
       """
-      return
-      if root == "if": # per interface
-         split = path.split('/')
-         interface = split.pop(3)
-         path = "/".join(split)
-         if not self.synced:
-            if interface not in self._data["vpp/gnmi"][self.node]["net_if"]:
-               with self._data["vpp/gnmi"][self.node].lock():
-                  self._data["vpp/gnmi"][self.node]["net_if"][interface] = {}
-            if path not in self._data["vpp/gnmi"][self.node]["net_if"][interface]:
-               with self._data["vpp/gnmi"][self.node].lock():
-                  self._data["vpp/gnmi"][self.node]["net_if"][interface][path] = RingBuffer(path, counter=True)
-         self._data["vpp/gnmi"][self.node]["net_if"][interface][path].append(val)
-      elif root == "err":
-         
-         if path not in self._data["vpp/gnmi"][self.node]:
-            # Lock the dict to make sure that main thread is not
-            # iterating.
-            with self._data["vpp/gnmi"][self.node].lock():
-               self._data["vpp/gnmi"][self.node][path] = RingBuffer(path, counter=True)
-         self._data["vpp/gnmi"][self.node][path].append(val)          
-      else:
-         if (root == "nat44") or (root == "nat64"):
-            return
-         if not self.synced:
-            if path not in self._data["vpp/gnmi"][self.node]:
-               # drop wierdly named /err/ 
-               with self._data["vpp/gnmi"][self.node].lock():
-                  self._data["vpp/gnmi"][self.node][path] = RingBuffer(path, counter=True)
-         self._data["vpp/gnmi"][self.node][path].append(val)
-         
+      #self.info("{} {} {} {} {}".format(path, root, val, ns_id, node_id))
+      index = "{}:{}".format(ns_id, node_id if node_id else "")
+      attr_key = path.split("/")[-1]
+      # add new namespace if needed
+      if index not in self._data["ioam/gnmi"][self.node]["namespace"]:
+         # Lock the dict to make sure that main thread is not
+         # iterating.
+         with self._data["ioam/gnmi"][self.node].lock():
+            self._data["ioam/gnmi"][self.node]["namespace"][index] = {}
+            
+      if attr_key not in self._data["ioam/gnmi"][self.node]["namespace"][index]:
+         with self._data["ioam/gnmi"][self.node].lock():
+            self._data["ioam/gnmi"][self.node]["namespace"][index][attr_key] = RingBuffer(attr_key)
+      self._data["ioam/gnmi"][self.node]["namespace"][index][attr_key].append(val)
+        
    def parse_json(self, response):
       """
       parse response and fill data dict
@@ -95,11 +81,16 @@ class IOAMGNMIClient(BaseGNMIClient):
       for e in msg["update"]["update"]:
          path_json, val = e["path"]["elem"], e["val"]["intVal"]
          root, node = path_json[0]["name"], path_json[1]["name"]
-         path = "/"+root+"/"+node
+         ns_id = path_json[0]["key"]["id"]
+         node_id = path_json[1].get("key", {}).get("id")
+         path = "/"+root+"[name="+ns_id+"]"+"/"+node
+         if node_id:
+            path += "[name="+node_id+"]"
+         
          # building path
          for name in path_json[2:]:
             path += "/{}".format(name["name"])
-         self.append_value(path, root, val) 
+         self.append_value(path, root, val, ns_id, node_id) 
 
 class BMWatcher():
 
@@ -127,8 +118,9 @@ class BMWatcher():
       for node in self.ioam_gnmi_nodes:
          self._data["ioam/gnmi"][node] = init_rb_dict(attr_names, type=str,
                                                      thread_safe=True)
-         #self._data["ioam/gnmi"][node].update({"net_if":{}})
-         self.gnmi_clients.append(IOAMGNMIClient(node, self.info, self._data))
+         self._data["ioam/gnmi"][node].update({"namespace":{}})
+         self.gnmi_clients.append(IOAMGNMIClient(node, self.info,
+                                                 self._data, sync_mode=False))
       self._connect_gnmi_clients()
 
    def _connect_gnmi_clients(self):

@@ -102,7 +102,7 @@ class DXAgent(Daemon, IOManager):
       self.running = False
       time.sleep(AGENT_INPUT_PERIOD)
 
-      self.bm_watch.exit()
+      self.bm_watcher.exit()
       self.vm_watcher.exit()
       self.vpp_watcher.exit()
       if not self.args.disable_shm:
