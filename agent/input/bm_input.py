@@ -152,7 +152,7 @@ class BMWatcher():
    def _init_dicts(self):
 
       # init categories whose input count are prone to change during execution
-      # e.g., interfaces , processes
+      # e.g., interfaces
       self._data["net/dev"] = {}
       self._data["routes4"] = {}
       self._data["routes6"] = {}
@@ -1046,7 +1046,7 @@ class BMWatcher():
                      continue
                   if_dict["ip6_gw_addr"].append(item[0])
                   if_dict["ip6_gw_if"].append(item[1])
-                  if_dict["ip6_gw_default"].append(tem[2])
+                  if_dict["ip6_gw_default"].append(item[2])
                   
          self.read_ethtool_info(if_name, if_dict)
                   

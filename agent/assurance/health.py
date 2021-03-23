@@ -146,39 +146,41 @@ class HealthEngine():
          for vm in monitored_vms - vms:
             self.add_node(self.root, vm, "vm", hypervisor="virtualbox")
          
-      kbs = set(s.name for s in self.root.dependencies if isinstance(s, KBNet))
-      monitored_kbs = set(self._data["vpp/gnmi"].keys())
-      # local vpp 
-      if self.vpp_api_supported and "vpp/system" in self._data:
-         monitored_kbs.add("localhost")
-      for kb in kbs - monitored_kbs:
-         #self.remove_node(self.root, kb, "kb")
-         # do not remove, keep it as inactive
-         pass
-      for kb in monitored_kbs - kbs:
-         self.add_node(self.root, kb, "kb", framework="vpp")
+      if "vpp/gnmi" in self._data:
+         kbs = set(s.name for s in self.root.dependencies if isinstance(s, KBNet))
+         monitored_kbs = set(self._data["vpp/gnmi"].keys())
+         # local vpp 
+         if self.vpp_api_supported and "vpp/system" in self._data:
+            monitored_kbs.add("localhost")
+         for kb in kbs - monitored_kbs:
+            #self.remove_node(self.root, kb, "kb")
+            # do not remove, keep it as inactive
+            pass
+         for kb in monitored_kbs - kbs:
+            self.add_node(self.root, kb, "kb", framework="vpp")
          
       # ioam nodes
-      ioam_nodes = set(self._data["/node/bm/net/ioam"].keys())
-      monitored_ioam_nodes = set(self._data["ioam/gnmi"].keys())
-      for node in ioam_nodes - monitored_ioam_nodes:
-         #self.remove_node(self.root, kb, "kb")
-         # do not remove, keep it as inactive
-         pass
-      for node in monitored_ioam_nodes - ioam_nodes:
-         parent = self.get_node(root_path+"/bm/net")
-         self._data["/node/bm/net/ioam"][node] = {}
-         self._data["/node/bm/net/ioam"][node]["/node/bm/net/ioam"] = self._init_metrics_rb("ioam")
-         self._data["/node/bm/net/ioam"][node]["/node/bm/net/ioam/namespace"] = {}
-         self.add_node(parent, node, "ioam")
-         
-      # ioam namespaces:nodes
-      for ioam_node in ioam_nodes:
-         parent = self.get_node(root_path+"/bm/net/ioam[name={}]".format(ioam_node))
-         previous = set(s.name for s in parent.dependencies)
-         current = set(self._data["ioam/gnmi"][ioam_node]["namespace"].keys())
-         self._update_childs(previous, current, parent, "namespace",
-                             subdict=self._data["/node/bm/net/ioam"][ioam_node])
+      if "ioam/gnmi" in self._data:
+         ioam_nodes = set(self._data["/node/bm/net/ioam"].keys())
+         monitored_ioam_nodes = set(self._data["ioam/gnmi"].keys())
+         for node in ioam_nodes - monitored_ioam_nodes:
+            #self.remove_node(self.root, kb, "kb")
+            # do not remove, keep it as inactive
+            pass
+         for node in monitored_ioam_nodes - ioam_nodes:
+            parent = self.get_node(root_path+"/bm/net")
+            self._data["/node/bm/net/ioam"][node] = {}
+            self._data["/node/bm/net/ioam"][node]["/node/bm/net/ioam"] = self._init_metrics_rb("ioam")
+            self._data["/node/bm/net/ioam"][node]["/node/bm/net/ioam/namespace"] = {}
+            self.add_node(parent, node, "ioam")
+            
+         # ioam namespaces:nodes
+         for ioam_node in ioam_nodes:
+            parent = self.get_node(root_path+"/bm/net/ioam[name={}]".format(ioam_node))
+            previous = set(s.name for s in parent.dependencies)
+            current = set(self._data["ioam/gnmi"][ioam_node]["namespace"].keys())
+            self._update_childs(previous, current, parent, "namespace",
+                                subdict=self._data["/node/bm/net/ioam"][ioam_node])
          
       # interfaces
       # .a bm interfaces

@@ -257,18 +257,19 @@ class DXTop(IOManager):
       self._format_attrs_list_rb_percpu("/node/bm/cpus/cpu", 6, health=True)
       self._format_attrs_list_rb("/node/bm/net/if", 6, health=True)
       
-      for ioam_name in self._data["/node/bm/net/ioam"]:
-         ioam_dict = self._data["/node/bm/net/ioam"][ioam_name]
-         self.info(ioam_dict)
-         skip = ["/node/bm/net/ioam/namespace"]
-         for subservice in ioam_dict:
-            if subservice in skip:
-               continue
-            self._format_attrs_rb(subservice, 6, subdict=ioam_dict,
-                                  health=True, health_index=ioam_name)
-                                  
-         self._format_attrs_list_rb("/node/bm/net/ioam/namespace", 6, subdict=ioam_dict,
-                                   health=True, health_index=ioam_name)
+      if "/node/bm/net/ioam" in self._data:
+         for ioam_name in self._data["/node/bm/net/ioam"]:
+            ioam_dict = self._data["/node/bm/net/ioam"][ioam_name]
+            self.info(ioam_dict)
+            skip = ["/node/bm/net/ioam/namespace"]
+            for subservice in ioam_dict:
+               if subservice in skip:
+                  continue
+               self._format_attrs_rb(subservice, 6, subdict=ioam_dict,
+                                     health=True, health_index=ioam_name)
+                                     
+            self._format_attrs_list_rb("/node/bm/net/ioam/namespace", 6, subdict=ioam_dict,
+                                      health=True, health_index=ioam_name)
       
       self._format_attrs_list_rb("/node/bm/sensors/sensor", 6, health=True)
       self._format_attrs_rb("/node/bm/mem", 6, health=True)

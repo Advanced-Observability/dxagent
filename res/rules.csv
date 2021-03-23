@@ -35,4 +35,3 @@ name,path,severity,rule,
 "Transmit Drops Peak",/node/kb/net/if,Orange,1min(dynamicity(tx_drop))>100
 "Low Buffer Availability",/node/kb/mem,Orange,(buffer_free/buffer_total)<0.1
 "DPDK Buffer Alloc Errors",/node/kb/net/if,Orange,dynamicity(dpdk_alloc_errors)>0
-
