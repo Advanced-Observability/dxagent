@@ -46,6 +46,7 @@ class IOManager():
          self.arguments_dxweb()
          self.configuration_dxweb()
          self.log()
+      return os.path.abspath(".")
       
    ########################################################
    # ARGPARSE
@@ -162,6 +163,7 @@ class IOManager():
          default_config_dir = "/home/{}/.config".format(
                      self.config["virtualbox"]["vbox_user"])
          self.config["virtualbox"]["config_directory"] = default_config_dir
+      
          
       # parse gnmi target url
       self.gnmi_target = self.config["gnmi"].get("target")

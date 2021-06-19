@@ -95,6 +95,15 @@ symptoms from DxAgent.
 
 ## Requirements
 
+### Owamp Installation guide
+
+- Clone with submodule using, for example :
+   - `git clone --recurse-submodules -j8 https://github.com/ekorian/dxagent`
+- If Automake is not installed on your machine, do it:
+   - `sudo apt-get install -y automake` (on Ubunutu)
+- Execute `install_owamp.sh` to configure owamp directories
+- (If owamp pings are needed, modify the related attributes in dxagent.ini)
+
 ### Python
 
 python >= 3.8 to have dxtop available, otherwise python >= 3.5.
@@ -109,6 +118,13 @@ python >= 3.8 to have dxtop available, otherwise python >= 3.5.
    
 - [pyroute2](https://pypi.org/project/pyroute2/)
    - `python3 -m pip install pyroute2`
+
+- [atomicwrites](https://pypi.org/project/atomicwrites/)
+   - `python3 -m pip install atomicwrites`
+
+- [APScheduler](https://pypi.org/project/APScheduler/)
+   - `python3 -m pip install APScheduler`
+
    
 ### Optional Libs
 
@@ -128,5 +144,4 @@ python >= 3.8 to have dxtop available, otherwise python >= 3.5.
 
 Medical diagnosis (abbreviated Dx or DS) is the process of determining which disease
 or condition explains a person's symptoms and signs. It is most often referred to as diagnosis.
-
 

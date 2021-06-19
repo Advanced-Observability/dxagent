@@ -150,7 +150,7 @@ import json
 import base64
 
 if __name__ == "__main__":
-   target = "0.0.0.0:50051"
+   target = "localhost:50051"
    cli = DXAgentGNMIClient(target, None)
    print(cli.capabilities())
    responses = cli.subscribe(xpath=["/"], mode="ON_CHANGE")

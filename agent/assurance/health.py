@@ -181,7 +181,30 @@ class HealthEngine():
             current = set(self._data["ioam/gnmi"][ioam_node]["namespace"].keys())
             self._update_childs(previous, current, parent, "namespace",
                                 subdict=self._data["/node/bm/net/ioam"][ioam_node])
+
+      # owamp node
+      if "owamp" in self._data or "ping" in self._data: 
+         parent = self.get_node(root_path+"/bm/net")
+         if "/node/bm/net/link" not in self._data:
+            self._data["/node/bm/net/link"] = {}
          
+         previous=set(self._data["/node/bm/net/link"].keys())
+
+         # both owamp and ping
+         if "owamp" in self._data and "ping" in self._data:
+            current_dict = {**self._data["owamp"], **self._data["ping"]}
+         
+         # only owamp
+         elif "owamp" in self._data:
+            current_dict = self._data["owamp"]
+         
+         # only ping
+         else:
+            current_dict = self._data["ping"]
+
+         current=set(current_dict.keys())
+         self._update_childs(previous, current, parent, "link")
+
       # interfaces
       # .a bm interfaces
       parent = self.get_node(root_path+"/bm/net")
@@ -631,6 +654,7 @@ class Subservice():
    ("Linux","/node/bm/net")        : self._update_metrics_linux_bm_net,
    ("Linux","/node/bm/net/if")     : self._update_metrics_linux_bm_net_if,
    ("Linux","/node/bm/net/ioam")   : self._update_metrics_linux_bm_net_ioam,
+   ("Linux","/node/bm/net/link")   : self._update_metrics_linux_bm_net_link,
    ("Linux","/node/bm/net/ioam/namespace") : self._update_metrics_linux_bm_net_ioam_ns,
    ("Linux","/node/vm/cpus")       : self._update_metrics_linux_vm_cpus,
    ("Linux","/node/vm/cpus/cpu")   : self._update_metrics_linux_vm_cpus_cpu,
@@ -746,6 +770,66 @@ class Subservice():
             rbs["size"]._top()/1000.0)
          self._data["/node/bm/disks/disk"][disk]["swap_used"].append(
             rbs["used"]._top())
+
+   def _update_metrics_linux_bm_net_link(self):
+      """Update metrics for a linux BM link subservice
+      
+      """
+      link = self.name
+
+      if "owamp" in self._data:
+         rbs_owamp  = self._data["owamp"].get(link)
+         if rbs_owamp:
+            self._data["/node/bm/net/link"][link]["owamp_accessible"].append(
+               rbs_owamp["owamp_accessible"]._top())
+            self._data["/node/bm/net/link"][link]["to_pkts_lost"].append(
+               rbs_owamp["to_pkts_lost"]._top())
+            self._data["/node/bm/net/link"][link]["to_pkts_dup"].append(
+               rbs_owamp["to_pkts_dup"]._top())
+            self._data["/node/bm/net/link"][link]["to_ow_del_min"].append(
+               rbs_owamp["to_ow_del_min"]._top())
+            self._data["/node/bm/net/link"][link]["to_ow_del_med"].append(
+               rbs_owamp["to_ow_del_med"]._top())
+            self._data["/node/bm/net/link"][link]["to_ow_del_max"].append(
+               rbs_owamp["to_ow_del_max"]._top())
+            self._data["/node/bm/net/link"][link]["to_ow_jitter"].append(
+               rbs_owamp["to_ow_jitter"]._top())
+            self._data["/node/bm/net/link"][link]["to_reordering"].append(
+               rbs_owamp["to_reordering"]._top())
+
+            self._data["/node/bm/net/link"][link]["from_pkts_lost"].append(
+               rbs_owamp["from_pkts_lost"]._top())
+            self._data["/node/bm/net/link"][link]["from_pkts_dup"].append(
+               rbs_owamp["from_pkts_dup"]._top())
+            self._data["/node/bm/net/link"][link]["from_ow_del_min"].append(
+               rbs_owamp["from_ow_del_min"]._top())
+            self._data["/node/bm/net/link"][link]["from_ow_del_med"].append(
+               rbs_owamp["from_ow_del_med"]._top())
+            self._data["/node/bm/net/link"][link]["from_ow_del_max"].append(
+               rbs_owamp["to_ow_del_max"]._top())
+            self._data["/node/bm/net/link"][link]["from_ow_jitter"].append(
+               rbs_owamp["from_ow_jitter"]._top())
+            self._data["/node/bm/net/link"][link]["from_reordering"].append(
+               rbs_owamp["from_reordering"]._top())
+
+      if "ping" in self._data:
+         rbs_ping = self._data["ping"].get(link)
+         if rbs_ping:
+            self._data["/node/bm/net/link"][link]["icmp_accessible"].append(
+               rbs_ping["icmp_accessible"]._top())
+            self._data["/node/bm/net/link"][link]["pkts_sent"].append(
+               rbs_ping["pkts_sent"]._top())
+            self._data["/node/bm/net/link"][link]["pkts_received"].append(
+               rbs_ping["pkts_received"]._top())
+            self._data["/node/bm/net/link"][link]["%_pkts_lost"].append(
+               rbs_ping["%_pkts_lost"]._top())
+            self._data["/node/bm/net/link"][link]["min_rtt"].append(
+               rbs_ping["min_rtt"]._top())
+            self._data["/node/bm/net/link"][link]["avg_rtt"].append(
+               rbs_ping["avg_rtt"]._top())
+            self._data["/node/bm/net/link"][link]["max_rtt"].append(
+               rbs_ping["max_rtt"]._top())
+      
    def _update_metrics_linux_bm_disks(self):
       """Update metrics for linux BM disks subservice
 

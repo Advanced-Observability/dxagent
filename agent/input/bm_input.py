@@ -12,6 +12,7 @@ import ipaddress
 import time
 import subprocess
 import socket
+from pathlib import Path
 
 import json
 import ethtool
@@ -25,6 +26,8 @@ from pyroute2.netlink.rtnl import rt_proto
 from ..core.rbuffer import RingBuffer
 from ..core.rbuffer import init_rb_dict
 from ..gnmi.client import BaseGNMIClient
+
+from owamp.source.owamp_api import OwampApi, InputError, OwampStats
 
 # linux/include/linux/if_arp.h
 _linux_if_types = { "0":"netrom", "1":"ether", "2":"eether", "3":"ax25",
@@ -107,6 +110,35 @@ class BMWatcher():
       self._route = pyroute2.IPRoute()
       if self.ioam_gnmi_nodes:
          self._init_gnmi_clients()
+      if self.parent.config["owamp-client"]["address_list"]:
+         self._init_owamp()
+      
+   def _init_owamp(self):
+      """
+      start the owamp ping scheduler
+
+      """
+
+      owamp_api = self.parent.owamp_api
+
+      # Ensure stat dir is empty
+      output_dir = "/ping/outputs/owamp_outputs"
+      self.parent.rm_directory(output_dir)
+
+      dir_stats = self.parent.agent_dir + output_dir
+
+      # Scheduler callbacks
+      def _callback_success(owamp_stats:OwampStats):
+         owamp_stats.write_stats_in_file(dir_stats)
+
+      def _callback_ping_failed(owamp_stats:OwampStats, stderr):
+         owamp_stats.write_error_in_file(dir_stats, stderr)
+
+      def _callback_fail():
+         # not needed
+         pass
+
+      owamp_api.start_owping_scheduler(_callback_success, _callback_fail, _callback_ping_failed)
          
    def _init_gnmi_clients(self):
       """
@@ -317,6 +349,10 @@ class BMWatcher():
       self._process_sensors()
       self._process_interfaces()
       self._process_routes()
+      if self.parent.config["owamp-client"]["address_list"]:
+         self._process_owamp()
+      if self.parent.config["ping"]["address_list"]:
+         self._process_icmp_ping()
       if self.ioam_gnmi_nodes:
          self._input_gnmi()
 
@@ -904,7 +940,6 @@ class BMWatcher():
          "duplex", "carrier",
          "operstate", "type",
           
-          
          "mtu", "tx_queue_len", 
          "ufo",
          "broadcast", "debug","loopback",
@@ -936,7 +971,7 @@ class BMWatcher():
          "carrier_down_count", "carrier_up_count", "carrier_changes",
       ] + attr_list_netdev
       type_list = 37*[str] + 72*[int] + 27*[int]
-      counter_list = 109*[False] + 27*[True]
+      counter_list = 110*[False] + 27*[True]
 
       gws = netifaces.gateways()
       active_ifs = []
@@ -1091,8 +1126,8 @@ class BMWatcher():
          if_dict["dns_server"].append(
                nameservers.get(if_name, nameserver))
          if_dict["dhcp_server"].append(
-               dhcp_servers.get(if_name, ""))               
-               
+               dhcp_servers.get(if_name, "")) 
+
       with open("/proc/net/dev", 'r') as f:
          for l in f.readlines()[2:]:
             attr_val = [e.rstrip(':') for e in l.rstrip().split()]
@@ -1145,6 +1180,224 @@ class BMWatcher():
                route_dict[key][attr].append(route_attrs[attr])
       
 
+   def _process_owamp(self):
+      attrs_to = [
+         'to_addr_from', 'to_addr_to', 'to_sid', 'to_first', 'to_last', 
+         'to_pkts_sent', 'to_pkts_lost', 'to_pkts_dup',
+         'to_ow_del_min', 'to_ow_del_med', 'to_ow_del_max',
+         'to_ow_jitter', 'to_hops', 'to_reordering',]
+      
+      attrs_from  = [
+         'from_addr_from', 'from_addr_to', 'from_sid', 'from_first', 'from_last', 
+         'from_pkts_sent', 'from_pkts_lost', 'from_pkts_dup',
+         'from_ow_del_min', 'from_ow_del_med', 'from_ow_del_max',
+         'from_ow_jitter', 'from_hops', 'from_reordering',]
+      
+      attr_types = [str] 
+      attr_types_dup= 5*[str] + 3*[int] + 4*[float] + [int] + [float]
+      attr_types += attr_types_dup + attr_types_dup
+      attrs = ['owamp_accessible'] + attrs_to + attrs_from
+
+      # get address list
+      address_list = self.parent.config["owamp-client"]["address_list"]
+
+      # no ping to realize
+      if not address_list:
+         return
+
+      address_list = address_list.split(",")
+      # For each address
+      for addr in address_list:
+
+         key = addr.split(":")[0]
+
+         owamp_info = self._read_owamp_info(key, attrs)
+
+         # not yet owamp ping done
+         if not owamp_info:
+            continue
+
+         # Init dict the first time
+         if "owamp" not in self._data:
+            self._data["owamp"] = {}
+
+         owamp_dict = self._data["owamp"]
+         owamp_dict.setdefault(key, init_rb_dict(attrs, types=attr_types))
+
+         # ping failed
+         if owamp_info["owamp_accessible"] == "no":
+            self.set_owamp_dict_ping_failed(owamp_dict[key], attrs, attr_types)
+            continue
+
+         # ping work
+         for attr in attrs:
+            owamp_dict[key][attr].append(owamp_info[attr])
+
+
+   def set_owamp_dict_ping_failed(self, owamp_dict_addr, attrs, attr_types):
+      """
+      Set the owamp dict when the ping failed
+      """
+
+      for attr, attr_type in zip(attrs, attr_types):
+         if attr == 'owamp_accessible':
+            owamp_dict_addr[attr].append("no")
+         elif attr_type == str:
+            owamp_dict_addr[attr].append("unavailable")
+         elif attr_type == int:
+            owamp_dict_addr[attr].append(0)
+         elif attr_type == float:
+            owamp_dict_addr[attr].append(0.0)
+
+   def _read_owamp_info(self, addr, attrs):
+      """
+      Fill and return a dictionnary containing owping infos
+      """
+
+      # get file to read
+      stat_file_dir = self.parent.agent_dir + "/ping/outputs/owamp_outputs"
+      stat_file_to_read = stat_file_dir + "/" + addr + ".txt"
+
+      owamp_info = {}
+
+      # get info from file
+      if Path(stat_file_to_read).is_file():  
+         with open(stat_file_to_read) as f:
+            lines = f.read().splitlines()
+            count = 0
+
+            # ping worked
+            if lines[0].startswith("yes"):
+               owamp_info["owamp_accessible"] = "yes"
+               owamp_info["err_msg"] = ""
+
+               for line in lines:
+               # check ping ended before end
+                  if line == "\n" or line.startswith("nan") or line.startswith("reported"):
+                     owamp_info["owamp_accessible"] = "no"
+                     owamp_info["err_msg"] = "ping ended before end"
+                  owamp_info[attrs[count]] = line
+                  count += 1
+
+            # ping failed
+            elif lines[0].startswith("no"):
+               owamp_info["owamp_accessible"] = "no"
+               owamp_info["err_msg"] = lines[1] + lines[2]
+            
+            else:
+               owamp_info["owamp_accessible"] = "no"
+               owamp_info["err_msg"] = "unknown error : shoulkd never happen"
+      return owamp_info
+
+   def _process_icmp_ping(self):
+      attrs = [
+         'icmp_accessible', 'time_ping_ended', 'pkts_sent', 
+         'pkts_received', '%_pkts_lost', 
+         'min_rtt', 'avg_rtt', 'max_rtt',]
+      
+      
+      attr_types = 2*[str] + 2*[int] + 4*[float]
+
+      # get address list
+      address_list = self.parent.config["ping"]["address_list"]
+
+      # no ping to realize
+      if not address_list:
+         return
+
+      address_list = address_list.split(",")
+
+      pings_info = self._read_icmp_ping_info(attrs)
+
+      # not yet ping done
+      if not pings_info:
+         return
+
+      # Init dict the first time
+      if "ping" not in self._data:
+         self._data["ping"] = {}
+
+      ping_dict = self._data["ping"]
+
+      # for each address
+      for addr in pings_info.keys():
+         
+         # for each pingable address
+         if pings_info[addr]:
+
+            # init the dict of rb
+            ping_dict.setdefault(addr, init_rb_dict(attrs, types=attr_types))
+
+            for attr in attrs:
+               ping_dict[addr][attr].append(pings_info[addr][attr])
+
+   def _read_icmp_ping_info(self, attrs):
+      """
+      Fill and return a dictionnary containing ping infos
+      """
+      # get file to read
+      stat_file = self.parent.agent_dir + "/ping/outputs/icmp_outputs/ping_output.txt"
+
+      ping_info = {}
+
+      # get info from file
+      if Path(stat_file).is_file():  
+         with open(stat_file) as f:
+            lines = f.read().splitlines()
+
+            time_read = False
+            time = None
+            for line in lines:
+               if not time_read:
+                  time = line
+                  time_read = True
+                  continue
+               if line:
+                  if line.startswith("ICMP"):
+                     addr = line.split(" ")[10].strip()
+                     ping_info[addr] = {}
+
+                     ping_info[addr]["icmp_accessible"] = "no"
+                     ping_info[addr]["min_rtt"] = 0
+                     ping_info[addr]["avg_rtt"] = 0
+                     ping_info[addr]["max_rtt"] = 0
+                  else:
+                     cut_line = line.split(":")
+                     addr = cut_line[0].strip()
+                     stats = cut_line[1].strip()
+
+                     ping_info[addr] = {}
+
+                     # address cannot be pinged
+                     if not stats.startswith("xmt"):
+                        continue
+                     else:
+                        ping_info[addr]["time_ping_ended"] = time
+                        ping_info[addr]["icmp_accessible"] = "yes"
+                        sub_stats = stats.split("=")
+
+                        # pkts infos
+                        pkts_info = sub_stats[1].split(",")[0].strip().split("/")
+                        ping_info[addr]["pkts_sent"] = int(pkts_info[0])
+                        ping_info[addr]["pkts_received"] = int(pkts_info[1])
+                        ping_info[addr]["%_pkts_lost"] = float(pkts_info[2].strip("%"))
+
+                        # rtt infos
+                        # some packets were received
+                        if ping_info[addr]["pkts_received"] > 0:
+                           rtt_info = sub_stats[2].strip().split("/")
+                           ping_info[addr]["min_rtt"] = float(rtt_info[0])
+                           ping_info[addr]["avg_rtt"] = float(rtt_info[1])
+                           ping_info[addr]["max_rtt"] = float(rtt_info[2])
+                        # 100 % of loss
+                        else:
+                           ping_info[addr]["icmp_accessible"] = "no"
+                           ping_info[addr]["min_rtt"] = 0
+                           ping_info[addr]["avg_rtt"] = 0
+                           ping_info[addr]["max_rtt"] = 0
+         
+      return ping_info
+
    def read_ethtool_info(self, if_name, if_dict):
       """
 
@@ -1165,7 +1418,8 @@ class BMWatcher():
          if not feature.name or not feature.available:
             continue
          #self.info("if: {} feature: {}".format(if_name,feature.name))
-         if_dict[feature.name].append(int(feature.enable))
+         # Crash with docker interface
+         # if_dict[feature.name].append(int(feature.enable))
          #self.info("inserted {} type {}".format(if_dict[attr]._top(),
          #                                       if_dict[attr].type))
          

@@ -219,6 +219,6 @@ class DXWeb(IOManager):
    def run(self):
       thread = threading.Thread(target=self.gnmi_read_loop)
       thread.start()
-      self.socketio.run(self.app, host="0.0.0.0")  
+      self.socketio.run(self.app, host="localhost")  
    
       
