@@ -971,7 +971,7 @@ class BMWatcher():
          "carrier_down_count", "carrier_up_count", "carrier_changes",
       ] + attr_list_netdev
       type_list = 37*[str] + 72*[int] + 27*[int]
-      counter_list = 110*[False] + 27*[True]
+      counter_list = 109*[False] + 27*[True]
 
       gws = netifaces.gateways()
       active_ifs = []
@@ -1418,8 +1418,8 @@ class BMWatcher():
          if not feature.name or not feature.available:
             continue
          #self.info("if: {} feature: {}".format(if_name,feature.name))
-         # Crash with docker interface
-         # if_dict[feature.name].append(int(feature.enable))
+         # Crashes on my machine (thomas carlisi)
+         #if_dict[feature.name].append(int(feature.enable))
          #self.info("inserted {} type {}".format(if_dict[attr]._top(),
          #                                       if_dict[attr].type))
          
