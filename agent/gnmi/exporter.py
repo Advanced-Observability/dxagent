@@ -130,7 +130,7 @@ class DXAgentServicer(gNMIServicer):
         
 class DXAgentExporter():
    def __init__(self, data, info, agent,
-                target_url="0.0.0.0:50051",
+                target_url="localhost:50051",
                 tls_enabled=True):
       self.data = data
       self.info = info

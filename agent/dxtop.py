@@ -194,6 +194,8 @@ class DXTop(IOManager):
       self._format_attrs_list_rb("net/dev", 3)
       self._format_attrs_list_rb("routes4", 3)
       self._format_attrs_list_rb("routes6", 3)
+      self._format_attrs_list_rb("owamp", 3)
+      self._format_attrs_list_rb("ping", 3)
       self._format_attrs_rb("proc/sys", 3)
       self._format_attrs_rb("netstat", 3)
       self._format_attrs_rb("snmp", 3)
@@ -275,6 +277,8 @@ class DXTop(IOManager):
       self._format_attrs_rb("/node/bm/mem", 6, health=True)
       self._format_attrs_rb("/node/bm/proc", 6, health=True)
       self._format_attrs_list_rb("/node/bm/disks/disk", 6, health=True)
+      if "/node/bm/net/link" in self._data:
+         self._format_attrs_list_rb("/node/bm/net/link", 6, health=True)
       self._format_attrs_rb("/node/bm/net", 6, health=True)
       
       if "/node/vm" in self._data:
@@ -321,7 +325,7 @@ class DXTop(IOManager):
       #self.info(self._data["health_scores"]) 
       #self.info(path)
       
-      suffixes = ["/if", "/cpu", "/sensor", "/disk", "/namespace"]
+      suffixes = ["/if", "/cpu", "/sensor", "/disk", "/namespace", "/link"]
       for suffix in suffixes:
          path = remove_suffix(path, suffix)
       
@@ -496,7 +500,7 @@ class DXTop(IOManager):
          data=self._data
       if category not in data:
          return
-      cpu_slice = 8
+      cpu_slice = 6
       cpu_count = len(data[category])-1
       if "cpu" in data[category]:
          keys = data[category]["cpu"].keys()
